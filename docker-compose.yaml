@@ -28,6 +28,8 @@ services:
     # Mount source for live reload during development
     volumes:
       - ./app:/code/app
+      - ./alembic.ini:/code/alembic.ini
+      - ./alembic:/code/alembic
     command:
       [
         "uvicorn",

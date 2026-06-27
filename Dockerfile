@@ -11,7 +11,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY app ./app
 
-# Uncomment once we scaffolded it already
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
 
