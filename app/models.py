@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
@@ -6,7 +7,7 @@ from app.db import Base
 class Exercise(Base):
     __tablename__ = "exercise"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, required=True)
-    category = Column(String, nullable=True)
-    is_compound = Column(Boolean, default=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(unique=True)
+    category: Mapped[str] = mapped_column(default=None)
+    is_compound: Mapped[bool] = mapped_column(default=False)
