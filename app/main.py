@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 
+from app.controllers import exercises
+
 app = FastAPI(title="Spottr", description="An AI-powered lifting coach", version="0.1.0")
+
+app.include_router(exercises.router, prefix="/exercises", tags=["Exercise"])
 
 
 @app.get("/")
