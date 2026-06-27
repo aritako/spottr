@@ -5,8 +5,8 @@ from sqlalchemy import TIMESTAMP, ForeignKey, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+from app.enums.exercises import ExerciseCategory
 from app.enums.workouts import UnitEnum
-from app.schemas.exercises import ExerciseCategory
 
 
 # Mixins

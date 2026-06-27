@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.schemas.exercises import ExerciseCategory
+from app.enums.exercises import ExerciseCategory
 
 client = TestClient(app)
 
