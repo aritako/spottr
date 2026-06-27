@@ -31,3 +31,5 @@ htmlcov/
 
 # Docker volume data (if ever mounted locally)
 pgdata/
+
+specs/
