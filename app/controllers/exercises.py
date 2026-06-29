@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm.session import Session
 
 from app.db import get_db
@@ -10,16 +10,23 @@ from app.schemas.exercises import ExerciseCreate, ExerciseRead
 router = APIRouter()
 
 
-@router.get("", response_model=list[ExerciseRead] | ExerciseRead | None)
-def get_exercises(
+@router.get("/{id}", response_model=ExerciseRead | None)
+def get_exercise(
     db: Annotated[Session, Depends(get_db)],
-    id: int | None = None,
+    id: int,
 ):
     handler = ExercisesHandler(db)
-    if id:
-        return handler.read_exercise(id)
-    else:
-        return handler.read_exercise_list()
+    return handler.read_exercise(id)
+
+
+@router.get("", response_model=list[ExerciseRead])
+def get_exercises(
+    db: Annotated[Session, Depends(get_db)],
+    page: int = Query(0, ge=0),
+    page_size: int = Query(10, ge=1, le=100),
+):
+    handler = ExercisesHandler(db)
+    return handler.read_exercise_list()
 
 
 @router.post("", status_code=201, response_model=ExerciseRead)

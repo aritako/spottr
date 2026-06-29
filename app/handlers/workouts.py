@@ -10,18 +10,8 @@ class WorkoutsHandler:
     def __init__(self, db: Session):
         self.repository = WorkoutsRepository(db)
 
-    def read_workout(self, id: int) -> WorkoutRead | None:
-        workout = self.repository.get(id)
-        if workout:
-            return WorkoutRead.model_validate(workout)
-        raise HTTPException(status_code=404, detail="Workout not found")
-
-    def read_workout_list(self, page: int, page_size: int) -> list[WorkoutRead]:
-        workouts = self.repository.list(page, page_size)
-        return [WorkoutRead.model_validate(workout) for workout in workouts]
-
     def create_workout(self, workout: WorkoutCreate) -> WorkoutRead:
-        setModelList = [
+        set_model_list = [
             Set(
                 exercise_id=set.exercise_id,
                 weight=set.weight,
@@ -31,12 +21,22 @@ class WorkoutsHandler:
             )
             for idx, set in enumerate(workout.sets)
         ]
-        workoutModel = Workout(
+        workout_model = Workout(
             unit=workout.unit,
             bodyweight=workout.bodyweight,
             notes=workout.notes,
             performed_at=workout.performed_at,
-            sets=setModelList,
+            sets=set_model_list,
         )
-        self.repository.create(workoutModel)
-        return WorkoutRead.model_validate(workoutModel)
+        new_workout = self.repository.create(workout_model)
+        return WorkoutRead.model_validate(new_workout)
+
+    def read_workout(self, id: int) -> WorkoutRead | None:
+        workout = self.repository.get(id)
+        if workout:
+            return WorkoutRead.model_validate(workout)
+        raise HTTPException(status_code=404, detail="Workout not found")
+
+    def read_workout_list(self, page: int, page_size: int) -> list[WorkoutRead]:
+        workouts = self.repository.list(page, page_size)
+        return [WorkoutRead.model_validate(workout) for workout in workouts]

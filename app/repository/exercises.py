@@ -12,15 +12,16 @@ class ExercisesRepository:
     def get(self, id: int) -> Exercise | None:
         return self.db.get(Exercise, id)
 
-    def list(self) -> list[Exercise]:
-        return list(self.db.scalars(select(Exercise)))
+    def list(self, page: int, page_size: int) -> list[Exercise]:
+        query = select(Exercise).offset(page * page_size).limit(page_size)
+        return list(self.db.scalars(query))
 
-    def create(self, exercise: ExerciseCreate) -> Exercise:
-        new_exercise = Exercise(
-            name=exercise.name,
-            category=exercise.category,
-            is_compound=exercise.is_compound,
-        )
-        self.db.add(new_exercise)
-        self.db.commit()
-        return new_exercise
+    def create(self, exercise: Exercise) -> Exercise:
+        try:
+            self.db.add(exercise)
+            self.db.commit()
+            self.db.refresh(exercise)
+            return exercise
+        except Exception as e:
+            self.db.rollback()
+            raise e
