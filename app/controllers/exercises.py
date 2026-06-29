@@ -26,7 +26,7 @@ def get_exercises(
     page_size: int = Query(10, ge=1, le=100),
 ):
     handler = ExercisesHandler(db)
-    return handler.read_exercise_list()
+    return handler.read_exercise_list(page, page_size)
 
 
 @router.post("", status_code=201, response_model=ExerciseRead)
