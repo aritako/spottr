@@ -1,11 +1,9 @@
 from datetime import datetime
-from enum import StrEnum
 
 from sqlalchemy import TIMESTAMP, ForeignKey, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
-from app.enums.exercises import ExerciseCategory
 from app.enums.workouts import UnitEnum
 
 
@@ -27,7 +25,7 @@ class Exercise(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
-    category: Mapped[ExerciseCategory] = mapped_column(default=None)
+    category: Mapped[str | None] = mapped_column(default=None)
     is_compound: Mapped[bool] = mapped_column(default=False)
 
 
@@ -36,7 +34,7 @@ class Workout(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     notes: Mapped[str | None] = mapped_column(default=None)
-    unit: Mapped[UnitEnum] = mapped_column(default=UnitEnum.KG)
+    unit: Mapped[str] = mapped_column(default=UnitEnum.KG.value)
     bodyweight: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
     sets: Mapped[list["Set"]] = relationship(back_populates="workout", cascade="all, delete-orphan")
     performed_at: Mapped[datetime] = mapped_column(

@@ -33,3 +33,7 @@ htmlcov/
 pgdata/
 
 specs/
+
+# Postman
+postman/
+.postman/
