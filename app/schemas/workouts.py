@@ -42,3 +42,7 @@ class WorkoutRead(BaseModel):
     performed_at: datetime
     created_at: datetime
     sets: list[SetRead]
+
+
+class WorkoutReadResponse(BaseModel):
+    id: int

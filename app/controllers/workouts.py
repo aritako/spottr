@@ -1,11 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm.session import Session
 
 from app.db import get_db
+from app.errors.exercises import ExerciseNotFoundError
 from app.handlers.workouts import WorkoutsHandler
-from app.schemas.workouts import WorkoutCreate, WorkoutRead
+from app.schemas.workouts import WorkoutCreate, WorkoutRead, WorkoutReadResponse
 
 router = APIRouter()
 
@@ -26,10 +27,14 @@ def get_workouts(
     return handler.read_workout_list(page, page_size)
 
 
-@router.post("", status_code=201, response_model=WorkoutRead)
+@router.post("", status_code=201, response_model=WorkoutReadResponse)
 def create_workout(
     db: Annotated[Session, Depends(get_db)],
     workout: WorkoutCreate,
-) -> WorkoutRead:
+):
     handler = WorkoutsHandler(db)
-    return handler.create_workout(workout)
+    try:
+        new_workout = handler.create_workout(workout)
+    except ExerciseNotFoundError as e:
+        raise HTTPException(status_code=404, detail="Invalid exercise id.") from e
+    return WorkoutReadResponse(id=new_workout.id)

@@ -9,6 +9,10 @@ class ExercisesRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def check(self, ids: set[int]) -> set[int]:
+        query = select(Exercise.id).where(Exercise.id.in_(ids))
+        return set(self.db.scalars(query))
+
     def get(self, id: int) -> Exercise | None:
         return self.db.get(Exercise, id)
 

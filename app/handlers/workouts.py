@@ -1,16 +1,26 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.errors.exercises import ExerciseNotFoundError
 from app.models import Set, Workout
+from app.repository.exercises import ExercisesRepository
 from app.repository.workouts import WorkoutsRepository
 from app.schemas.workouts import WorkoutCreate, WorkoutRead
 
 
 class WorkoutsHandler:
     def __init__(self, db: Session):
-        self.repository = WorkoutsRepository(db)
+        self.workoutsRepository = WorkoutsRepository(db)
+        self.exercisesRepository = ExercisesRepository(db)
 
     def create_workout(self, workout: WorkoutCreate) -> WorkoutRead:
+        exercise_ids = {s.exercise_id for s in workout.sets}
+        existing_ids = self.exercisesRepository.check(exercise_ids)
+        missing_ids = exercise_ids - existing_ids
+
+        if missing_ids:
+            raise ExerciseNotFoundError()
+
         set_model_list = [
             Set(
                 exercise_id=set.exercise_id,
@@ -28,15 +38,15 @@ class WorkoutsHandler:
             performed_at=workout.performed_at,
             sets=set_model_list,
         )
-        new_workout = self.repository.create(workout_model)
+        new_workout = self.workoutsRepository.create(workout_model)
         return WorkoutRead.model_validate(new_workout)
 
     def read_workout(self, id: int) -> WorkoutRead | None:
-        workout = self.repository.get(id)
+        workout = self.workoutsRepository.get(id)
         if workout:
             return WorkoutRead.model_validate(workout)
         raise HTTPException(status_code=404, detail="Workout not found")
 
     def read_workout_list(self, page: int, page_size: int) -> list[WorkoutRead]:
-        workouts = self.repository.list(page, page_size)
+        workouts = self.workoutsRepository.list(page, page_size)
         return [WorkoutRead.model_validate(workout) for workout in workouts]
