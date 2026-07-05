@@ -93,7 +93,9 @@ def weekly_tonnage(entries: list[DatedTonnage]) -> list[tuple[str, float]]:
     return sorted(weekly_bucket.items())
 
 
-def query_workouts(entries: list[DatedTonnageByExercise]) -> dict[str, list[tuple[str, float]]]:
+def weekly_tonnage_by_exercise(
+    entries: list[DatedTonnageByExercise],
+) -> dict[str, list[tuple[str, float]]]:
     final_bucket: dict[str, list[tuple[str, float]]] = {}
     exercise_bucket: dict[str, list[DatedTonnage]] = defaultdict(list)
 

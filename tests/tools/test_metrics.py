@@ -1,10 +1,11 @@
 from datetime import date
 
-from app.tools.metrics import DatedTonnageByExercise, query_workouts
+from app.tools.metrics import DatedTonnageByExercise, weekly_tonnage_by_exercise
 
 
-def test_query_workouts() -> None:
+def test_weekly_tonnage_by_exercise() -> None:
     entries = [
+        DatedTonnageByExercise(exercise="bench", date=date(2025, 12, 30), tonnage=100.0),
         DatedTonnageByExercise(exercise="bench", date=date(2026, 1, 1), tonnage=100.0),
         DatedTonnageByExercise(exercise="bench", date=date(2026, 1, 2), tonnage=120.0),
         DatedTonnageByExercise(exercise="bench", date=date(2026, 1, 8), tonnage=120.0),
@@ -15,9 +16,9 @@ def test_query_workouts() -> None:
         DatedTonnageByExercise(exercise="overhead press", date=date(2026, 1, 1), tonnage=100.0),
         DatedTonnageByExercise(exercise="overhead press", date=date(2026, 1, 8), tonnage=120.0),
     ]
-    result = query_workouts(entries)
+    result = weekly_tonnage_by_exercise(entries)
     assert result == {
-        "bench": [("2026-W01", 220.0), ("2026-W02", 120.0)],
+        "bench": [("2026-W01", 320.0), ("2026-W02", 120.0)],
         "squat": [("2026-W01", 80.0), ("2026-W02", 90.0)],
         "deadlift": [("2026-W01", 150.0), ("2026-W02", 160.0)],
         "overhead press": [("2026-W01", 100.0), ("2026-W02", 120.0)],
