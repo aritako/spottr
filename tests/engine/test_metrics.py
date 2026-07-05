@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.tools.metrics import DatedTonnageByExercise, weekly_tonnage_by_exercise
+from app.engine.tools import DatedTonnageByExercise, weekly_tonnage_by_exercise
 
 
 def test_weekly_tonnage_by_exercise() -> None:
