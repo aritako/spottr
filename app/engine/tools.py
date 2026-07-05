@@ -107,3 +107,13 @@ def weekly_tonnage_by_exercise(
         final_bucket[exercise] = weekly_tonnage(dated_tonnage)
 
     return final_bucket
+
+
+def query_workouts(
+    exercise: str | None = None,
+    metric: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    group_by: str | None = None,
+):
+    pass
