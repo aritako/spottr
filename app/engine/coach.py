@@ -1,7 +1,6 @@
 import json
 from typing import cast
 
-from openai import OpenAI
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessage,
@@ -11,17 +10,16 @@ from openai.types.chat import (
 )
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.engine.tools import Tools
+from app.openai.client import client
 from app.repository.workouts import WorkoutsRepository
-
-client = OpenAI(api_key=settings.openai_api_key)
 
 
 class Coach:
     def __init__(self, db: Session):
         self.tools = Tools(db)
         self.TOOL_REGISTRY = {"query_workouts": self.tools.query_workouts}
+        self.client = client
 
         self.TOOLS: list[ChatCompletionToolParam] = [
             {
