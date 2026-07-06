@@ -27,6 +27,7 @@ class Exercise(Base):
     name: Mapped[str] = mapped_column(unique=True)
     category: Mapped[str | None] = mapped_column(default=None)
     is_compound: Mapped[bool] = mapped_column(default=False)
+    sets: Mapped[list["Set"]] = relationship(back_populates="exercise")
 
 
 class Workout(TimestampMixin, Base):
@@ -53,3 +54,4 @@ class Set(TimestampMixin, Base):
     rpe: Mapped[float | None] = mapped_column(nullable=True)
     set_index: Mapped[int] = mapped_column(default=0)
     workout: Mapped["Workout"] = relationship(back_populates="sets")
+    exercise: Mapped["Exercise"] = relationship(back_populates="sets")
