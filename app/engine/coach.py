@@ -12,7 +12,7 @@ from openai.types.chat import (
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.engine.tools import query_workouts
+from app.engine.tools import Tools
 from app.repository.workouts import WorkoutsRepository
 
 client = OpenAI(api_key=settings.openai_api_key)
@@ -20,7 +20,8 @@ client = OpenAI(api_key=settings.openai_api_key)
 
 class Coach:
     def __init__(self, db: Session):
-        self.TOOL_REGISTRY = {"query_workouts": query_workouts}
+        self.tools = Tools(db)
+        self.TOOL_REGISTRY = {"query_workouts": self.tools.query_workouts}
 
         self.TOOLS: list[ChatCompletionToolParam] = [
             {

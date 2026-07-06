@@ -1,9 +1,17 @@
 from datetime import date
+from unittest.mock import Mock
 
-from app.engine.tools import DatedTonnageByExercise, weekly_tonnage_by_exercise
+import pytest
+
+from app.engine.tools import DatedTonnageByExercise, Tools
 
 
-def test_weekly_tonnage_by_exercise() -> None:
+@pytest.fixture
+def tools() -> Tools:
+    return Tools(db=Mock())
+
+
+def test_weekly_tonnage_by_exercise(tools: Tools) -> None:
     entries = [
         DatedTonnageByExercise(exercise="bench", date=date(2025, 12, 30), tonnage=100.0),
         DatedTonnageByExercise(exercise="bench", date=date(2026, 1, 1), tonnage=100.0),
@@ -16,7 +24,7 @@ def test_weekly_tonnage_by_exercise() -> None:
         DatedTonnageByExercise(exercise="overhead press", date=date(2026, 1, 1), tonnage=100.0),
         DatedTonnageByExercise(exercise="overhead press", date=date(2026, 1, 8), tonnage=120.0),
     ]
-    result = weekly_tonnage_by_exercise(entries)
+    result = tools.weekly_tonnage_by_exercise(entries)
     assert result == {
         "bench": [("2026-W01", 320.0), ("2026-W02", 120.0)],
         "squat": [("2026-W01", 80.0), ("2026-W02", 90.0)],
