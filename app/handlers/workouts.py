@@ -55,6 +55,5 @@ class WorkoutsHandler:
 
     def get_sets_for_metrics(
         self, exercise: str | None, start: date | None, end: date | None
-    ) -> list[SetRead]:
-        sets = self.workoutsRepository.get_sets_for_metrics(exercise, start, end)
-        return [SetRead.model_validate(set) for set in sets]
+    ) -> list[Set]:
+        return self.workoutsRepository.get_sets_for_metrics(exercise, start, end)

@@ -21,10 +21,23 @@ class DatedTonnage:
 
 
 @dataclass
+class DatedE1RM:
+    date: date
+    e1rm: float
+
+
+@dataclass
 class DatedTonnageByExercise:
     exercise: str
     date: date
     tonnage: float
+
+
+@dataclass
+class DatedE1RMByExercise:
+    exercise: str
+    date: date
+    e1rm: float
 
 
 def estimated_one_rep_max(weight: float, reps: int) -> float:
@@ -110,5 +123,35 @@ def weekly_tonnage_by_exercise(
 
     for exercise, dated_tonnage in exercise_bucket.items():
         final_bucket[exercise] = weekly_tonnage(dated_tonnage)
+
+    return final_bucket
+
+
+def weekly_e1rm(entries: list[DatedE1RM]) -> list[tuple[str, float]]:
+    weekly_bucket: dict[str, float] = defaultdict(float)
+
+    for entry in entries:
+        date = entry.date
+        e1rm = entry.e1rm
+
+        year, week = date.isocalendar()[0:2]
+        weekly_bucket_key = f"{year}-W{week:02d}"
+        weekly_bucket[weekly_bucket_key] = max(weekly_bucket[weekly_bucket_key], e1rm)
+
+    return sorted(weekly_bucket.items())
+
+
+def weekly_e1rm_by_exercise(
+    entries: list[DatedE1RMByExercise],
+) -> dict[str, list[tuple[str, float]]]:
+    final_bucket: dict[str, list[tuple[str, float]]] = {}
+    exercise_bucket: dict[str, list[DatedE1RM]] = defaultdict(list)
+
+    for entry in entries:
+        dated_e1rm = DatedE1RM(entry.date, entry.e1rm)
+        exercise_bucket[entry.exercise].append(dated_e1rm)
+
+    for exercise, dated_e1rm in exercise_bucket.items():
+        final_bucket[exercise] = weekly_e1rm(dated_e1rm)
 
     return final_bucket
