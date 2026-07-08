@@ -30,6 +30,7 @@ services:
       - ./app:/code/app
       - ./alembic.ini:/code/alembic.ini
       - ./alembic:/code/alembic
+      - ./tests:/code/tests
     command:
       [
         "uvicorn",

@@ -40,12 +40,12 @@ class Tools:
                 entries = [
                     DatedTonnage(
                         date=s.workout.performed_at.date(),
-                        tonnage=set_tonnage(s.weight, s.reps),
+                        tonnage=set_tonnage(float(s.weight), s.reps),
                     )
                     for s in sets
                 ]
                 result = weekly_tonnage(entries)
-                return {"metric": metric.value, "weekly": result}
+                return {"metric": "tonnage", "weekly": result}
             case Metric.E1RM:
                 entries = [
                     DatedE1RM(
@@ -55,6 +55,6 @@ class Tools:
                     for s in sets
                 ]
                 result = weekly_e1rm(entries)
-                return {"metric": metric.value, "weekly": result}
+                return {"metric": "e1rm", "weekly": result}
             case _:
                 return {"result": "Metric not yet implemented."}

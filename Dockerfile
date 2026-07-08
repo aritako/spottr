@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 
 COPY app ./app
+COPY tests ./tests
 
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
