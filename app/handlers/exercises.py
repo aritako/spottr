@@ -26,5 +26,5 @@ class ExercisesHandler:
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     def read_exercise_list(self, page: int, page_size: int) -> list[ExerciseRead]:
-        exercises = self.repository.list(page, page_size)
+        exercises = self.repository.list_(page, page_size)
         return [ExerciseRead.model_validate(exercise) for exercise in exercises]

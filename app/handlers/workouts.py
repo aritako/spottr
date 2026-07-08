@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -5,7 +7,7 @@ from app.errors.exercises import ExerciseNotFoundError
 from app.models import Set, Workout
 from app.repository.exercises import ExercisesRepository
 from app.repository.workouts import WorkoutsRepository
-from app.schemas.workouts import WorkoutCreate, WorkoutRead
+from app.schemas.workouts import SetRead, WorkoutCreate, WorkoutRead
 
 
 class WorkoutsHandler:
@@ -48,5 +50,11 @@ class WorkoutsHandler:
         raise HTTPException(status_code=404, detail="Workout not found")
 
     def read_workout_list(self, page: int, page_size: int) -> list[WorkoutRead]:
-        workouts = self.workoutsRepository.list(page, page_size)
+        workouts = self.workoutsRepository.list_(page, page_size)
         return [WorkoutRead.model_validate(workout) for workout in workouts]
+
+    def get_sets_for_metrics(
+        self, exercise: str | None, start: date | None, end: date | None
+    ) -> list[SetRead]:
+        sets = self.workoutsRepository.get_sets_for_metrics(exercise, start, end)
+        return [SetRead.model_validate(set) for set in sets]

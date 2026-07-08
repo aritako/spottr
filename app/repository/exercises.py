@@ -16,7 +16,7 @@ class ExercisesRepository:
     def get(self, id: int) -> Exercise | None:
         return self.db.get(Exercise, id)
 
-    def list(self, page: int, page_size: int) -> list[Exercise]:
+    def list_(self, page: int, page_size: int) -> list[Exercise]:
         query = select(Exercise).offset(page * page_size).limit(page_size)
         return list(self.db.scalars(query))
 
