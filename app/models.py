@@ -22,7 +22,7 @@ class TimestampMixin:
 
 
 class Exercise(Base):
-    __tablename__ = "exercise"
+    __tablename__ = "exercises"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(unique=True)
@@ -32,7 +32,7 @@ class Exercise(Base):
 
 
 class Workout(TimestampMixin, Base):
-    __tablename__ = "workout"
+    __tablename__ = "workouts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     notes: Mapped[str | None] = mapped_column(default=None)
@@ -48,8 +48,8 @@ class Set(TimestampMixin, Base):
     __tablename__ = "sets"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    workout_id: Mapped[int] = mapped_column(ForeignKey("workout.id"))
-    exercise_id: Mapped[int] = mapped_column(ForeignKey("exercise.id"))
+    workout_id: Mapped[int] = mapped_column(ForeignKey("workouts.id"))
+    exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"))
     weight: Mapped[float] = mapped_column(Numeric(6, 2))
     reps: Mapped[int] = mapped_column(default=0)
     rpe: Mapped[float | None] = mapped_column(nullable=True)
