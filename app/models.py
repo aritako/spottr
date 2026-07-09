@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import TIMESTAMP, ForeignKey, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -55,3 +56,25 @@ class Set(TimestampMixin, Base):
     set_index: Mapped[int] = mapped_column(default=0)
     workout: Mapped["Workout"] = relationship(back_populates="sets")
     exercise: Mapped["Exercise"] = relationship(back_populates="sets")
+
+
+class Chunk(Base):
+    __tablename__ = "chunks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"))
+    chunk_index: Mapped[int] = mapped_column()
+    content: Mapped[str] = mapped_column()
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536))
+    document: Mapped["Document"] = relationship(back_populates="chunks")
+
+
+class Document(TimestampMixin, Base):
+    __tablename__ = "documents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column()
+    source: Mapped[str | None] = mapped_column(default=None)
+    chunks: Mapped[list["Chunk"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
