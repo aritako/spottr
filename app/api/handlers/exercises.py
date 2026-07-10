@@ -1,9 +1,9 @@
 from fastapi import HTTPException
 from sqlalchemy.orm.session import Session
 
-from app.models import Exercise
-from app.repository.exercises import ExercisesRepository
-from app.schemas.exercises import ExerciseCreate, ExerciseRead
+from app.api.repository.exercises import ExercisesRepository
+from app.core.models import Exercise
+from app.shared.schemas.exercises import ExerciseCreate, ExerciseRead
 
 
 class ExercisesHandler:

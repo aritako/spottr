@@ -10,9 +10,9 @@ from openai.types.chat import (
 )
 from sqlalchemy.orm import Session
 
+from app.api.repository.workouts import WorkoutsRepository
+from app.core.openai.client import client
 from app.engine.tools import Tools
-from app.openai.client import client
-from app.repository.workouts import WorkoutsRepository
 
 
 class Coach:

@@ -3,11 +3,11 @@ from datetime import date
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.errors.exercises import ExerciseNotFoundError
-from app.models import Set, Workout
-from app.repository.exercises import ExercisesRepository
-from app.repository.workouts import WorkoutsRepository
-from app.schemas.workouts import SetRead, WorkoutCreate, WorkoutRead
+from app.api.repository.exercises import ExercisesRepository
+from app.api.repository.workouts import WorkoutsRepository
+from app.core.models import Set, Workout
+from app.shared.errors.exercises import ExerciseNotFoundError
+from app.shared.schemas.workouts import SetRead, WorkoutCreate, WorkoutRead
 
 
 class WorkoutsHandler:

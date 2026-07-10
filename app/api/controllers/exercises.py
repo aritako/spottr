@@ -3,9 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm.session import Session
 
-from app.db import get_db
-from app.handlers.exercises import ExercisesHandler
-from app.schemas.exercises import ExerciseCreate, ExerciseRead, ExerciseReadResponse
+from app.api.handlers.exercises import ExercisesHandler
+from app.core.db import get_db
+from app.shared.schemas.exercises import ExerciseCreate, ExerciseRead, ExerciseReadResponse
 
 router = APIRouter()
 

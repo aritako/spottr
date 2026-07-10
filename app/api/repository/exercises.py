@@ -1,8 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm.session import Session
 
-from app.models import Exercise
-from app.schemas.exercises import ExerciseCreate
+from app.core.models import Exercise
 
 
 class ExercisesRepository:

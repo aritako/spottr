@@ -2,7 +2,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
-from app.enums.exercises import ExerciseCategory
+from app.shared.enums.exercises import ExerciseCategory
 
 
 class ExerciseCreate(BaseModel):

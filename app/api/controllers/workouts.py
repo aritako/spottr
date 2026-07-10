@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm.session import Session
 
-from app.db import get_db
-from app.errors.exercises import ExerciseNotFoundError
-from app.handlers.workouts import WorkoutsHandler
-from app.schemas.workouts import WorkoutCreate, WorkoutRead, WorkoutReadResponse
+from app.api.handlers.workouts import WorkoutsHandler
+from app.core.db import get_db
+from app.shared.errors.exercises import ExerciseNotFoundError
+from app.shared.schemas.workouts import WorkoutCreate, WorkoutRead, WorkoutReadResponse
 
 router = APIRouter()
 

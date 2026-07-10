@@ -1,4 +1,4 @@
-from app.db import SessionLocal
+from app.core.db import SessionLocal
 from app.engine.coach import Coach
 
 db = SessionLocal()

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.enums.workouts import UnitEnum
+from app.shared.enums.workouts import UnitEnum
 
 
 class SetCreate(BaseModel):

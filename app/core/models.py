@@ -4,8 +4,8 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import TIMESTAMP, ForeignKey, Numeric, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db import Base
-from app.enums.workouts import UnitEnum
+from app.core.db import Base
+from app.shared.enums.workouts import UnitEnum
 
 
 # Mixins

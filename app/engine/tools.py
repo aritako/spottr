@@ -2,6 +2,8 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.api.handlers.workouts import WorkoutsHandler
+from app.core.models import Set
 from app.engine.helpers import (
     DatedE1RM,
     DatedTonnage,
@@ -10,9 +12,7 @@ from app.engine.helpers import (
     weekly_e1rm,
     weekly_tonnage,
 )
-from app.enums.coach import Metric
-from app.handlers.workouts import WorkoutsHandler
-from app.models import Set
+from app.shared.enums.coach import Metric
 
 
 class Tools:

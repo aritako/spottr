@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.session import Session
 
-from app.models import Exercise, Set, Workout
+from app.core.models import Exercise, Set, Workout
 
 
 class WorkoutsRepository:
