@@ -1,105 +1,111 @@
 import json
-from typing import cast
+from collections.abc import Iterable
+from typing import Any, cast
 
-from openai.types.chat import (
-    ChatCompletionAssistantMessageParam,
-    ChatCompletionMessage,
-    ChatCompletionMessageFunctionToolCall,
-    ChatCompletionMessageParam,
-    ChatCompletionToolParam,
+from openai.types.chat import ChatCompletionMessageFunctionToolCall
+from openai.types.responses import (
+    FunctionToolParam,
+    ResponseInputItemParam,
+    ResponseInputParam,
+    ResponseOutputItem,
+    ToolParam,
 )
 from sqlalchemy.orm import Session
 
 from app.api.repository.workouts import WorkoutsRepository
 from app.core.openai.client import client
 from app.engine.tools import Tools
+from app.shared.enums.coach import Metric
 
 
 class Coach:
     def __init__(self, db: Session):
         self.tools = Tools(db)
-        self.TOOL_REGISTRY = {"query_workouts": self.tools.query_workouts}
         self.client = client
 
-        self.TOOLS: list[ChatCompletionToolParam] = [
+        self.QUERY_MODEL = "gpt-5.4-nano"
+        self.TOOL_REGISTRY = {"query_workouts": self.tools.query_workouts}
+        self.TOOLS: list[FunctionToolParam] = [
             {
                 "type": "function",
-                "function": {
-                    "name": "query_workouts",
-                    "description": """
-                        Query the user's logged workout data. Use for any question
-                        about their actual numbers, trends, volume, or PRs.
-                    """,
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "exercise": {
-                                "type": "string",
-                                "description": "Exercise name, e.g. 'Back Squat'. Omit for all.",
-                            },
-                            "metric": {
-                                "type": "string",
-                                "enum": ["e1rm", "tonnage", "max_weight", "avg_rpe", "set_count"],
-                            },
-                            "start_date": {"type": "string", "format": "date"},
-                            "end_date": {"type": "string", "format": "date"},
-                            "group_by": {"type": "string", "enum": ["day", "week", "month"]},
+                "name": "query_workouts",
+                "description": (
+                    "Query the user's logged workout data. Use for any question "
+                    "about their actual numbers, trends, volume, or PRs."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "exercise": {
+                            "type": ["string", "null"],
+                            "description": "Exercise name, e.g. 'Back Squat'.",
                         },
-                        "required": ["metric"],
+                        "metric": {
+                            "type": "string",
+                            "enum": ["e1rm", "tonnage"],
+                        },
+                        "start_date": {
+                            "type": ["string", "null"],
+                            "format": "date",
+                        },
+                        "end_date": {
+                            "type": ["string", "null"],
+                            "format": "date",
+                        },
                     },
+                    "required": ["exercise", "metric", "start_date", "end_date"],
+                    "additionalProperties": False,
                 },
-            },
+                "strict": True,
+            }
         ]
 
         self.workoutsRepository = WorkoutsRepository(db)
 
     def ask_coach(self, question: str, max_iterations: int = 5) -> str:
-        messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": question}]
+        response = client.responses.create(
+            model=self.QUERY_MODEL,
+            input=question,
+            tools=self.TOOLS,
+        )
 
         for _ in range(max_iterations):
-            # Send the ENTIRE history + the tool menu, every time.
-            response = client.chat.completions.create(
-                model="gpt-5.4-nano",
-                messages=messages,
-                tools=self.TOOLS,
-            )
+            tool_calls = [item for item in response.output if item.type == "function_call"]
 
-            message: ChatCompletionMessage = response.choices[0].message
+            if not tool_calls:
+                return response.output_text or "I couldn't complete that request."
 
-            # ---- Branch: did the model ask for a tool, or give a final answer? ----
-            if not message.tool_calls:
-                # No tool requested -> this is the final answer. Done.
-                return message.content if message.content else "I couldn't complete that request."
+            tool_outputs: list[ResponseInputItemParam] = []
+            for tool_call in tool_calls:
+                fn_name = tool_call.name
+                fn_args: dict[str, Any] = json.loads(tool_call.arguments)
 
-            # ---- Branch: the model wants to call one or more tools. ----
-            # First, append the model's OWN message (the tool request) to history.
-            # This is essential — the result we send next must reference it.
-            messages.append(
-                cast(ChatCompletionAssistantMessageParam, message.model_dump(exclude_none=True))
-            )
+                # The schema sends `metric` as a string; convert to the enum
+                # so Tools.query_workouts' match statement works.
+                if isinstance(fn_args.get("metric"), str):
+                    fn_args["metric"] = Metric(fn_args["metric"])
 
-            # Run each requested tool and feed its result back.
-            for tool_call in message.tool_calls:
-                tool_call = cast(ChatCompletionMessageFunctionToolCall, tool_call)
-                fn_name = tool_call.function.name
-                fn_args = json.loads(tool_call.function.arguments)
+                if fn_name not in self.TOOL_REGISTRY:
+                    continue
 
-                # Dispatch to the real function via the registry.
                 fn = self.TOOL_REGISTRY[fn_name]
-                result = fn(**fn_args)  # **fn_args unpacks {} for a no-arg tool
+                result = fn(**fn_args)
+                output_str = result if isinstance(result, str) else json.dumps(result)
 
-                # Append the result as a 'tool' message, linked by tool_call_id.
-                # The id is how the model knows WHICH call this answers.
-                messages.append(
+                tool_outputs.append(
                     {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": str(result),
+                        "type": "function_call_output",
+                        "call_id": tool_call.call_id,
+                        "output": output_str,
                     }
                 )
 
-            # Loop continues: next iteration sends the updated history,
-            # now including the tool result, so the model can answer.
+            # Feed results back; previous_response_id chains the conversation
+            # server-side so we don't rebuild the full message history.
+            response = client.responses.create(
+                model=self.QUERY_MODEL,
+                previous_response_id=response.id,
+                input=tool_outputs,
+            )
 
-        # Safety valve: we hit the iteration cap without a final answer.
         return "I couldn't complete that request."
