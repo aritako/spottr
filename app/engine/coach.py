@@ -78,9 +78,6 @@ class Coach:
                 cast(ChatCompletionAssistantMessageParam, message.model_dump(exclude_none=True))
             )
 
-            if not message.tool_calls:
-                return "I couldn't complete that request."
-
             # Run each requested tool and feed its result back.
             for tool_call in message.tool_calls:
                 tool_call = cast(ChatCompletionMessageFunctionToolCall, tool_call)
