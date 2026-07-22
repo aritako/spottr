@@ -6,7 +6,7 @@ helper classes that will be used by the engine.tools.
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 
 class Set(TypedDict):
@@ -88,70 +88,81 @@ def workout_tonnage(sets: list[Set]) -> float:
     return sum(set_tonnage(set_["weight"], set_["reps"]) for set_ in sets)
 
 
-def weekly_tonnage(entries: list[DatedTonnage]) -> list[tuple[str, float]]:
+def sort_key(
+    d: date, group_by: Literal["day", "week", "month", "year"] | None = None
+) -> tuple[int, int]:
+    match group_by:
+        case "day":
+            return (d.year, d.toordinal())
+        case "week":
+            iso_year, iso_week, _ = d.isocalendar()
+            return (iso_year, iso_week)
+        case "month":
+            return (d.year, d.month)
+        case "year":
+            return (d.year, 0)
+        case None:
+            iso_year, iso_week, _ = d.isocalendar()
+            return (iso_year, iso_week)
+
+
+def get_time_bucket_key(
+    d: date, group_by: Literal["day", "week", "month", "year"] | None = None
+) -> str:
     """
-    Groups per-workout tonnage into weekly buckets.
-    Args:
-        entries: A list of dates with their total tonnage lifted
-    Returns:
-        a list of (week_key, total_tonnage) sorted chronologically,
-        where week_key is an ISO year-week string like "2026-W25".
+    Returns a human-readable, chronologically-sortable-enough label for the
+    time bucket `d` falls into, at the given grain.
+
+    Note: these labels are for DISPLAY. Internally, sorting is still done
+    on the (year, week)/(year, month)/etc. tuples before formatting — see
+    tonnage_over_time, which sorts by the underlying key, not the string.
     """
-    weekly_bucket: dict[str, float] = defaultdict(float)
+    match group_by:
+        case None:
+            iso_year, iso_week, _ = d.isocalendar()
+            monday = date.fromisocalendar(iso_year, iso_week, 1)
+            return f"Week of {monday.strftime('%b %d, %Y')}"  # "Week of Jun 15, 2026"
+
+        case "day":
+            return d.strftime("%b %d, %Y")  # "Jun 20, 2026"
+
+        case "week":
+            iso_year, iso_week, _ = d.isocalendar()
+            monday = date.fromisocalendar(iso_year, iso_week, 1)
+            return f"Week of {monday.strftime('%b %d, %Y')}"  # "Week of Jun 15, 2026"
+
+        case "month":
+            return d.strftime("%b %Y")  # "Jun 2026"
+
+        case "year":
+            return str(d.year)  # "2026"
+
+
+def tonnage_over_time(
+    entries: list[DatedTonnage],
+    group_by: Literal["day", "week", "month", "year"] | None = None,
+) -> list[tuple[str, float]]:
+    buckets: dict[tuple[int, int], float] = defaultdict(float)
+    label_for: dict[tuple[int, int], str] = {}
 
     for entry in entries:
-        date = entry.date
-        tonnage = entry.tonnage
+        key = sort_key(entry.date, group_by)
+        buckets[key] += entry.tonnage
+        label_for[key] = get_time_bucket_key(entry.date, group_by)
 
-        year, week = date.isocalendar()[0:2]
-
-        weekly_bucket_key = f"{year}-W{week:02d}"
-        weekly_bucket[weekly_bucket_key] += tonnage
-
-    return sorted(weekly_bucket.items())
+    return [(label_for[k], v) for k, v in sorted(buckets.items())]
 
 
-def weekly_tonnage_by_exercise(
-    entries: list[DatedTonnageByExercise],
-) -> dict[str, list[tuple[str, float]]]:
-    final_bucket: dict[str, list[tuple[str, float]]] = {}
-    exercise_bucket: dict[str, list[DatedTonnage]] = defaultdict(list)
+def e1rm_over_time(
+    entries: list[DatedE1RM],
+    group_by: Literal["day", "week", "month", "year"] | None = None,
+) -> list[tuple[str, float]]:
+    buckets: dict[tuple[int, int], float] = defaultdict(float)
+    label_for: dict[tuple[int, int], str] = {}
 
     for entry in entries:
-        date_tonnage = DatedTonnage(entry.date, entry.tonnage)
-        exercise_bucket[entry.exercise].append(date_tonnage)
+        key = sort_key(entry.date, group_by)
+        buckets[key] = max(buckets[key], entry.e1rm)
+        label_for[key] = get_time_bucket_key(entry.date, group_by)
 
-    for exercise, dated_tonnage in exercise_bucket.items():
-        final_bucket[exercise] = weekly_tonnage(dated_tonnage)
-
-    return final_bucket
-
-
-def weekly_e1rm(entries: list[DatedE1RM]) -> list[tuple[str, float]]:
-    weekly_bucket: dict[str, float] = defaultdict(float)
-
-    for entry in entries:
-        date = entry.date
-        e1rm = entry.e1rm
-
-        year, week = date.isocalendar()[0:2]
-        weekly_bucket_key = f"{year}-W{week:02d}"
-        weekly_bucket[weekly_bucket_key] = max(weekly_bucket[weekly_bucket_key], e1rm)
-
-    return sorted(weekly_bucket.items())
-
-
-def weekly_e1rm_by_exercise(
-    entries: list[DatedE1RMByExercise],
-) -> dict[str, list[tuple[str, float]]]:
-    final_bucket: dict[str, list[tuple[str, float]]] = {}
-    exercise_bucket: dict[str, list[DatedE1RM]] = defaultdict(list)
-
-    for entry in entries:
-        dated_e1rm = DatedE1RM(entry.date, entry.e1rm)
-        exercise_bucket[entry.exercise].append(dated_e1rm)
-
-    for exercise, dated_e1rm in exercise_bucket.items():
-        final_bucket[exercise] = weekly_e1rm(dated_e1rm)
-
-    return final_bucket
+    return [(label_for[k], v) for k, v in sorted(buckets.items())]

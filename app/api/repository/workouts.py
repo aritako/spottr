@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -53,5 +53,5 @@ class WorkoutsRepository:
         if start_date:
             query = query.where(Workout.performed_at >= start_date)
         if end_date:
-            query = query.where(Workout.performed_at <= end_date)
+            query = query.where(Workout.performed_at < end_date + timedelta(days=1))
         return list(self.db.scalars(query))
