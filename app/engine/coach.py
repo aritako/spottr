@@ -65,7 +65,7 @@ class Coach:
                         },
                         "group_by": {
                             "type": ["string", "null"],
-                            "enum": ["day", "week", "month", "year", None],
+                            "enum": ["day", "week", "month", "year"],
                             "description": (
                                 """
                                 Time bucket size. Use 'day' for ranges under ~2 weeks, 'week' for
@@ -140,7 +140,10 @@ class Coach:
             as a preliminary signal").
             """.strip()
 
-    def ask_coach(self, question: str, max_iterations: int = 5) -> str:
+    def ask_coach(self, question: str, max_iterations: int = 5) -> dict[str, Any]:
+        used_tools: list[str] = []
+        citations: list[dict[str, Any]] = []
+
         response = client.responses.create(
             instructions=Coach.build_instructions(self),
             model=self.QUERY_MODEL,
@@ -152,7 +155,11 @@ class Coach:
             tool_calls = [item for item in response.output if item.type == "function_call"]
 
             if not tool_calls:
-                return response.output_text or "I couldn't complete that request."
+                return {
+                    "answer": response.output_text or "I couldn't complete that request.",
+                    "used_tools": used_tools,
+                    "citations": citations,
+                }
 
             tool_outputs: list[ResponseInputItemParam] = []
             for tool_call in tool_calls:
@@ -166,6 +173,9 @@ class Coach:
 
                 if fn_name not in self.TOOL_REGISTRY:
                     continue
+
+                if fn_name not in used_tools:
+                    used_tools.append(fn_name)
 
                 fn = self.TOOL_REGISTRY[fn_name]
                 result = fn(**fn_args)
@@ -188,4 +198,8 @@ class Coach:
                 tools=self.TOOLS,
             )
 
-        return "I couldn't complete that request."
+        return {
+            "answer": "I couldn't complete that request.",
+            "used_tools": used_tools,
+            "citations": citations,
+        }
