@@ -88,6 +88,32 @@ def workout_tonnage(sets: list[Set]) -> float:
     return sum(set_tonnage(set_["weight"], set_["reps"]) for set_ in sets)
 
 
+def weekly_tonnage_by_exercise(
+    entries: list[DatedTonnageByExercise],
+) -> dict[str, list[tuple[str, float]]]:
+    """
+    Group tonnage entries by exercise and ISO week, returning total tonnage per week.
+
+    Args:
+        entries: A list of dated tonnage entries tagged with an exercise name.
+
+    Returns:
+        A dictionary mapping exercise name to a chronologically sorted list of
+        (week_label, total_tonnage) tuples. Week labels use ISO-8601 format
+        (e.g. "2026-W01").
+    """
+    buckets: dict[tuple[str, int, int], float] = defaultdict(float)
+    for entry in entries:
+        iso_year, iso_week, _ = entry.date.isocalendar()
+        buckets[(entry.exercise, iso_year, iso_week)] += entry.tonnage
+
+    grouped: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    for (exercise, iso_year, iso_week), tonnage in sorted(buckets.items()):
+        grouped[exercise].append((f"{iso_year}-W{iso_week:02d}", tonnage))
+
+    return dict(grouped)
+
+
 def sort_key(
     d: date, group_by: Literal["day", "week", "month", "year"] | None = None
 ) -> tuple[int, int]:
