@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository. Read this fully before
 
 ## Project
 
-Spottr is an AI lifting coach backend. Users log workouts, then ask questions in natural language.
+Spottr is an AI lifting coach application. Users log workouts, then ask questions in natural language.
 The coach answers by calling tools that query real workout data (and, soon, a RAG tool over a
 coaching-knowledge corpus with citations). It must never guess or invent numbers.
 
@@ -19,6 +19,13 @@ this backend so future clients (web, Expo) can reuse it.
 - OpenAI Python SDK, **Responses API** (not Chat Completions)
 - pytest, httpx (TestClient), ruff
 - Docker Compose: `db`, `app` (live reload), `pgadmin`
+
+## Git
+
+- Never run `git commit`, `git push`, `git stash`, `git reset`, or `git checkout` on files.
+- Leave all changes as unstaged modifications in the working tree. Do not run `git add`.
+- The human reviews the diff and commits manually.
+- The agent can only execute `git` commands if the human explicitly says so.
 
 ## Commands
 
