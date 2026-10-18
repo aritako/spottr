@@ -1,5 +1,3 @@
-from enum import StrEnum
-
 from pydantic import BaseModel, ConfigDict
 
 from app.shared.enums.exercises import ExerciseCategory

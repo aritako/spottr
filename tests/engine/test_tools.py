@@ -1,7 +1,4 @@
 from datetime import date
-from unittest.mock import Mock
-
-import pytest
 
 from app.engine.helpers import DatedTonnageByExercise, weekly_tonnage_by_exercise
 

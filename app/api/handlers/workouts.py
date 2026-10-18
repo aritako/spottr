@@ -7,7 +7,7 @@ from app.api.repository.exercises import ExercisesRepository
 from app.api.repository.workouts import WorkoutsRepository
 from app.core.models import Set, Workout
 from app.shared.errors.exercises import ExerciseNotFoundError
-from app.shared.schemas.workouts import SetRead, WorkoutCreate, WorkoutRead
+from app.shared.schemas.workouts import WorkoutCreate, WorkoutRead
 
 
 class WorkoutsHandler:
