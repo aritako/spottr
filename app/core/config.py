@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     database_url: str = "postgresql+psycopg://coach:coach@db:5432/coach"
+    embedding_model: str = "text-embedding-3-small"
 
 
 settings = Settings()

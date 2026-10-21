@@ -144,7 +144,7 @@ class Coach:
         used_tools: list[str] = []
         citations: list[dict[str, Any]] = []
 
-        response = client.responses.create(
+        response = self.client.responses.create(
             instructions=Coach.build_instructions(self),
             model=self.QUERY_MODEL,
             input=question,
@@ -191,7 +191,7 @@ class Coach:
 
             # Feed results back; previous_response_id chains the conversation
             # server-side so we don't rebuild the full message history.
-            response = client.responses.create(
+            response = self.client.responses.create(
                 model=self.QUERY_MODEL,
                 previous_response_id=response.id,
                 input=tool_outputs,
