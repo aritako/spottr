@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spottr · Coach: start</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23F0524A'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23110E0E'/%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;family=Martian+Mono:wght@300..600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#F0524A}a:hover{color:#F47A73}
+.x{font-family:'Archivo',sans-serif;font-stretch:125%;text-transform:uppercase;font-weight:800;letter-spacing:.01em}
+.lab{font-family:'Archivo',sans-serif;font-stretch:125%;font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#A39996}
+.n{font-family:'Martian Mono',monospace;font-variant-numeric:tabular-nums}
+.q{display:flex;justify-content:space-between;align-items:center;width:100%;height:52px;padding:0 16px;border:0;border-radius:16px;background:#1A1616;color:#F0EBE8;font-family:'Archivo',sans-serif;font-size:14px;text-align:left}
+.rc{display:flex;justify-content:space-between;align-items:center;height:46px;border-top:1px solid #211B1B;text-decoration:none;color:#F0EBE8;font-size:14px}
+.tab{width:56px;height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#A39996;text-decoration:none;border-radius:16px}
+</style>
+<style>
+html,body{background:#0A0909}
+.page{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:20px;padding:28px 16px 48px;box-sizing:border-box;font-family:'Archivo',sans-serif;color:#F0EBE8}
+.bar{width:100%;max-width:1280px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bar a{color:#A39996;text-decoration:none;font-size:13px}.bar a:hover{color:#F0EBE8}
+.stage{max-width:100%;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="bar">
+<a href="index.html">← All screens</a>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="font-size:15px;font-weight:600">Coach: start</span><span style="font-size:12px;color:#A39996">Suggested questions and the data the coach can see.</span></div>
+</div>
+<div class="stage">
+<div style="width:422px;height:900px;box-sizing:border-box;padding:28px 16px;background:transparent;font-family:'Archivo',sans-serif">
+<div style="width:390px;height:844px;border-radius:44px;background:#110E0E;color:#F0EBE8;overflow:hidden;box-shadow:0 0 0 1px #2E2E33;display:flex;flex-direction:column">
+<div style="height:54px;flex:none;display:flex;justify-content:center;padding-top:11px;box-sizing:border-box"><div style="width:124px;height:34px;border-radius:20px;background:#000"></div></div>
+
+<div style="flex:none;padding:8px 20px 14px"><span class="x" style="font-size:22px;line-height:1">Coach</span></div>
+
+<div style="flex:1;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;flex-direction:column;gap:12px;padding:6px 4px 0">
+<svg width="44" height="44" viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="27" fill="#1A1616"/><circle cx="30" cy="30" r="21" fill="none" stroke="#F0524A" stroke-width="3"/><circle cx="30" cy="30" r="6" fill="#110E0E" stroke="#4C4141" stroke-width="2"/></svg>
+<span style="font-size:20px;font-weight:600;line-height:1.3;letter-spacing:-.01em">Ask anything about your training.</span>
+<span style="font-size:14px;line-height:1.5;color:#C2B8B5">Answers come from your own log, with the sessions they're based on.</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#1A1616;border-radius:18px;padding:12px 0">
+<div style="display:flex;flex-direction:column;gap:4px;align-items:center"><span class="n" style="font-size:15px">47</span><span class="lab" style="font-size:8.5px">Sessions</span></div>
+<div style="display:flex;flex-direction:column;gap:4px;align-items:center;border-left:1px solid #2F2727;border-right:1px solid #2F2727"><span class="n" style="font-size:15px">1,312</span><span class="lab" style="font-size:8.5px">Sets</span></div>
+<div style="display:flex;flex-direction:column;gap:4px;align-items:center"><span class="n" style="font-size:15px">3 Mar</span><span class="lab" style="font-size:8.5px">Since</span></div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+<span class="lab" style="padding:0 4px">Try asking</span>
+<button class="q">Has my bench stalled?<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="#A39996" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg></button>
+<button class="q">Which lift is progressing fastest?<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="#A39996" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg></button>
+<button class="q">Am I training legs enough?<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="#A39996" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg></button>
+<button class="q">Plan my next 4 weeks<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="#A39996" stroke-width="1.5" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg></button>
+</div>
+
+<div style="padding:0 4px">
+<span class="lab">Recent</span>
+<div style="margin-top:6px">
+<a class="rc" href="#">Bench plateau<span class="n" style="font-size:10px;color:#A39996">Wed</span></a>
+<a class="rc" href="#">Deadlift rep targets<span class="n" style="font-size:10px;color:#A39996">12 Oct</span></a>
+</div>
+</div>
+</div>
+
+<form style="flex:none;display:flex;gap:8px;padding:10px 16px 0">
+<label for="hc-msg" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Message coach</label>
+<input id="hc-msg" placeholder="Ask about your training" style="flex:1;height:46px;box-sizing:border-box;border-radius:999px;border:0;background:#1A1616;box-shadow:inset 0 0 0 1px #2F2727;color:#F0EBE8;padding:0 18px;font-family:'Archivo',sans-serif;font-size:15px">
+<button aria-label="Send" style="width:46px;height:46px;border-radius:23px;border:0;background:#F0524A;color:#1A0605;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14V4M4.5 8.5L9 4l4.5 4.5"/></svg></button>
+</form>
+
+<nav aria-label="Primary" style="flex:none;margin:12px 20px 26px;height:64px;border-radius:24px;background:#1A1616;box-shadow:0 0 0 1px #2F2727;display:flex;justify-content:space-around;align-items:center">
+<a class="tab" href="#" aria-label="Workout"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 9v6M7.5 6.5v11M16.5 6.5v11M20 9v6M7.5 12h9"/></svg></a>
+<a class="tab" href="#" aria-label="History"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="4"/><path d="M4 10h16"/></svg></a>
+<a class="tab" href="#" aria-current="page" aria-label="Coach" style="color:#F0EBE8;background:#251F1F"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.5V16"/></svg><span style="width:4px;height:4px;border-radius:2px;background:#F0524A"></span></a>
+<a class="tab" href="#" aria-label="Progress"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-5 3.5 3L20 7"/></svg></a>
+</nav>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

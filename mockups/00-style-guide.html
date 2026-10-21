@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spottr · Style guide</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23F0524A'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23110E0E'/%3E%3C/svg%3E">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;family=Martian+Mono:wght@300..600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#F0524A}a:hover{color:#F47A73}
+.x{font-family:'Archivo',sans-serif;font-stretch:125%;text-transform:uppercase;font-weight:800;letter-spacing:.01em}
+.lab{font-family:'Archivo',sans-serif;font-stretch:125%;font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#A39996}
+.n{font-family:'Martian Mono',monospace;font-variant-numeric:tabular-nums}
+.card{background:#1A1616;border-radius:20px;padding:16px 18px}
+.sw{display:flex;flex-direction:column;gap:6px;flex:1}
+.sw div{height:46px;border-radius:12px}
+</style>
+<style>
+html,body{background:#0A0909}
+.page{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:20px;padding:28px 16px 48px;box-sizing:border-box;font-family:'Archivo',sans-serif;color:#F0EBE8}
+.bar{width:100%;max-width:1280px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bar a{color:#A39996;text-decoration:none;font-size:13px}.bar a:hover{color:#F0EBE8}
+.stage{max-width:100%;overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="bar">
+<a href="index.html">← All screens</a>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><span style="font-size:15px;font-weight:600">Style guide</span><span style="font-size:12px;color:#A39996">Palette, type, plate loader, PR stamp, controls.</span></div>
+</div>
+<div class="stage">
+<div style="width:560px;height:900px;box-sizing:border-box;background:#110E0E;color:#F0EBE8;font-family:'Archivo',sans-serif;padding:28px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<span class="x" style="font-size:22px;letter-spacing:.04em">Spottr<span style="color:#F0524A">/</span>25</span>
+<span class="lab">Red Lab · system · rev 03</span>
+</div>
+
+<div class="card" style="display:flex;gap:8px">
+<div class="sw"><div style="background:#110E0E;box-shadow:inset 0 0 0 1px #2F2727"></div><span class="n" style="font-size:9px;color:#A39996">#110E0E</span></div>
+<div class="sw"><div style="background:#1A1616"></div><span class="n" style="font-size:9px;color:#A39996">#1A1616</span></div>
+<div class="sw"><div style="background:#251F1F"></div><span class="n" style="font-size:9px;color:#A39996">#251F1F</span></div>
+<div class="sw"><div style="background:#A39996"></div><span class="n" style="font-size:9px;color:#A39996">#A39996</span></div>
+<div class="sw"><div style="background:#F0EBE8"></div><span class="n" style="font-size:9px;color:#A39996">#F0EBE8</span></div>
+<div class="sw" style="flex:1.6"><div style="background:#F0524A"></div><span class="n" style="font-size:9px;color:#F0524A">#F0524A · 25 kg</span></div>
+</div>
+
+<div class="card" style="display:flex;flex-direction:column;gap:8px">
+<span class="lab">Type</span>
+<span class="x" style="font-size:26px;line-height:1">Paused, not stalled.</span>
+<div style="display:flex;align-items:baseline;gap:8px"><span class="n" style="font-size:34px;font-weight:400;letter-spacing:-.04em">99.2</span><span class="n" style="font-size:11px;color:#A39996">kg e1RM</span></div>
+<span style="font-size:14px;line-height:1.5;color:#C2B8B5">Archivo Expanded for headlines and stamped labels. Archivo for reading. Martian Mono for anything you could put on a scale.</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+<div class="card" style="display:flex;flex-direction:column;gap:8px">
+<span class="lab">Plate loader</span>
+<svg viewBox="0 0 340 72" width="100%" height="58" role="img" aria-label="Barbell loaded to 85 kg: per side 25, 5 and 2.5 kg plates">
+<line x1="8" y1="36" x2="332" y2="36" stroke="#8F8583" stroke-width="4" stroke-linecap="round"/>
+<line x1="110" y1="36" x2="230" y2="36" stroke="#5E5554" stroke-width="3" stroke-dasharray="2 2"/>
+<rect x="96" y="27" width="8" height="18" rx="2" fill="#8F8583"/><rect x="236" y="27" width="8" height="18" rx="2" fill="#8F8583"/>
+<rect x="82" y="6" width="14" height="60" rx="3" fill="#F0524A"/><rect x="244" y="6" width="14" height="60" rx="3" fill="#F0524A"/>
+<rect x="74" y="19" width="8" height="34" rx="2" fill="#6B6262"/><rect x="258" y="19" width="8" height="34" rx="2" fill="#6B6262"/>
+<rect x="68" y="23" width="6" height="26" rx="2" fill="#4C4141"/><rect x="266" y="23" width="6" height="26" rx="2" fill="#4C4141"/>
+<rect x="62" y="29" width="6" height="14" rx="1" fill="#C2B8B5"/><rect x="272" y="29" width="6" height="14" rx="1" fill="#C2B8B5"/>
+</svg>
+<span class="n" style="font-size:10px;color:#A39996">20 + 2 × (25 · 5 · 2.5)</span>
+</div>
+<div class="card" style="display:flex;align-items:center;gap:12px">
+<svg width="84" height="84" viewBox="0 0 100 100" role="img" aria-label="Plate-style rest timer, 1:47 left">
+<circle cx="50" cy="50" r="48" fill="#251F1F"/>
+<circle cx="50" cy="50" r="44" fill="none" stroke="#3A3030" stroke-width="4"/>
+<circle cx="50" cy="50" r="44" fill="none" stroke="#F0524A" stroke-width="4" stroke-linecap="round" stroke-dasharray="164.2 276.5" transform="rotate(-90 50 50)"/>
+<circle cx="50" cy="50" r="31" fill="none" stroke="#2F2727" stroke-width="1"/>
+<circle cx="50" cy="50" r="9" fill="#110E0E" stroke="#4C4141" stroke-width="2"/>
+<text x="50" y="27" text-anchor="middle" font-family="Martian Mono, ui-monospace, monospace" font-size="11" fill="#F0EBE8">1:47</text>
+<text x="50" y="80" text-anchor="middle" font-family="Archivo, system-ui, sans-serif" font-weight="700" font-size="7" letter-spacing="1.4" fill="#A39996">REST</text>
+</svg>
+<div style="display:flex;flex-direction:column;gap:4px"><span class="lab">Plate timer</span><span style="font-size:13px;line-height:1.4;color:#C2B8B5">The rim drains as rest runs out.</span></div>
+</div>
+</div>
+
+<div class="card" style="display:flex;align-items:center;gap:16px">
+<svg width="58" height="58" viewBox="0 0 60 60" role="img" aria-label="PR stamp"><circle cx="30" cy="30" r="28" fill="none" stroke="#F0524A" stroke-width="2"/><circle cx="30" cy="30" r="22" fill="none" stroke="#F0524A" stroke-width="1" stroke-dasharray="2 2.5"/><text x="30" y="35" text-anchor="middle" font-family="Archivo, system-ui, sans-serif" font-weight="900" font-size="15" fill="#F0524A" style="font-stretch:125%">PR</text></svg>
+<div style="flex:1;display:flex;flex-direction:column;gap:6px">
+<span class="lab">PR stamp · coach citation</span>
+<span style="font-size:14px;line-height:1.5">One extra rep on Oct 7 broke it<sup class="n" style="font-size:9px;color:#F0524A">[2]</sup>, and today is a new best<sup class="n" style="font-size:9px;color:#F0524A">[3]</sup>.</span>
+</div>
+</div>
+
+<div class="card" style="display:flex;flex-direction:column;gap:12px">
+<span class="lab">Controls</span>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<button class="x" style="height:46px;padding:0 20px;border-radius:999px;border:0;background:#F0524A;color:#1A0605;font-size:12px;letter-spacing:.08em">Log set</button>
+<button class="x" style="height:46px;padding:0 20px;border-radius:999px;border:0;background:#251F1F;color:#F0EBE8;font-size:12px;letter-spacing:.08em">Add set</button>
+<span class="n" style="height:24px;padding:0 9px;border-radius:999px;background:#F0524A24;color:#F0524A;font-size:10px;display:inline-flex;align-items:center">Δ +0.2</span>
+<span class="n" style="height:24px;padding:0 9px;border-radius:999px;background:#251F1F;color:#C2B8B5;font-size:10px;display:inline-flex;align-items:center">RPE 8</span>
+</div>
+<div style="display:flex;gap:10px">
+<div style="flex:1;display:flex;flex-direction:column;gap:5px"><label class="lab" for="f-kg">Load kg</label><input id="f-kg" class="n" value="85.0" style="height:48px;box-sizing:border-box;border-radius:14px;border:0;background:#251F1F;color:#F0EBE8;padding:0 14px;font-size:16px;box-shadow:inset 0 0 0 1.5px #F0524A"></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:5px"><label class="lab" for="f-reps">Reps</label><input id="f-reps" class="n" value="5" style="height:48px;box-sizing:border-box;border-radius:14px;border:0;background:#251F1F;color:#F0EBE8;padding:0 14px;font-size:16px"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
