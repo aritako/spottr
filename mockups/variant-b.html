@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spottr — Variant B: Bold Athletic</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700&family=Plus+Jakarta+Sans:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            iron: '#0A0A0A',
+            plate: '#141414',
+            knurl: '#1F1F1F',
+            edge: '#292929',
+            chalk: '#FAF8F5',
+            concrete: '#8A8780',
+            blaze: '#FF3D00',
+            blazeSoft: 'rgba(255, 61, 0, 0.14)',
+          },
+          fontFamily: {
+            display: ['"Barlow Condensed"', 'sans-serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"Space Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      background-color: #060606;
+      color: #FAF8F5;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .tnum {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+    }
+    .display-condensed {
+      font-family: 'Barlow Condensed', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      line-height: 0.95;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0A0A0A;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #292929;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #FF3D00;
+    }
+  </style>
+</head>
+<body class="min-h-screen selection:bg-blaze selection:text-chalk">
+
+  <!-- TOP STUDIO BAR -->
+  <header class="sticky top-0 z-50 border-b-2 border-edge bg-iron/95 backdrop-blur-sm px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="index.html" class="font-display text-sm font-bold tracking-wider uppercase text-concrete hover:text-chalk flex items-center gap-1.5 bg-plate border border-edge rounded px-3 py-1 transition-colors">
+        <span>←</span>
+        <span>ALL DIRECTIONS</span>
+      </a>
+      <div class="h-5 w-0.5 bg-edge"></div>
+      <div class="flex items-center gap-2.5">
+        <span class="inline-block w-3 h-3 rounded-xs bg-blaze"></span>
+        <span class="font-display text-lg font-extrabold tracking-wide uppercase text-chalk">DIRECTION B — BOLD ATHLETIC</span>
+        <span class="text-xs font-semibold text-concrete hidden sm:inline">High-Contrast Performance &amp; Heavy Iron</span>
+      </div>
+    </div>
+    <nav class="flex items-center gap-1.5 font-display text-sm font-bold tracking-wider uppercase">
+      <a href="variant-a.html" class="px-3.5 py-1 rounded text-concrete hover:text-chalk bg-plate border border-edge">A: PRECISION</a>
+      <a href="variant-b.html" class="px-3.5 py-1 rounded bg-blaze text-chalk">B: ATHLETIC</a>
+      <a href="variant-c.html" class="px-3.5 py-1 rounded text-concrete hover:text-chalk bg-plate border border-edge">C: CALM PREMIUM</a>
+    </nav>
+  </header>
+
+  <!-- STYLE GUIDE STRIP -->
+  <section class="border-b-2 border-edge bg-iron px-6 py-6">
+    <div class="max-w-[2240px] mx-auto">
+      <div class="flex items-center justify-between mb-3">
+        <span class="font-display text-sm font-bold tracking-wider uppercase text-blaze">DESIGN SYSTEM — BOLD ATHLETIC (RADIUS: 6PX · TOUCH TARGETS: 48PX · HIGH-IMPACT CONTRAST)</span>
+        <span class="font-mono text-xs text-concrete">BARLOW CONDENSED + PLUS JAKARTA SANS + SPACE MONO</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 bg-plate border-2 border-edge rounded-lg p-5">
+        
+        <!-- Palette Swatches -->
+        <div class="lg:col-span-5">
+          <div class="font-display text-xs font-bold tracking-widest uppercase text-concrete mb-2.5">COLOR PALETTE</div>
+          <div class="grid grid-cols-6 gap-2.5">
+            <div class="bg-iron border border-edge rounded-md p-2">
+              <div class="h-8 w-full rounded bg-[#0A0A0A] border border-edge mb-2"></div>
+              <div class="font-display text-sm font-bold">IRON</div>
+              <div class="font-mono text-[10px] text-concrete">#0A0A0A</div>
+            </div>
+            <div class="bg-iron border border-edge rounded-md p-2">
+              <div class="h-8 w-full rounded bg-[#141414] border border-edge mb-2"></div>
+              <div class="font-display text-sm font-bold">PLATE</div>
+              <div class="font-mono text-[10px] text-concrete">#141414</div>
+            </div>
+            <div class="bg-iron border border-edge rounded-md p-2">
+              <div class="h-8 w-full rounded bg-[#1F1F1F] border border-edge mb-2"></div>
+              <div class="font-display text-sm font-bold">KNURL</div>
+              <div class="font-mono text-[10px] text-concrete">#1F1F1F</div>
+            </div>
+            <div class="bg-iron border border-edge rounded-md p-2">
+              <div class="h-8 w-full rounded bg-[#FAF8F5] mb-2"></div>
+              <div class="font-display text-sm font-bold">CHALK</div>
+              <div class="font-mono text-[10px] text-concrete">#FAF8F5</div>
+            </div>
+            <div class="bg-iron border border-edge rounded-md p-2">
+              <div class="h-8 w-full rounded bg-[#8A8780] mb-2"></div>
+              <div class="font-display text-sm font-bold">CONCRETE</div>
+              <div class="font-mono text-[10px] text-concrete">#8A8780</div>
+            </div>
+            <div class="bg-iron border-2 border-blaze rounded-md p-2">
+              <div class="h-8 w-full rounded bg-[#FF3D00] mb-2"></div>
+              <div class="font-display text-sm font-bold text-blaze">BLAZE</div>
+              <div class="font-mono text-[10px] text-concrete">#FF3D00</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Typography -->
+        <div class="lg:col-span-4 lg:border-l-2 lg:border-edge lg:pl-5 flex flex-col justify-between">
+          <div class="font-display text-xs font-bold tracking-widest uppercase text-concrete mb-2">TYPE PAIRING &amp; SCALE</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-iron border border-edge rounded-md p-3">
+              <div class="font-mono text-[10px] text-concrete mb-1">BARLOW CONDENSED 800</div>
+              <div class="display-condensed text-2xl font-extrabold text-chalk">BENCH PRESS PR</div>
+              <div class="text-xs text-concrete mt-1 font-medium">Plus Jakarta Sans UI body</div>
+            </div>
+            <div class="bg-iron border border-edge rounded-md p-3">
+              <div class="font-mono text-[10px] text-concrete mb-1">SPACE MONO (TABULAR)</div>
+              <div class="font-mono text-lg font-bold text-chalk tnum">95.0 × 5</div>
+              <div class="font-mono text-xs text-blaze font-bold tnum mt-1">110.8 KG E1RM</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sample Buttons & Inputs -->
+        <div class="lg:col-span-3 lg:border-l-2 lg:border-edge lg:pl-5 flex flex-col justify-between">
+          <div class="font-display text-xs font-bold tracking-widest uppercase text-concrete mb-2">CHUNKY GYM FLOOR CONTROLS</div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <button class="bg-blaze text-chalk font-display text-base font-extrabold tracking-wider uppercase px-4 py-2.5 rounded-md shadow-sm">
+              LOG SET ✓
+            </button>
+            <button class="bg-knurl border-2 border-edge text-chalk font-display text-base font-bold tracking-wider uppercase px-3.5 py-2 rounded-md">
+              + ADD SET
+            </button>
+            <div class="bg-iron border-2 border-blaze rounded-md px-3 py-2 font-mono text-sm font-bold text-chalk tnum">
+              95.0 <span class="text-[10px] text-concrete">KG</span>
+            </div>
+            <span class="bg-blaze text-chalk font-display text-xs font-extrabold uppercase px-2 py-1 rounded">NEW PR</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ARTBOARDS STAGE -->
+  <main class="px-6 py-8 overflow-x-auto bg-[#060606]">
+    <div class="min-w-[2140px] max-w-[2240px] mx-auto flex items-start gap-8">
+
+      <!-- ================================================================= -->
+      <!-- ARTBOARD 1: MOBILE ACTIVE WORKOUT LOGGER (390px wide)             -->
+      <!-- ================================================================= -->
+      <div class="shrink-0">
+        <div class="flex items-center justify-between mb-2.5 px-1">
+          <div class="flex items-center gap-2">
+            <span class="bg-blaze text-chalk font-display text-xs font-extrabold px-2 py-0.5 rounded-xs">01</span>
+            <span class="font-display text-base font-bold tracking-wider uppercase text-chalk">MOBILE — ACTIVE WORKOUT LOGGER</span>
+          </div>
+          <span class="font-mono text-xs text-concrete">390 × 844</span>
+        </div>
+
+        <!-- Phone Frame (Exact 390px wide) -->
+        <div class="w-[390px] h-[844px] bg-iron border-[3px] border-edge rounded-[28px] shadow-2xl flex flex-col justify-between overflow-hidden">
+          
+          <!-- Status & Top Bar -->
+          <div class="bg-plate border-b-2 border-edge px-4 pt-3 pb-3.5 shrink-0">
+            <div class="flex items-center justify-between text-xs font-mono text-concrete mb-2.5">
+              <span class="text-chalk font-bold tnum">18:42</span>
+              <span class="text-blaze font-bold tnum">● 34:18 ELAPSED</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-display text-xs font-bold tracking-widest uppercase text-blaze">WEEK 8 · DAY 1</div>
+                <h1 class="display-condensed text-3xl font-extrabold text-chalk">UPPER POWER</h1>
+              </div>
+              <button class="bg-blaze text-chalk font-display text-base font-extrabold tracking-wider uppercase px-4 py-2.5 rounded-md">
+                FINISH WORKOUT
+              </button>
+            </div>
+          </div>
+
+          <!-- Scrollable Workout Cards -->
+          <div class="flex-1 overflow-y-auto p-3.5 space-y-4">
+
+            <!-- EXERCISE CARD 1: BARBELL BENCH PRESS -->
+            <div class="bg-plate border-2 border-edge rounded-lg overflow-hidden">
+              <!-- Card Header -->
+              <div class="p-3.5 border-b-2 border-edge flex items-start justify-between bg-knurl/60">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="bg-blaze text-chalk font-display text-xs font-extrabold px-1.5 py-0.5 rounded-xs">COMPOUND</span>
+                    <span class="font-mono text-[11px] text-concrete tnum">E1RM 110.8 KG</span>
+                  </div>
+                  <h2 class="display-condensed text-2xl font-extrabold text-chalk mt-1">BARBELL BENCH PRESS</h2>
+                </div>
+                <div class="text-right font-mono">
+                  <div class="text-[10px] text-concrete">LAST WEEK</div>
+                  <div class="text-xs font-bold text-chalk tnum">92.5 × 5</div>
+                </div>
+              </div>
+
+              <!-- Column Labels -->
+              <div class="grid grid-cols-12 px-3 py-1.5 bg-iron text-[11px] font-display font-bold tracking-wider uppercase text-concrete border-b border-edge">
+                <div class="col-span-2">SET</div>
+                <div class="col-span-3">PREVIOUS</div>
+                <div class="col-span-3 text-center">KG</div>
+                <div class="col-span-2 text-center">REPS</div>
+                <div class="col-span-2 text-right">LOG</div>
+              </div>
+
+              <!-- Chunky Set Rows -->
+              <div class="divide-y divide-edge font-mono tnum">
+                <!-- Set 1: Done -->
+                <div class="grid grid-cols-12 items-center px-3 py-2.5 bg-plate">
+                  <div class="col-span-2">
+                    <span class="w-7 h-7 rounded bg-knurl text-concrete font-bold text-xs inline-flex items-center justify-center">1</span>
+                  </div>
+                  <div class="col-span-3 text-xs text-concrete">90.0 × 5</div>
+                  <div class="col-span-3 text-center text-sm font-bold text-chalk">90.0</div>
+                  <div class="col-span-2 text-center text-sm font-bold text-chalk">5</div>
+                  <div class="col-span-2 flex justify-end">
+                    <span class="w-9 h-9 rounded-md bg-knurl border border-edge text-chalk inline-flex items-center justify-center font-bold text-sm">✓</span>
+                  </div>
+                </div>
+
+                <!-- Set 2: Done + PR -->
+                <div class="grid grid-cols-12 items-center px-3 py-2.5 bg-blazeSoft border-l-4 border-l-blaze">
+                  <div class="col-span-2">
+                    <span class="px-1.5 py-1 rounded bg-blaze text-chalk font-display font-extrabold text-xs">PR</span>
+                  </div>
+                  <div class="col-span-3 text-xs text-concrete">92.5 × 5</div>
+                  <div class="col-span-3 text-center text-base font-bold text-chalk">95.0</div>
+                  <div class="col-span-2 text-center text-base font-bold text-chalk">5</div>
+                  <div class="col-span-2 flex justify-end">
+                    <span class="w-9 h-9 rounded-md bg-blaze text-chalk inline-flex items-center justify-center font-bold text-sm">✓</span>
+                  </div>
+                </div>
+
+                <!-- Set 3: Active Chunky Touch Row -->
+                <div class="grid grid-cols-12 items-center px-3 py-2.5 bg-iron">
+                  <div class="col-span-2">
+                    <span class="w-7 h-7 rounded border-2 border-blaze text-blaze font-bold text-xs inline-flex items-center justify-center">3</span>
+                  </div>
+                  <div class="col-span-3 text-xs text-concrete">92.5 × 5</div>
+                  <div class="col-span-3 px-1">
+                    <div class="bg-knurl border-2 border-blaze rounded-md py-1.5 text-center text-sm font-bold text-chalk">95.0</div>
+                  </div>
+                  <div class="col-span-2 px-1">
+                    <div class="bg-knurl border-2 border-edge rounded-md py-1.5 text-center text-sm font-bold text-chalk">5</div>
+                  </div>
+                  <div class="col-span-2 flex justify-end">
+                    <button class="w-9 h-9 rounded-md bg-knurl border-2 border-blaze text-blaze inline-flex items-center justify-center font-bold text-xs">
+                      GO
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Set 4: Upcoming -->
+                <div class="grid grid-cols-12 items-center px-3 py-2.5 bg-plate opacity-60">
+                  <div class="col-span-2">
+                    <span class="w-7 h-7 rounded bg-iron text-concrete font-bold text-xs inline-flex items-center justify-center">4</span>
+                  </div>
+                  <div class="col-span-3 text-xs text-concrete">90.0 × 6</div>
+                  <div class="col-span-3 text-center text-sm font-bold text-concrete">90.0</div>
+                  <div class="col-span-2 text-center text-sm font-bold text-concrete">6</div>
+                  <div class="col-span-2 flex justify-end">
+                    <span class="w-9 h-9 rounded-md bg-iron border border-edge inline-flex items-center justify-center text-concrete text-xs">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick-Add Set Button -->
+              <div class="p-2.5 bg-iron border-t border-edge">
+                <button class="w-full py-2.5 bg-knurl hover:bg-edge border border-edge rounded-md font-display text-sm font-extrabold tracking-wider uppercase text-chalk flex items-center justify-center gap-2">
+                  <span class="text-blaze text-base leading-none">+</span>
+                  <span>QUICK ADD SET (90.0 KG × 6)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- EXERCISE CARD 2: INCLINE DB PRESS -->
+            <div class="bg-plate border-2 border-edge rounded-lg overflow-hidden">
+              <div class="p-3.5 border-b border-edge flex items-center justify-between bg-knurl/40">
+                <div>
+                  <h2 class="display-condensed text-xl font-extrabold text-chalk">INCLINE DUMBBELL PRESS</h2>
+                  <div class="font-mono text-[11px] text-concrete tnum">PREV: 34.0 KG × 8 (3 SETS)</div>
+                </div>
+                <span class="font-mono text-xs font-bold text-chalk bg-iron border border-edge px-2.5 py-1 rounded tnum">2/3 SETS</span>
+              </div>
+              <div class="p-2.5 bg-iron">
+                <button class="w-full py-2 bg-knurl border border-edge rounded-md font-display text-xs font-bold tracking-wider uppercase text-concrete">
+                  + ADD SET
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- CHUNKY FULL-BLEED ORANGE REST TIMER -->
+          <div class="bg-blaze text-chalk px-4 py-3 shrink-0">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-display text-xs font-extrabold tracking-widest uppercase text-iron/80">RESTING · SET 3 UP NEXT</div>
+                <div class="font-mono text-3xl font-bold tnum leading-none mt-0.5">01:45</div>
+              </div>
+              <div class="flex items-center gap-1.5 font-display text-sm font-extrabold uppercase">
+                <button class="bg-iron/25 hover:bg-iron/40 text-chalk px-3 py-2 rounded-md tnum">-15S</button>
+                <button class="bg-iron/25 hover:bg-iron/40 text-chalk px-3 py-2 rounded-md tnum">+15S</button>
+                <button class="bg-iron text-chalk px-3.5 py-2 rounded-md">SKIP →</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM TAB NAVIGATION -->
+          <nav class="grid grid-cols-4 bg-iron border-t-2 border-edge font-display text-xs font-bold tracking-wider uppercase shrink-0">
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-blaze border-t-2 border-t-blaze bg-plate">
+              <span class="text-sm font-extrabold">WORKOUT</span>
+            </a>
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-concrete hover:text-chalk">
+              <span>HISTORY</span>
+            </a>
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-concrete hover:text-chalk">
+              <span>PROGRESS</span>
+            </a>
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-concrete hover:text-chalk">
+              <span>COACH</span>
+            </a>
+          </nav>
+
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- ARTBOARD 2: MOBILE AI COACH CHAT (390px wide)                     -->
+      <!-- ================================================================= -->
+      <div class="shrink-0">
+        <div class="flex items-center justify-between mb-2.5 px-1">
+          <div class="flex items-center gap-2">
+            <span class="bg-blaze text-chalk font-display text-xs font-extrabold px-2 py-0.5 rounded-xs">02</span>
+            <span class="font-display text-base font-bold tracking-wider uppercase text-chalk">MOBILE — AI COACH CHAT</span>
+          </div>
+          <span class="font-mono text-xs text-concrete">390 × 844</span>
+        </div>
+
+        <!-- Phone Frame (Exact 390px wide) -->
+        <div class="w-[390px] h-[844px] bg-iron border-[3px] border-edge rounded-[28px] shadow-2xl flex flex-col justify-between overflow-hidden">
+          
+          <!-- Header -->
+          <div class="bg-plate border-b-2 border-edge px-4 pt-3 pb-3.5 shrink-0">
+            <div class="flex items-center justify-between text-xs font-mono text-concrete mb-2">
+              <span class="text-chalk font-bold tnum">19:14</span>
+              <span class="text-blaze font-bold">RAG VERIFIED LOGS</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-display text-xs font-bold tracking-widest uppercase text-blaze">SPOTTR PERFORMANCE AI</div>
+                <h1 class="display-condensed text-3xl font-extrabold text-chalk">HEAD COACH</h1>
+              </div>
+              <span class="bg-knurl border border-edge rounded-md px-2.5 py-1 font-mono text-[11px] text-chalk tnum">148 SESSIONS</span>
+            </div>
+          </div>
+
+          <!-- Chat Stream -->
+          <div class="flex-1 overflow-y-auto p-3.5 space-y-4">
+
+            <!-- User Message Bubble -->
+            <div class="flex justify-end">
+              <div class="bg-knurl border-2 border-edge rounded-lg p-3.5 max-w-[88%]">
+                <div class="font-display text-[11px] font-bold tracking-wider uppercase text-concrete mb-1">YOU · 19:13</div>
+                <p class="text-xs font-semibold text-chalk leading-relaxed">
+                  Has my bench stalled? I was stuck on 92.5 kg for two weeks before today's session.
+                </p>
+              </div>
+            </div>
+
+            <!-- Coach Response Card -->
+            <div class="bg-plate border-2 border-edge rounded-lg p-3.5 space-y-3.5">
+              <div class="flex items-center justify-between border-b border-edge pb-2">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 bg-blaze inline-block rounded-xs"></span>
+                  <span class="font-display text-base font-extrabold tracking-wide uppercase text-chalk">NO STALL — YOU BUILT MOMENTUM</span>
+                </div>
+                <span class="font-mono text-[10px] text-blaze font-bold">+2.9 KG PR</span>
+              </div>
+
+              <p class="text-xs text-chalk/90 leading-relaxed">
+                Holding <span class="font-mono font-bold text-chalk tnum">92.5 kg</span> for two weeks wasn't a plateau. Look at your effort drop before today's breakout set:
+              </p>
+
+              <!-- INLINE SCORECARD CITATION 1 -->
+              <div class="bg-iron border-2 border-edge rounded-md overflow-hidden">
+                <div class="bg-knurl px-3 py-1.5 flex items-center justify-between">
+                  <span class="font-display text-xs font-bold tracking-wider uppercase text-chalk">BARBELL BENCH PRESS · TOP SETS</span>
+                  <span class="font-mono text-[10px] text-concrete">3-WEEK LOG</span>
+                </div>
+                <div class="p-2.5 space-y-2 font-mono text-xs tnum">
+                  <div class="flex items-center justify-between px-2 py-1.5 bg-plate rounded">
+                    <span class="text-concrete text-[11px]">07 OCT</span>
+                    <span class="font-bold text-chalk">92.5 × 5</span>
+                    <span class="text-concrete text-[11px]">RPE 9.5</span>
+                    <span class="text-concrete font-bold">107.9</span>
+                  </div>
+                  <div class="flex items-center justify-between px-2 py-1.5 bg-plate rounded">
+                    <span class="text-concrete text-[11px]">14 OCT</span>
+                    <span class="font-bold text-chalk">92.5 × 5</span>
+                    <span class="text-chalk text-[11px]">RPE 8.5 ↓</span>
+                    <span class="text-concrete font-bold">107.9</span>
+                  </div>
+                  <div class="flex items-center justify-between px-2 py-1.5 bg-blazeSoft border border-blaze rounded">
+                    <span class="text-blaze font-bold text-[11px]">TODAY</span>
+                    <span class="font-bold text-chalk">95.0 × 5</span>
+                    <span class="text-blaze font-bold text-[11px]">RPE 8.5</span>
+                    <span class="bg-blaze text-chalk text-[10px] font-bold px-1.5 py-0.5 rounded-xs">110.8 PR</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- INLINE CITATION 2: Volume + RAG Doc -->
+              <div class="bg-iron border-l-4 border-l-blaze rounded-r-md p-3">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="font-display text-xs font-extrabold uppercase tracking-wider text-blaze">COACHING GUIDE · DOC #04 (CHUNK 12)</span>
+                  <span class="font-mono text-[10px] text-concrete">DOUBLE PROGRESSION</span>
+                </div>
+                <p class="text-xs text-concrete leading-snug">
+                  Dropping a full RPE point at <span class="font-mono text-chalk tnum">92.5 kg</span> while adding <span class="font-mono text-chalk tnum">+280 kg</span> of weekly volume confirmed readiness for <span class="font-mono text-chalk font-bold tnum">95.0 kg</span>.
+                </p>
+              </div>
+
+              <p class="text-xs text-chalk/90 leading-relaxed">
+                <strong class="text-blaze font-display uppercase tracking-wide text-sm">NEXT TARGET:</strong> Stay at <span class="font-mono font-bold tnum">95.0 kg × 5</span> next Monday. Attack <span class="font-mono font-bold tnum">97.5 kg</span> once Set 1 feels like RPE 8.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Composer Bar -->
+          <div class="p-3 bg-plate border-t-2 border-edge shrink-0 space-y-2">
+            <div class="flex gap-1.5 overflow-x-auto">
+              <button class="shrink-0 bg-knurl border border-edge rounded px-2.5 py-1 font-display text-xs font-bold uppercase tracking-wider text-chalk">
+                HOW IS MY INCLINE DB PROGRESSING?
+              </button>
+              <button class="shrink-0 bg-knurl border border-edge rounded px-2.5 py-1 font-display text-xs font-bold uppercase tracking-wider text-concrete">
+                120KG BENCH ROADMAP
+              </button>
+            </div>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                value="Ask Coach about your numbers..."
+                readonly
+                class="flex-1 bg-iron border-2 border-edge rounded-md px-3 py-2.5 text-xs text-concrete font-medium focus:outline-none"
+              />
+              <button class="bg-blaze text-chalk font-display text-base font-extrabold uppercase tracking-wider px-4 rounded-md">
+                SEND
+              </button>
+            </div>
+          </div>
+
+          <!-- BOTTOM TAB NAVIGATION -->
+          <nav class="grid grid-cols-4 bg-iron border-t-2 border-edge font-display text-xs font-bold tracking-wider uppercase shrink-0">
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-concrete hover:text-chalk">
+              <span>WORKOUT</span>
+            </a>
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-concrete hover:text-chalk">
+              <span>HISTORY</span>
+            </a>
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-concrete hover:text-chalk">
+              <span>PROGRESS</span>
+            </a>
+            <a href="#" class="py-3 flex flex-col items-center justify-center text-blaze border-t-2 border-t-blaze bg-plate">
+              <span class="text-sm font-extrabold">COACH</span>
+            </a>
+          </nav>
+
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- ARTBOARD 3: DESKTOP PROGRESS VIEW (1280px wide)                   -->
+      <!-- ================================================================= -->
+      <div class="shrink-0">
+        <div class="flex items-center justify-between mb-2.5 px-1">
+          <div class="flex items-center gap-2">
+            <span class="bg-blaze text-chalk font-display text-xs font-extrabold px-2 py-0.5 rounded-xs">03</span>
+            <span class="font-display text-base font-bold tracking-wider uppercase text-chalk">DESKTOP — PROGRESS SCOREBOARD &amp; COACH PANEL</span>
+          </div>
+          <span class="font-mono text-xs text-concrete">1280 × 844</span>
+        </div>
+
+        <!-- Desktop Browser Frame (1280px wide) -->
+        <div class="w-[1280px] h-[844px] bg-iron border-[3px] border-edge rounded-xl shadow-2xl flex flex-col overflow-hidden">
+          
+          <!-- Browser Top Bar -->
+          <div class="h-10 bg-plate border-b-2 border-edge px-4 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-edge inline-block"></span>
+              <span class="w-3 h-3 rounded-full bg-edge inline-block"></span>
+              <span class="w-3 h-3 rounded-full bg-blaze inline-block"></span>
+              <span class="ml-3 font-mono text-xs text-concrete">app.spottr.ai/progress/barbell-bench-press</span>
+            </div>
+            <div class="font-display text-sm font-bold tracking-wider uppercase text-chalk">
+              BLOCK 04 · HEAVY ACCUMULATION
+            </div>
+          </div>
+
+          <!-- Main 3-Column Layout -->
+          <div class="flex-1 grid grid-cols-12 overflow-hidden">
+
+            <!-- LEFT SIDEBAR (2 cols) -->
+            <aside class="col-span-2 bg-plate border-r-2 border-edge flex flex-col justify-between p-4">
+              <div class="space-y-6">
+                <!-- Brand -->
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded bg-blaze flex items-center justify-center font-display text-lg font-extrabold text-chalk">S</div>
+                  <span class="display-condensed text-2xl font-extrabold tracking-wider text-chalk">SPOTTR</span>
+                </div>
+
+                <!-- Navigation -->
+                <nav class="space-y-1.5 font-display text-base font-bold tracking-wider uppercase">
+                  <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-md text-concrete hover:text-chalk hover:bg-knurl">
+                    <span>WORKOUTS</span>
+                  </a>
+                  <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-md bg-blaze text-chalk font-extrabold">
+                    <span>PROGRESS</span>
+                    <span>→</span>
+                  </a>
+                  <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-md text-concrete hover:text-chalk hover:bg-knurl">
+                    <span>EXERCISES</span>
+                  </a>
+                  <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-md text-concrete hover:text-chalk hover:bg-knurl">
+                    <span>AI COACH</span>
+                  </a>
+                </nav>
+
+                <!-- Key Lifts Switcher -->
+                <div class="pt-4 border-t-2 border-edge">
+                  <div class="font-display text-xs font-extrabold tracking-widest uppercase text-concrete mb-2.5">PRIMARY LIFTS</div>
+                  <div class="space-y-1.5">
+                    <div class="p-2.5 rounded-md bg-iron border-2 border-blaze flex items-center justify-between">
+                      <span class="font-display text-sm font-extrabold uppercase text-chalk">BENCH PRESS</span>
+                      <span class="font-mono text-xs font-bold text-blaze tnum">110.8</span>
+                    </div>
+                    <div class="p-2.5 rounded-md bg-iron border border-edge flex items-center justify-between text-concrete">
+                      <span class="font-display text-sm font-bold uppercase">BACK SQUAT</span>
+                      <span class="font-mono text-xs font-bold text-chalk tnum">152.5</span>
+                    </div>
+                    <div class="p-2.5 rounded-md bg-iron border border-edge flex items-center justify-between text-concrete">
+                      <span class="font-display text-sm font-bold uppercase">DEADLIFT</span>
+                      <span class="font-mono text-xs font-bold text-chalk tnum">185.0</span>
+                    </div>
+                    <div class="p-2.5 rounded-md bg-iron border border-edge flex items-center justify-between text-concrete">
+                      <span class="font-display text-sm font-bold uppercase">OVERHEAD PRESS</span>
+                      <span class="font-mono text-xs font-bold text-chalk tnum">68.5</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Athlete Card -->
+              <div class="bg-iron border-2 border-edge rounded-lg p-3">
+                <div class="font-display text-xs font-bold uppercase text-blaze">TOTAL E1RM</div>
+                <div class="font-mono text-xl font-bold text-chalk tnum mt-0.5">448.3 KG</div>
+                <div class="font-mono text-[10px] text-concrete tnum mt-1">BW 81.4 KG · DOTS 342</div>
+              </div>
+            </aside>
+
+            <!-- CENTER PROGRESS SCOREBOARD (6 cols) -->
+            <section class="col-span-6 bg-iron p-5 overflow-y-auto space-y-5">
+              
+              <!-- Header + Time Filter -->
+              <div class="flex items-end justify-between border-b-2 border-edge pb-4">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="bg-blaze text-chalk font-display text-xs font-extrabold uppercase px-2 py-0.5 rounded-xs">NEW ALL-TIME PR</span>
+                    <span class="font-mono text-xs text-concrete">CHEST · COMPOUND</span>
+                  </div>
+                  <h2 class="display-condensed text-4xl font-extrabold text-chalk mt-1">BARBELL BENCH PRESS</h2>
+                </div>
+                <div class="flex bg-plate border-2 border-edge rounded-md p-1 font-display text-sm font-bold uppercase">
+                  <button class="px-3 py-1 text-concrete">4W</button>
+                  <button class="px-3 py-1 bg-blaze text-chalk rounded-xs font-extrabold">8W</button>
+                  <button class="px-3 py-1 text-concrete">16W</button>
+                  <button class="px-3 py-1 text-concrete">ALL</button>
+                </div>
+              </div>
+
+              <!-- Poster KPI Cards -->
+              <div class="grid grid-cols-3 gap-3.5">
+                <div class="bg-plate border-2 border-blaze rounded-lg p-3.5">
+                  <div class="font-display text-xs font-extrabold tracking-wider uppercase text-blaze">ESTIMATED 1RM</div>
+                  <div class="font-mono text-3xl font-bold text-chalk tnum mt-1">110.8<span class="text-sm text-concrete ml-1">KG</span></div>
+                  <div class="font-display text-xs font-bold uppercase text-chalk mt-1">+6.3 KG IN 8 WEEKS</div>
+                </div>
+                <div class="bg-plate border-2 border-edge rounded-lg p-3.5">
+                  <div class="font-display text-xs font-extrabold tracking-wider uppercase text-concrete">HEAVIEST 5-REP SET</div>
+                  <div class="font-mono text-3xl font-bold text-chalk tnum mt-1">95.0<span class="text-sm text-concrete ml-1">× 5</span></div>
+                  <div class="font-display text-xs font-bold uppercase text-concrete mt-1">LOGGED 21 OCT · RPE 8.5</div>
+                </div>
+                <div class="bg-plate border-2 border-edge rounded-lg p-3.5">
+                  <div class="font-display text-xs font-extrabold tracking-wider uppercase text-concrete">WEEKLY VOLUME</div>
+                  <div class="font-mono text-3xl font-bold text-chalk tnum mt-1">2,460<span class="text-sm text-concrete ml-1">KG</span></div>
+                  <div class="font-display text-xs font-bold uppercase text-concrete mt-1">18 WORKING SETS</div>
+                </div>
+              </div>
+
+              <!-- CHART 1: ESTIMATED 1RM & PR MARKERS -->
+              <div class="bg-plate border-2 border-edge rounded-lg p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 class="display-condensed text-xl font-extrabold text-chalk">ESTIMATED 1RM PROGRESSION (KG)</h3>
+                    <p class="text-xs text-concrete">8-week trajectory with verified PR breakthroughs</p>
+                  </div>
+                  <div class="flex items-center gap-3 font-display text-xs font-bold uppercase">
+                    <span class="flex items-center gap-1.5 text-chalk">
+                      <span class="w-3 h-1 bg-blaze inline-block"></span> E1RM CURVE
+                    </span>
+                    <span class="flex items-center gap-1.5 text-blaze">
+                      <span class="w-3 h-3 rounded-full bg-blaze inline-block"></span> PR SET
+                    </span>
+                  </div>
+                </div>
+
+                <svg viewBox="0 0 560 175" class="w-full h-auto font-mono">
+                  <!-- Grid lines -->
+                  <line x1="40" y1="20" x2="540" y2="20" stroke="#292929" stroke-width="1.5" />
+                  <line x1="40" y1="60" x2="540" y2="60" stroke="#1F1F1F" stroke-width="1.5" />
+                  <line x1="40" y1="100" x2="540" y2="100" stroke="#1F1F1F" stroke-width="1.5" />
+                  <line x1="40" y1="140" x2="540" y2="140" stroke="#292929" stroke-width="2" />
+
+                  <text x="32" y="24" text-anchor="end" fill="#8A8780" font-size="10" font-weight="700">112</text>
+                  <text x="32" y="64" text-anchor="end" fill="#8A8780" font-size="10" font-weight="700">108</text>
+                  <text x="32" y="104" text-anchor="end" fill="#8A8780" font-size="10" font-weight="700">104</text>
+                  <text x="32" y="144" text-anchor="end" fill="#8A8780" font-size="10" font-weight="700">100</text>
+
+                  <!-- Bold Fill under curve -->
+                  <polygon
+                    points="65,95 130,82 195,78 260,90 325,61 390,61 455,57 520,32 520,140 65,140"
+                    fill="rgba(255, 61, 0, 0.16)"
+                  />
+
+                  <!-- Thick Athletic Line -->
+                  <polyline
+                    fill="none"
+                    stroke="#FF3D00"
+                    stroke-width="4"
+                    stroke-linejoin="round"
+                    stroke-linecap="round"
+                    points="65,95 130,82 195,78 260,90 325,61 390,61 455,57 520,32"
+                  />
+
+                  <!-- Regular nodes -->
+                  <circle cx="65" cy="95" r="5" fill="#0A0A0A" stroke="#FAF8F5" stroke-width="2.5" />
+                  <circle cx="130" cy="82" r="5" fill="#0A0A0A" stroke="#FAF8F5" stroke-width="2.5" />
+                  <circle cx="260" cy="90" r="5" fill="#0A0A0A" stroke="#8A8780" stroke-width="2.5" />
+                  <circle cx="390" cy="61" r="5" fill="#0A0A0A" stroke="#FAF8F5" stroke-width="2.5" />
+                  <circle cx="455" cy="57" r="5" fill="#0A0A0A" stroke="#FAF8F5" stroke-width="2.5" />
+
+                  <!-- PR Nodes -->
+                  <circle cx="195" cy="78" r="7" fill="#FF3D00" stroke="#FAF8F5" stroke-width="2.5" />
+                  <text x="195" y="64" text-anchor="middle" fill="#FAF8F5" font-size="9" font-weight="700">105.0 PR</text>
+
+                  <circle cx="325" cy="61" r="7" fill="#FF3D00" stroke="#FAF8F5" stroke-width="2.5" />
+                  <text x="325" y="47" text-anchor="middle" fill="#FAF8F5" font-size="9" font-weight="700">107.9 PR</text>
+
+                  <!-- Hero PR Node -->
+                  <circle cx="520" cy="32" r="9" fill="#FF3D00" stroke="#FAF8F5" stroke-width="3" />
+                  <rect x="445" y="4" width="90" height="20" rx="4" fill="#FF3D00" />
+                  <text x="490" y="18" text-anchor="middle" fill="#FAF8F5" font-size="10" font-weight="700">110.8 KG PR</text>
+
+                  <!-- X-Axis Dates -->
+                  <text x="65" y="162" text-anchor="middle" fill="#8A8780" font-size="9" font-weight="700">02 SEP</text>
+                  <text x="130" y="162" text-anchor="middle" fill="#8A8780" font-size="9" font-weight="700">09 SEP</text>
+                  <text x="195" y="162" text-anchor="middle" fill="#8A8780" font-size="9" font-weight="700">16 SEP</text>
+                  <text x="260" y="162" text-anchor="middle" fill="#8A8780" font-size="9" font-weight="700">23 SEP</text>
+                  <text x="325" y="162" text-anchor="middle" fill="#8A8780" font-size="9" font-weight="700">30 SEP</text>
+                  <text x="390" y="162" text-anchor="middle" fill="#8A8780" font-size="9" font-weight="700">07 OCT</text>
+                  <text x="455" y="162" text-anchor="middle" fill="#8A8780" font-size="9" font-weight="700">14 OCT</text>
+                  <text x="520" y="162" text-anchor="middle" fill="#FF3D00" font-size="10" font-weight="700">21 OCT</text>
+                </svg>
+              </div>
+
+              <!-- CHART 2: WEEKLY VOLUME BARS -->
+              <div class="bg-plate border-2 border-edge rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="display-condensed text-lg font-extrabold text-chalk">WEEKLY TONNAGE (KG)</h3>
+                  <span class="font-mono text-xs text-blaze font-bold tnum">8-WK AVG: 2,302 KG</span>
+                </div>
+                <svg viewBox="0 0 560 95" class="w-full h-auto font-mono">
+                  <line x1="40" y1="75" x2="540" y2="75" stroke="#292929" stroke-width="2" />
+                  <text x="32" y="25" text-anchor="end" fill="#8A8780" font-size="9" font-weight="700">2.5K</text>
+                  <text x="32" y="75" text-anchor="end" fill="#8A8780" font-size="9" font-weight="700">0</text>
+
+                  <rect x="49" y="27" width="32" height="48" rx="3" fill="#292929" />
+                  <rect x="114" y="23" width="32" height="52" rx="3" fill="#292929" />
+                  <rect x="179" y="19" width="32" height="56" rx="3" fill="#292929" />
+                  <rect x="244" y="37" width="32" height="38" rx="3" fill="#1F1F1F" stroke="#292929" stroke-width="1.5" />
+                  <rect x="309" y="18" width="32" height="57" rx="3" fill="#292929" />
+                  <rect x="374" y="16" width="32" height="59" rx="3" fill="#292929" />
+                  <rect x="439" y="13" width="32" height="62" rx="3" fill="#8A8780" />
+                  <rect x="504" y="15" width="32" height="60" rx="3" fill="#FF3D00" />
+                </svg>
+              </div>
+
+            </section>
+
+            <!-- RIGHT DOCKED AI COACH (4 cols) -->
+            <aside class="col-span-4 bg-plate border-l-2 border-edge flex flex-col justify-between overflow-hidden">
+              
+              <!-- Coach Banner -->
+              <div class="p-4 bg-iron border-b-2 border-edge flex items-center justify-between">
+                <div>
+                  <div class="font-display text-xs font-extrabold tracking-widest uppercase text-blaze">LIVE RAG ANALYSIS</div>
+                  <h3 class="display-condensed text-2xl font-extrabold text-chalk">COACH SIDELINE</h3>
+                </div>
+                <span class="bg-blaze text-chalk font-display text-xs font-extrabold uppercase px-2.5 py-1 rounded">BENCH PRESS</span>
+              </div>
+
+              <!-- Messages -->
+              <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                
+                <!-- User Question -->
+                <div class="bg-knurl border-2 border-edge rounded-lg p-3">
+                  <div class="font-display text-xs font-bold uppercase text-concrete mb-1">ATHLETE QUESTION</div>
+                  <p class="text-xs font-semibold text-chalk">
+                    Has my bench stalled? How should I load next week's heavy session?
+                  </p>
+                </div>
+
+                <!-- Coach Breakdown -->
+                <div class="bg-iron border-2 border-edge rounded-lg p-3.5 space-y-3">
+                  <div class="font-display text-sm font-extrabold uppercase tracking-wider text-blaze">
+                    BREAKOUT CONFIRMED (+2.9 KG E1RM)
+                  </div>
+                  <p class="text-xs text-chalk/90 leading-relaxed">
+                    Your 2-week pause at <span class="font-mono font-bold tnum">92.5 kg</span> compressed top-set RPE from <span class="font-mono font-bold tnum">9.5 → 8.5</span>, setting up today's <span class="font-mono font-bold text-blaze tnum">95.0 kg × 5</span> PR.
+                  </p>
+
+                  <!-- Inline Scorecard -->
+                  <div class="bg-plate border-2 border-blaze rounded-md p-3 font-mono text-xs tnum">
+                    <div class="flex items-center justify-between text-[10px] text-blaze font-bold mb-1">
+                      <span>SESSION #148 · TODAY</span>
+                      <span>PR VERIFIED</span>
+                    </div>
+                    <div class="flex items-center justify-between text-sm font-bold text-chalk">
+                      <span>95.0 KG × 5</span>
+                      <span>RPE 8.5</span>
+                      <span class="text-blaze">110.8 KG</span>
+                    </div>
+                  </div>
+
+                  <!-- Next Session Prescription Card -->
+                  <div class="bg-knurl border border-edge rounded-md p-3">
+                    <div class="font-display text-xs font-extrabold uppercase tracking-wider text-chalk mb-1.5">
+                      MONDAY PRESCRIPTION (UPPER POWER)
+                    </div>
+                    <div class="space-y-1 font-mono text-xs tnum">
+                      <div class="flex justify-between text-chalk">
+                        <span>TOP SETS (3×5):</span>
+                        <span class="font-bold text-blaze">95.0 KG @ RPE 8.0</span>
+                      </div>
+                      <div class="flex justify-between text-concrete">
+                        <span>BACK-OFF (2×7):</span>
+                        <span class="text-chalk">87.5 KG</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Input Box -->
+              <div class="p-3.5 bg-iron border-t-2 border-edge">
+                <div class="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Ask Coach about Bench Press..."
+                    readonly
+                    class="flex-1 bg-plate border-2 border-edge rounded-md px-3 py-2.5 text-xs text-chalk placeholder:text-concrete focus:outline-none"
+                  />
+                  <button class="bg-blaze text-chalk font-display text-base font-extrabold uppercase tracking-wider px-5 rounded-md">
+                    ASK
+                  </button>
+                </div>
+              </div>
+
+            </aside>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</body>
+</html>
