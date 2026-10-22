@@ -17,6 +17,14 @@ dist/
 venv/
 env/
 
+# Node / frontend
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
+
 # Test / coverage
 .pytest_cache/
 .coverage
