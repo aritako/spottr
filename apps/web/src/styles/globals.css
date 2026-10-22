@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@spottr/ui/styles.css";
+
+/* Workspace UI package lives outside the Next app, so opt it into scanning. */
+@source "../../../../packages/ui/src";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+}
