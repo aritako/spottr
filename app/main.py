@@ -1,11 +1,17 @@
 from fastapi import FastAPI
 
-from app.api.controllers import coach, exercises, workouts
+from app.api.controllers import coach, docs, exercises, workouts
 
-app = FastAPI(title="Spottr", description="An AI-powered lifting coach", version="0.1.0")
+app = FastAPI(
+    title="Spottr",
+    description="An AI-powered lifting coach",
+    version="0.1.0",
+    docs_url="/swagger",
+)
 
 app.include_router(exercises.router, prefix="/exercises", tags=["Exercise"])
 app.include_router(workouts.router, prefix="/workouts", tags=["Workout"])
+app.include_router(docs.router, prefix="/docs", tags=["Docs"])
 app.include_router(coach.router, prefix="/coach", tags=["Coach"])
 
 

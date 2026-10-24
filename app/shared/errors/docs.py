@@ -1,0 +1,2 @@
+class EmptyDocumentError(Exception):
+    pass
