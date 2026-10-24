@@ -1,0 +1,12 @@
+node_modules/
+.next/
+apps/web/.next/
+pnpm-lock.yaml
+README.md
+mockups/
+app/
+tests/
+scripts/
+alembic/
+*.py
+.env*

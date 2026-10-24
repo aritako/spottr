@@ -1,7 +1,10 @@
 # Environment / secrets
 .env
+.env.*
 *.env
+.envrc
 !.env.example
+!.env.*.example
 
 # Python
 __pycache__/
@@ -16,6 +19,14 @@ dist/
 .venv/
 venv/
 env/
+
+# Node / frontend
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
 
 # Test / coverage
 .pytest_cache/

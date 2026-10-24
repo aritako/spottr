@@ -123,6 +123,55 @@ the default in `app/core/config.py` uses the `db` hostname, which only resolves 
 
 ---
 
+## Frontend
+
+The web app lives in `apps/web` inside a pnpm workspace:
+
+```
+apps/web              Next.js 15 (App Router), React 19, Tailwind CSS v4
+packages/ui           "Red Lab" design tokens + shared primitives (@spottr/ui)
+packages/api-client   Typed fetch client for this FastAPI service (@spottr/api-client)
+```
+
+It was scaffolded with [create.t3.gg](https://create.t3.gg/) but deliberately **without
+tRPC, Prisma or NextAuth**. Business logic and persistence stay in this Python service, so the
+frontend talks to the REST API through `@spottr/api-client`. A future Expo app can reuse the
+API client as-is; the UI package is web-only for now, so mobile components will share the
+palette and type scale rather than the Tailwind components. API types are hand-written from the
+Pydantic schemas and can move to generated OpenAPI types once the surface settles.
+
+### Run it
+
+```bash
+corepack enable
+pnpm install
+pnpm dev            # http://localhost:3000
+```
+
+The coach screen calls FastAPI from a server action. Point it at the API with `SPOTTR_API_URL`
+(defaults to `http://localhost:8000`) in `apps/web/.env`; see `apps/web/.env.example`.
+
+| Script | What it does |
+|---|---|
+| `pnpm dev` | Start the Next.js dev server |
+| `pnpm build` | Production build |
+| `pnpm lint` | ESLint |
+| `pnpm typecheck` | TypeScript across every workspace package |
+| `pnpm format` | Prettier |
+
+### What is ported
+
+- **Home** — next workout, weekly strip, coach nudge and routines.
+- **Routine detail** — plan, last performance and target per exercise.
+- **Coach** — start state plus a real `POST /coach/ask` round trip, citations and tool badges.
+
+History, Progress and live workout logging are intentionally placeholders: the API does not
+expose those aggregates yet. Routines and weekly summaries are fixture data in
+`apps/web/src/lib/fixtures.ts` until their endpoints exist. Design tokens come from
+`mockups/00-style-guide.html`.
+
+---
+
 ## Local development
 
 Dev dependencies are **not** installed in the Docker image, so install them on the host:
