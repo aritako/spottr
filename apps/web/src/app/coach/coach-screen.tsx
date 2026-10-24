@@ -160,7 +160,8 @@ function Composer({
         </Button>
       </div>
       <p className="text-ash-500 text-center text-[10px] leading-relaxed">
-        AI can be wrong · Not medical advice · Workout data is sent to OpenAI
+        AI can be wrong · Not medical advice · Workout data is sent to your AI
+        provider
       </p>
     </div>
   );
