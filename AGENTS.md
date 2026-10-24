@@ -108,6 +108,12 @@ Layer rules:
 - Type-hint everything. Use modern syntax (`str | None`, `list[int]`). Line length is 100.
 - Don't shadow builtins in new code (e.g. name a loop variable `set_` rather than `set`).
 - Keep changes small and focused on the task. No drive-by refactors or renames.
+- **File references in prose use full repo-relative paths.** Cite files as
+  `app/api/handlers/docs.py:16`, never a basename (`docs.py`) or partial path (`handlers/docs.py`).
+  Several same-named files exist across layers (e.g. `docs.py` under `handlers/`, `repository/`,
+  `controllers/`, `schemas/`, and `errors/`), and file/review-comment links resolve by basename, so a
+  partial path links to the wrong file. A `:line` is a snapshot of the file as it exists when written;
+  re-read the file before citing a specific line, since earlier line numbers go stale after edits.
 
 ## Coach engine (app/engine)
 
