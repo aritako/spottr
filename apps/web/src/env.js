@@ -8,7 +8,18 @@ export const env = createEnv({
    */
   server: {
     NODE_ENV: z.enum(["development", "test", "production"]),
-    SPOTTR_API_URL: z.string().url().default("http://localhost:8000"),
+    SPOTTR_API_URL: z
+      .string()
+      .url()
+      .refine((value) => {
+        const url = new URL(value);
+        return (
+          (url.protocol === "http:" || url.protocol === "https:") &&
+          url.username === "" &&
+          url.password === ""
+        );
+      }, "SPOTTR_API_URL must be an http(s) URL without credentials")
+      .default("http://localhost:8000"),
   },
 
   /**
