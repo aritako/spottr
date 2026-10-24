@@ -159,13 +159,6 @@ The coach screen calls FastAPI from a server action. Point it at the API with `S
 | `pnpm typecheck` | TypeScript across every workspace package |
 | `pnpm format` | Prettier |
 
-### Security status
-
-This is a local-only scaffold. It has no authentication, per-user authorization or rate
-limiting, and the Compose API port is published on the host. Do not expose the web app or API
-publicly. The coach sends questions and relevant workout data to OpenAI; answers can be wrong
-and are not medical advice. Preview data is labeled in the UI.
-
 ### What is ported
 
 - **Home** — next workout, weekly strip, coach nudge and routines.
