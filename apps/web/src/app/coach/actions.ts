@@ -7,6 +7,7 @@ import {
 } from "@spottr/api-client";
 
 import { env } from "~/env";
+import { MAX_QUESTION_LENGTH } from "~/lib/coach";
 import { readStringField } from "~/lib/form-value";
 
 export type CoachState =
@@ -28,6 +29,14 @@ export async function askCoach(
     };
   }
 
+  if (question.length > MAX_QUESTION_LENGTH) {
+    return {
+      status: "error",
+      question: "",
+      message: `Keep questions under ${MAX_QUESTION_LENGTH} characters.`,
+    };
+  }
+
   const client = createSpottrClient({ baseUrl: env.SPOTTR_API_URL });
 
   try {
@@ -38,14 +47,15 @@ export async function askCoach(
       return {
         status: "error",
         question,
-        message: `The coach API returned ${error.status}: ${error.detail.slice(0, 240)}`,
+        message: `The coach service returned an error (${error.status}). Please try again.`,
       };
     }
 
     return {
       status: "error",
       question,
-      message: `Could not reach the Spottr API at ${env.SPOTTR_API_URL}. Start the backend and try again.`,
+      message:
+        "Could not reach the coach service. Make sure the backend is running and try again.",
     };
   }
 }

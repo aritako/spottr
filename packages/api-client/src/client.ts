@@ -29,6 +29,8 @@ export interface SpottrClientOptions {
   baseUrl: string;
   fetch?: FetchLike;
   headers?: HeadersInit;
+  /** Abort a request after this many milliseconds. Defaults to 30s. */
+  timeoutMs?: number;
 }
 
 function buildQuery(params: PaginationParams | undefined): string {
@@ -52,7 +54,7 @@ async function readError(response: Response): Promise<string> {
     ) {
       return body.detail;
     }
-    return JSON.stringify(body);
+    return JSON.stringify(body).slice(0, 500);
   } catch {
     return response.statusText || "Unknown error";
   }
@@ -62,30 +64,40 @@ export function createSpottrClient({
   baseUrl,
   fetch: fetchImpl,
   headers,
+  timeoutMs = 30_000,
 }: SpottrClientOptions) {
   const root = baseUrl.replace(/\/+$/, "");
   const doFetch: FetchLike = fetchImpl ?? globalThis.fetch;
 
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await doFetch(`${root}${path}`, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-        ...headers,
-        ...init?.headers,
-      },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (!response.ok) {
-      throw new SpottrApiError(response.status, await readError(response));
+    try {
+      const response = await doFetch(`${root}${path}`, {
+        ...init,
+        cache: init?.cache ?? "no-store",
+        signal: init?.signal ?? controller.signal,
+        headers: {
+          Accept: "application/json",
+          ...(init?.body ? { "Content-Type": "application/json" } : {}),
+          ...headers,
+          ...init?.headers,
+        },
+      });
+
+      if (!response.ok) {
+        throw new SpottrApiError(response.status, await readError(response));
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      return (await response.json()) as T;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
   }
 
   return {
