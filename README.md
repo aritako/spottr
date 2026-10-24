@@ -99,7 +99,7 @@ docker compose up --build
 
 | Service | URL | Notes |
 |---|---|---|
-| API | http://localhost:8000 | Swagger UI at http://localhost:8000/docs |
+| API | http://localhost:8000 | Swagger UI at http://localhost:8000/swagger |
 | pgAdmin | http://localhost:5050 | `admin@admin.com` / `admin` |
 | PostgreSQL | localhost:5432 | user `coach`, password `coach`, db `coach` |
 
