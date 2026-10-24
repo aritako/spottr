@@ -9,6 +9,7 @@ import {
 } from "@spottr/ui";
 
 import { AppShell } from "~/components/app-shell";
+import { DemoNotice } from "~/components/demo-notice";
 import { PageHeader } from "~/components/page-header";
 import { getRoutine } from "~/lib/fixtures";
 
@@ -59,6 +60,10 @@ export default async function RoutinePage({ params }: RoutinePageProps) {
               {routine.summary}
             </span>
           </div>
+
+          <DemoNotice>
+            This routine is preview data, not a routine from your log.
+          </DemoNotice>
 
           <ol className="flex flex-col">
             {routine.exercises.map((exercise, index) => (

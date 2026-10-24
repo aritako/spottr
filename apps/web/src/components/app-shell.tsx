@@ -18,14 +18,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <AppNav variant="sidebar" />
 
-        <div className="mt-auto flex items-center gap-3 px-3.5 py-2">
+        <div
+          className="mt-auto flex items-center gap-3 px-3.5 py-2"
+          title="Demo profile — authentication is not wired yet"
+        >
           <span
             aria-hidden="true"
             className="bg-lab-700 flex size-8 items-center justify-center rounded-full text-[13px] font-semibold"
           >
             M
           </span>
-          <span className="text-bone-300 text-sm">Melo</span>
+          <span className="flex flex-col">
+            <span className="text-bone-300 text-sm">Melo</span>
+            <span className="text-ash-500 text-[9px] uppercase tracking-[0.12em]">
+              Demo
+            </span>
+          </span>
         </div>
       </aside>
 

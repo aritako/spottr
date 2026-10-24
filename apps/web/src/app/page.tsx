@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AppShell } from "~/components/app-shell";
+import { DemoNotice } from "~/components/demo-notice";
 import {
   CoachNudge,
   NextWorkoutCard,
@@ -36,14 +37,19 @@ export default function HomePage() {
         action={
           <span
             role="img"
-            aria-label="Signed in as Melo"
-            title="Melo"
+            aria-label="Demo profile"
+            title="Demo profile — authentication is not wired yet"
             className="flex size-10 items-center justify-center rounded-full bg-lab-800 text-sm font-semibold"
           >
             M
           </span>
         }
       />
+
+      <DemoNotice className="mb-5">
+        The next workout, routines, weekly stats and PR markers are preview
+        data until those endpoints exist.
+      </DemoNotice>
 
       <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-6 lg:gap-y-5">
         <section className="lg:col-start-1 lg:row-start-1">
