@@ -1,8 +1,9 @@
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
+from app.api.handlers.docs import DocsHandler
 from app.api.handlers.exercises import ExercisesHandler
 from app.api.handlers.workouts import WorkoutsHandler
 from app.core.models import Set
@@ -20,6 +21,7 @@ from app.shared.enums.coach import Metric
 class Tools:
     def __init__(self, db: Session):
         self.db = db
+        self.docsHandler = DocsHandler(db)
         self.exercisesHandler = ExercisesHandler(db)
         self.workoutsHandler = WorkoutsHandler(db)
 
@@ -65,3 +67,6 @@ class Tools:
                 return {"metric": "e1rm", "group_by": group_by, "result": result}
             case _:
                 return {"result": "Metric not yet implemented."}
+
+    def search_coaching_docs(self, query: str, k: int | None = None) -> dict[str, Any]:
+        return self.docsHandler.search(query, k).model_dump(mode="json")

@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
+from app.shared.enums.docs import SearchStatus
+
 
 class DocumentIngest(BaseModel):
     title: str
@@ -20,3 +22,15 @@ class DocumentRead(BaseModel):
 
 class DocumentReadResponse(BaseModel):
     id: int
+
+
+class PassageRead(BaseModel):
+    document_id: int
+    document: str
+    chunk_index: int
+    content: str
+
+
+class PassageSearch(BaseModel):
+    status: SearchStatus
+    results: list[PassageRead]

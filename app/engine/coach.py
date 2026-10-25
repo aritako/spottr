@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.api.repository.workouts import WorkoutsRepository
 from app.core.openai.client import client
+from app.engine.rag import DEFAULT_TOP_K, MAX_TOP_K, MIN_TOP_K
 from app.engine.tools import Tools
 from app.shared.enums.coach import Metric
+from app.shared.schemas.coach import Citation
 
 
 class Coach:
@@ -23,6 +25,7 @@ class Coach:
         self.TOOL_REGISTRY = {
             "query_exercises": self.tools.query_exercises,
             "query_workouts": self.tools.query_workouts,
+            "search_coaching_docs": self.tools.search_coaching_docs,
         }
         self.TOOLS: list[FunctionToolParam] = [
             {
@@ -80,6 +83,37 @@ class Coach:
                 },
                 "strict": True,
             },
+            {
+                "type": "function",
+                "name": "search_coaching_docs",
+                "description": """
+                    Search the coaching corpus for training principles, deload
+                    guidance, programming advice, technique cues, and recovery or
+                    autoregulation guidance. Use for general "should I..." / "how do I..."
+                    questions that are not about the user's logged numbers. Returns passages
+                    with their document title and chunk index, plus a status of "ok",
+                    "no_match", or "empty_corpus".
+                """,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Natural-language search query.",
+                        },
+                        "k": {
+                            "type": ["integer", "null"],
+                            "description": (
+                                "Number of passages to retrieve. Pass null for the default "
+                                f"({DEFAULT_TOP_K}). Values are clamped to {MIN_TOP_K}-{MAX_TOP_K}."
+                            ),
+                        },
+                    },
+                    "required": ["query", "k"],
+                    "additionalProperties": False,
+                },
+                "strict": True,
+            },
         ]
 
         self.workoutsRepository = WorkoutsRepository(db)
@@ -129,6 +163,26 @@ class Coach:
             then call query_workouts once per relevant exercise (or omit the exercise
             filter if the tool supports querying across all of them).
 
+            COACHING KNOWLEDGE
+            Call search_coaching_docs for general coaching questions: programming, deloads,
+            technique, recovery, autoregulation, exercise selection. Do not answer those from
+            your own knowledge; retrieve first.
+
+            When a question mixes principle and data (e.g. "given my volume, should I
+            deload?"), call both search_coaching_docs and query_workouts, then combine the
+            retrieved guidance with the user's actual numbers.
+
+            The tool reports a status:
+            - "ok": passages were found. Answer from them, and close with one sentence naming
+              the documents you drew on (e.g. "That's based on Deload Guidelines."). Never
+              write bracketed citation numbers; the app lists the sources separately.
+            - "no_match": the corpus has nothing relevant. Say plainly that your coaching
+              material doesn't cover this, rather than filling the gap with outside knowledge.
+            - "empty_corpus": no coaching documents have been ingested yet. Say that the
+              coaching library is empty.
+
+            Never invent a document title, chunk index, or citation.
+
             INTERPRETING RESULTS
             - If query_workouts returns no data for a range, say so plainly rather than
             inventing a plausible-sounding answer.
@@ -142,7 +196,7 @@ class Coach:
 
     def ask_coach(self, question: str, max_iterations: int = 5) -> dict[str, Any]:
         used_tools: list[str] = []
-        citations: list[dict[str, Any]] = []
+        citations: list[Citation] = []
 
         response = self.client.responses.create(
             instructions=Coach.build_instructions(self),
@@ -158,7 +212,7 @@ class Coach:
                 return {
                     "answer": response.output_text or "I couldn't complete that request.",
                     "used_tools": used_tools,
-                    "citations": citations,
+                    "citations": [citation.model_dump() for citation in citations],
                 }
 
             tool_outputs: list[ResponseInputItemParam] = []
@@ -179,6 +233,8 @@ class Coach:
 
                 fn = self.TOOL_REGISTRY[fn_name]
                 result = fn(**fn_args)
+                if fn_name == "search_coaching_docs":
+                    self._collect_citations(citations, result)
                 output_str = result if isinstance(result, str) else json.dumps(result)
 
                 tool_outputs.append(
@@ -201,5 +257,23 @@ class Coach:
         return {
             "answer": "I couldn't complete that request.",
             "used_tools": used_tools,
-            "citations": citations,
+            "citations": [citation.model_dump() for citation in citations],
         }
+
+    @staticmethod
+    def _collect_citations(citations: list[Citation], result: Any) -> None:
+        """Record every passage the coach consulted, deduplicated by document and chunk."""
+        if not isinstance(result, dict):
+            return
+        for passage in result.get("results", []):
+            citation = Citation(
+                document_id=passage["document_id"],
+                document=passage["document"],
+                chunk_index=passage["chunk_index"],
+            )
+            if not any(
+                known.document_id == citation.document_id
+                and known.chunk_index == citation.chunk_index
+                for known in citations
+            ):
+                citations.append(citation)
