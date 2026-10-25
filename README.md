@@ -125,20 +125,40 @@ the default in `app/core/config.py` uses the `db` hostname, which only resolves 
 
 ## Frontend
 
-The web app lives in `apps/web` inside a pnpm workspace:
+The web client lives in `web/` at the repo root, next to the Python service:
 
 ```
-apps/web              Next.js 15 (App Router), React 19, Tailwind CSS v4
-packages/ui           "Red Lab" design tokens + shared primitives (@spottr/ui)
+web/                  Next.js 15 (App Router), React 19, Tailwind CSS v4
 packages/api-client   Typed fetch client for this FastAPI service (@spottr/api-client)
 ```
 
-It was scaffolded with [create.t3.gg](https://create.t3.gg/) but deliberately **without
+The root project is the backend; `web/` is a second deployable, not a subproject of an `apps/`
+tree. It was scaffolded with [create.t3.gg](https://create.t3.gg/) but deliberately **without
 tRPC, Prisma or NextAuth**. Business logic and persistence stay in this Python service, so the
-frontend talks to the REST API through `@spottr/api-client`. A future Expo app can reuse the
-API client as-is; the UI package is web-only for now, so mobile components will share the
-palette and type scale rather than the Tailwind components. API types are hand-written from the
-Pydantic schemas and can move to generated OpenAPI types once the surface settles.
+frontend talks to the REST API through `@spottr/api-client`. The client is React-free so a future
+Expo app can reuse it as-is; web-only primitives live in `web/src/components/ui`. API types are
+hand-written from the Pydantic schemas and can move to generated OpenAPI types once the surface
+settles.
+
+### Structure
+
+`web/src` uses vertical slices: routes compose, slices own features.
+
+```
+web/src/
+├── app/                # thin routes: metadata, AppShell, one slice
+├── features/           # coach, home, routines, history, progress, workout-session
+│   └── <slice>/        # index.ts, actions.ts, components/, model/, api/
+├── components/         # cross-feature chrome
+│   └── ui/             # design primitives + Red Lab tokens
+├── lib/                # framework-agnostic helpers, query client
+└── styles/             # Tailwind entry + @theme tokens
+```
+
+Pages import a slice through its `index.ts`; slices never reach into each other's internals.
+TanStack Query is wired at the root, with server components prefetching and per-slice query keys
+in `features/<slice>/api/keys.ts`. Form commands use server actions, so the coach still works
+without JS.
 
 ### Run it
 
@@ -149,14 +169,14 @@ pnpm dev            # http://localhost:3000
 ```
 
 The coach screen calls FastAPI from a server action. Point it at the API with `SPOTTR_API_URL`
-(defaults to `http://localhost:8000`) in `apps/web/.env`; see `apps/web/.env.example`.
+(defaults to `http://localhost:8000`) in `web/.env`; see `web/.env.example`.
 
 | Script | What it does |
 |---|---|
 | `pnpm dev` | Start the Next.js dev server |
 | `pnpm build` | Production build |
 | `pnpm lint` | ESLint |
-| `pnpm typecheck` | TypeScript across every workspace package |
+| `pnpm typecheck` | TypeScript across `web/` and `packages/api-client` |
 | `pnpm format` | Prettier |
 
 ### What is ported
@@ -166,9 +186,9 @@ The coach screen calls FastAPI from a server action. Point it at the API with `S
 - **Coach** — start state plus a real `POST /coach/ask` round trip, citations and tool badges.
 
 History, Progress and live workout logging are intentionally placeholders: the API does not
-expose those aggregates yet. Routines and weekly summaries are fixture data in
-`apps/web/src/lib/fixtures.ts` until their endpoints exist. Design tokens come from
-`mockups/00-style-guide.html`.
+expose those aggregates yet. Fixtures are colocated with their slice
+(`web/src/features/*/model/`) until those endpoints exist. Design tokens come from
+`web/src/styles/theme.css`, which mirrors `mockups/00-style-guide.html`.
 
 ---
 

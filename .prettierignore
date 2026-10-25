@@ -1,6 +1,6 @@
 node_modules/
 .next/
-apps/web/.next/
+web/.next/
 pnpm-lock.yaml
 README.md
 mockups/
