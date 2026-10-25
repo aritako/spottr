@@ -43,7 +43,9 @@ htmlcov/
 # Docker volume data (if ever mounted locally)
 pgdata/
 
+# Local planning docs (specs, issue tickets — never pushed)
 specs/
+.scratch/
 
 # Postman
 postman/

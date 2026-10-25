@@ -229,3 +229,19 @@ Tasks are given as markdown files with a goal and acceptance criteria.
 - Change `docker-compose.yaml`, `Dockerfile`, or existing migrations unless the task asks.
 - Import across frontend feature slices except through `features/<slice>/index.ts`, or put
   business logic in `web/src/app/**/page.tsx`.
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown under `.scratch/` for now; GitHub Issues once the MVP is refined. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`.
