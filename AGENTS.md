@@ -8,8 +8,8 @@ Spottr is an AI lifting coach application. Users log workouts, then ask question
 The coach answers by calling tools that query real workout data (and, soon, a RAG tool over a
 coaching-knowledge corpus with citations). It must never guess or invent numbers.
 
-Status: backend-only, work in progress. A Next.js frontend comes later; keep all business logic in
-this backend so future clients (web, Expo) can reuse it.
+Status: work in progress. The Python service is the root project; the Next.js client lives in `web/`.
+Keep all business logic in this backend so every client (web, Expo) reuses it.
 
 ## Stack
 
@@ -50,6 +50,18 @@ When running tests or Alembic from the host instead of the container, set
 `DATABASE_URL=postgresql+psycopg://coach:coach@localhost:5432/coach`. The default in
 `app/core/config.py` uses the `db` hostname, which only resolves inside Docker.
 
+### Frontend (from the repo root)
+
+```bash
+corepack enable
+pnpm install
+pnpm dev            # Next.js on :3000; expects the API on :8000
+pnpm lint           # ESLint for web/
+pnpm typecheck      # tsc across web/ and packages/api-client
+pnpm build
+pnpm format         # Prettier (writes)
+```
+
 ## Architecture
 
 Requests flow one way: **controller → handler → repository → ORM model**.
@@ -89,6 +101,44 @@ Layer rules:
   refactor existing handlers unless the task asks for it.
 - **`engine/helpers.py` must stay pure:** no ORM imports, no DB, no I/O. Pass plain values or
   dataclasses in, get plain values out. This keeps metrics trivially unit-testable.
+
+### Frontend (`web/`)
+
+The client is a vertical-slice architecture: routes compose, slices own features. Do not add
+route-local business logic or a second horizontal `hooks/`, `services/`, `types/` tree.
+
+```
+web/src/
+├── app/                  # routes only: metadata, shell, one slice per page
+├── features/             # vertical slices
+│   └── <slice>/
+│       ├── index.ts      # the slice's public surface
+│       ├── actions.ts    # server actions, when the slice owns a command
+│       ├── components/   # screens and slice-local components
+│       ├── model/        # types, constants, fixtures
+│       └── api/          # query keys / client helpers
+├── components/           # cross-feature chrome (app shell, nav, page header)
+│   ├── ui/               # design primitives (button, card, citation, ...)
+│   └── providers.tsx     # client-only providers (TanStack Query)
+├── lib/                  # framework-agnostic helpers
+└── styles/               # Tailwind entry + design tokens
+```
+
+Slice rules:
+
+- Pages in `app/` stay thin: `metadata`, `<AppShell>`, and one imported screen. No data shaping.
+- Other code imports a slice through `~/features/<slice>` only. Never reach into
+  `features/<slice>/components` from outside that slice.
+- Slices own their fixtures and response shapes. Put a screen's fake data in
+  `features/<slice>/model/`, not in a shared `lib/` module.
+- `components/ui` holds generic primitives with no feature knowledge; `components/` holds chrome
+  every screen needs. Neither imports a slice.
+- Cross-slice composition happens at the route or in a screen, through slice index files.
+- TanStack Query: server components prefetch and hydrate; client components read query keys from
+  the owning slice's `api/keys.ts`. Form-driven commands use server actions plus `useActionState`
+  (the coach is the reference), not `useMutation`.
+- `packages/api-client` is the only shared workspace package. Keep it React-free so the future
+  Expo client can reuse it; web-only primitives belong in `web/src/components/ui`.
 
 ## Conventions
 
@@ -149,6 +199,8 @@ Layer rules:
 - Tests must never call the real OpenAI API. Mock `client.responses.create` (or inject a fake
   client) and assert on tool calls and final output.
 - New behavior needs a test. Bug fixes need a test that fails before the fix.
+- The frontend has no test runner yet. When one is added, colocate tests with the slice they cover
+  (`features/<slice>/…test.ts(x)`) and keep `@spottr/api-client` tests dependency-free.
 
 ## Security
 
@@ -175,3 +227,5 @@ Tasks are given as markdown files with a goal and acceptance criteria.
 - Put business logic in controllers or queries in handlers.
 - Add dependencies without saying so in your summary, and add them to `pyproject.toml`.
 - Change `docker-compose.yaml`, `Dockerfile`, or existing migrations unless the task asks.
+- Import across frontend feature slices except through `features/<slice>/index.ts`, or put
+  business logic in `web/src/app/**/page.tsx`.
