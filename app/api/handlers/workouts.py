@@ -7,6 +7,7 @@ from app.api.repository.exercises import ExercisesRepository
 from app.api.repository.workouts import WorkoutsRepository
 from app.core.models import Set, Workout
 from app.shared.errors.exercises import ExerciseNotFoundError
+from app.shared.errors.workouts import WorkoutNotFoundError
 from app.shared.schemas.workouts import WorkoutCreate, WorkoutRead
 
 
@@ -52,6 +53,12 @@ class WorkoutsHandler:
     def read_workout_list(self, page: int, page_size: int) -> list[WorkoutRead]:
         workouts = self.workoutsRepository.list_(page, page_size)
         return [WorkoutRead.model_validate(workout) for workout in workouts]
+
+    def delete_workout(self, id: int) -> None:
+        workout = self.workoutsRepository.get(id)
+        if workout is None:
+            raise WorkoutNotFoundError()
+        self.workoutsRepository.delete(workout)
 
     def get_sets_for_metrics(
         self, exercise: str | None, start: date | None, end: date | None

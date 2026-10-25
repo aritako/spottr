@@ -1,0 +1,2 @@
+class WorkoutNotFoundError(Exception):
+    pass

@@ -34,6 +34,14 @@ class WorkoutsRepository:
             self.db.rollback()
             raise e
 
+    def delete(self, workout: Workout) -> None:
+        try:
+            self.db.delete(workout)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            raise e
+
     # Engine Tools
 
     def get_sets_for_metrics(

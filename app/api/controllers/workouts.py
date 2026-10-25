@@ -6,6 +6,7 @@ from sqlalchemy.orm.session import Session
 from app.api.handlers.workouts import WorkoutsHandler
 from app.core.db import get_db
 from app.shared.errors.exercises import ExerciseNotFoundError
+from app.shared.errors.workouts import WorkoutNotFoundError
 from app.shared.schemas.workouts import WorkoutCreate, WorkoutRead, WorkoutReadResponse
 
 router = APIRouter()
@@ -38,3 +39,15 @@ def create_workout(
     except ExerciseNotFoundError as e:
         raise HTTPException(status_code=404, detail="Invalid exercise id.") from e
     return WorkoutReadResponse(id=new_workout.id)
+
+
+@router.delete("/{id}", status_code=204)
+def delete_workout(
+    db: Annotated[Session, Depends(get_db)],
+    id: int,
+) -> None:
+    handler = WorkoutsHandler(db)
+    try:
+        handler.delete_workout(id)
+    except WorkoutNotFoundError as e:
+        raise HTTPException(status_code=404, detail="Workout not found.") from e
