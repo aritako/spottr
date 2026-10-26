@@ -1,0 +1,43 @@
+# Applies to every build whose context is the repo root (the backend Dockerfile and
+# web/Dockerfile). Only exclude things no image copies; both builds need the workspace
+# config files, web/, and packages/.
+
+# Dependencies are installed inside each image, never copied from the host.
+node_modules
+**/node_modules
+
+# Build output and caches.
+**/.next
+out
+.pytest_cache
+.ruff_cache
+__pycache__
+**/__pycache__
+*.pyc
+
+# Local env files must never enter a build context; examples are safe to keep.
+.env
+**/.env
+.env.*
+**/.env.*
+*.env
+.envrc
+!.env.example
+!**/.env.example
+
+# Host artifacts no image needs.
+.venv
+venv
+*.egg-info
+build
+dist
+.turbo
+*.tsbuildinfo
+coverage
+
+# Repo content no image needs.
+.git
+docs
+mockups
+scripts
+.scratch

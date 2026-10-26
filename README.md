@@ -100,8 +100,16 @@ docker compose up --build
 | Service | URL | Notes |
 |---|---|---|
 | API | http://localhost:8000 | Swagger UI at http://localhost:8000/swagger |
+| Web | http://localhost:3000 | Next.js dev server with live reload |
 | pgAdmin | http://localhost:5050 | `admin@admin.com` / `admin` |
 | PostgreSQL | localhost:5432 | user `coach`, password `coach`, db `coach` |
+
+After changing `pnpm-lock.yaml` or any `package.json`, refresh the web container's
+dependencies (compose reuses the old volumes otherwise):
+
+```bash
+docker compose up -d --build --renew-anon-volumes web
+```
 
 ### 3. Run migrations
 
@@ -167,6 +175,10 @@ corepack enable
 pnpm install
 pnpm dev            # http://localhost:3000
 ```
+
+Or skip this entirely and let `docker compose up` run the web dev server for you. If you do
+run both, stop the host dev server first — they share port 3000, and the host and container
+both write to `web/.next`.
 
 The coach screen calls FastAPI from a server action. Point it at the API with `SPOTTR_API_URL`
 (defaults to `http://localhost:8000`) in `web/.env`; see `web/.env.example`.
