@@ -18,7 +18,7 @@ Keep all business logic in this backend so every client (web, Expo) reuses it.
 - Alembic for migrations
 - OpenAI Python SDK, **Responses API** (not Chat Completions)
 - pytest, httpx (TestClient), ruff
-- Docker Compose: `db`, `app` (live reload), `pgadmin`
+- Docker Compose: `db`, `app` (live reload), `web` (live reload), `pgadmin`
 
 ## Git
 
@@ -30,7 +30,7 @@ Keep all business logic in this backend so every client (web, Expo) reuses it.
 ## Commands
 
 ```bash
-# Start everything (app on :8000, Swagger at /docs, pgAdmin on :5050)
+# Start everything (app on :8000, web on :3000, Swagger at /docs, pgAdmin on :5050)
 docker compose up --build
 
 # Apply migrations

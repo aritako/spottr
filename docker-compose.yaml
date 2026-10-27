@@ -42,6 +42,26 @@ services:
         "--reload",
       ]
 
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    # pnpm (PID 1) does not reap orphans well; let docker's init handle signals.
+    init: true
+    depends_on:
+      - app
+    environment:
+      # Server actions call the API container-to-container, never via localhost.
+      SPOTTR_API_URL: http://app:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/code
+      - /code/node_modules
+      - /code/web/node_modules
+      - /code/packages/api-client/node_modules
+      - /code/web/.next
+
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
