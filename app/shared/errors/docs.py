@@ -7,8 +7,9 @@ class EmbeddingDimensionError(Exception):
 
     def __init__(self, expected: int, actual: int) -> None:
         super().__init__(
-            f"Query embedding has {actual} dimensions but the corpus stores {expected}. "
-            "The embedding model and the ingested chunks must match."
+            f"Query embedding has {actual} dimensions but retrieval expects {expected} to "
+            "compare against the stored chunks. Use the same embedding model the corpus "
+            "was ingested with."
         )
         self.expected = expected
         self.actual = actual

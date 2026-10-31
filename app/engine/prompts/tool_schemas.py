@@ -64,10 +64,11 @@ TOOL_SCHEMAS: list[FunctionToolParam] = [
         "description": """
             Search the coaching corpus for training principles, deload
             guidance, programming advice, technique cues, and recovery or
-            autoregulation guidance. Use for general "should I..." / "how do I..."
-            questions that are not about the user's logged numbers. Returns passages
-            with their document title and chunk index, plus a status of "ok",
-            "no_match", or "empty_corpus".
+            autoregulation guidance. Use it for general coaching questions,
+            including ones you answer alongside the user's logged data (e.g.
+            "given my volume, should I deload?"). Returns passages with their
+            document title and chunk index, plus a status of "ok", "no_match",
+            or "empty_corpus".
         """,
         "parameters": {
             "type": "object",

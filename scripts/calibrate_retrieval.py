@@ -67,8 +67,9 @@ def main() -> None:
             print(f"\n{query}")
             print("-" * len(query))
             embedding = get_embeddings([query])[0]
-            # A cutoff above 1.0 keeps every candidate so the rejected ones are visible.
-            for chunk, distance in repository.search(embedding, args.k, max_distance=1.1):
+            # Cosine distance spans [0, 2], so a cutoff of 2 keeps every candidate and the
+            # rejected ones stay visible.
+            for chunk, distance in repository.search(embedding, args.k, max_distance=2.0):
                 verdict = "PASS" if distance < MAX_COSINE_DISTANCE else "FAIL"
                 snippet = " ".join(chunk.content.split())[:100]
                 print(
