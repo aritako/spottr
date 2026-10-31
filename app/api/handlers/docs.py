@@ -60,7 +60,7 @@ class DocsHandler:
         return PassageRetrieval(status=RetrievalStatus.NO_MATCH, passages=[])
 
     @staticmethod
-    def _to_passages(chunks: list[tuple[Chunk, float]], limit: int) -> list[PassageRead]:
+    def _to_passages(chunks: list[Chunk], limit: int) -> list[PassageRead]:
         """Map retrieved chunks to passages, dropping duplicate rows from re-ingested documents.
 
         Chunk overlap is intentional and leaves neighbouring chunks with different text, so this
@@ -71,7 +71,7 @@ class DocsHandler:
         """
         seen: set[str] = set()
         passages: list[PassageRead] = []
-        for chunk, _distance in chunks:
+        for chunk in chunks:
             if chunk.content in seen:
                 continue
             seen.add(chunk.content)

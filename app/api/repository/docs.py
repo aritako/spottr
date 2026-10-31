@@ -23,23 +23,21 @@ class DocsRepository:
         query = select(Document).offset(page * page_size).limit(page_size)
         return list(self.db.scalars(query))
 
-    def retrieve(
-        self, query_embedding: list[float], k: int, max_distance: float
-    ) -> list[tuple[Chunk, float]]:
-        """Return the closest chunks to an embedding, paired with their cosine distance.
+    def retrieve(self, query_embedding: list[float], k: int, max_distance: float) -> list[Chunk]:
+        """Return the chunks closest to an embedding, ordered by ascending cosine distance.
 
         The distance cutoff is applied in SQL so the ordered index scan stops early instead
         of fetching rows the caller would discard.
         """
-        distance = Chunk.embedding.cosine_distance(query_embedding).label("distance")
+        distance = Chunk.embedding.cosine_distance(query_embedding)
         query = (
-            select(Chunk, distance)
+            select(Chunk)
             .options(selectinload(Chunk.document))
             .where(distance < max_distance)
             .order_by(distance)
             .limit(k)
         )
-        return [(row[0], float(row[1])) for row in self.db.execute(query).all()]
+        return list(self.db.scalars(query))
 
     def has_chunks(self) -> bool:
         return bool(self.db.scalar(select(exists().select_from(Chunk))))

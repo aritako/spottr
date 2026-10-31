@@ -8,7 +8,7 @@ MIN_TOP_K = 1
 MAX_TOP_K = 10
 # Retrieved chunks are deduplicated by content after the query, so ask for headroom.
 DUPLICATE_OVERFETCH = 3
-MAX_COSINE_DISTANCE = 0.55  # starting value; tune with scripts/calibrate_retrieval.py
+MAX_COSINE_DISTANCE = 0.55  # starting value, pending calibration against a real corpus
 EMBEDDING_DIMENSIONS = 1536
 
 

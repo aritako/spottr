@@ -16,5 +16,5 @@ imports the engine, and the cutoff is applied in SQL rather than by filtering ro
 - Re-tuning is a code change, reviewed like any other, rather than an env edit.
 - A future move to per-environment tuning means promoting these to `Settings` deliberately, and
   documenting the cutoff in `.env.example` at that point.
-- `scripts/calibrate_retrieval.py` exists because the cutoff cannot be judged without printing
-  real distances from the seeded corpus.
+- The starting value is a guess until it is calibrated against a seeded corpus. That work, and the
+  tooling to print real distances, is a separate change so this one stays about retrieval.

@@ -39,7 +39,7 @@ def _chunk(
 @contextmanager
 def _retrieval(
     handler: DocsHandler,
-    chunks: list[tuple[Chunk, float]] | None = None,
+    chunks: list[Chunk] | None = None,
     has_chunks: bool = True,
     embedding: list[float] | None = None,
 ) -> Iterator[SimpleNamespace]:
@@ -78,11 +78,11 @@ def test_ingest_empty_text_raises() -> None:
         handler.ingest("Empty", None, "   ")
 
 
-def test_search_returns_passages_from_retrieved_chunks() -> None:
+def test_retrieve_returns_passages_from_retrieved_chunks() -> None:
     handler = _handler()
     chunk = _chunk(chunk_index=2)
 
-    with _retrieval(handler, chunks=[(chunk, 0.21)]) as stubs:
+    with _retrieval(handler, chunks=[chunk]) as stubs:
         result = handler.retrieve("should I deload?")
 
     stubs.embed.assert_called_once_with(["should I deload?"])
@@ -106,7 +106,7 @@ def test_search_returns_passages_from_retrieved_chunks() -> None:
     ("requested", "expected"),
     [(None, DEFAULT_TOP_K), (0, MIN_TOP_K), (3, 3), (MAX_TOP_K, MAX_TOP_K), (500, MAX_TOP_K)],
 )
-def test_search_clamps_requested_passage_count(requested: int | None, expected: int) -> None:
+def test_retrieve_clamps_requested_passage_count(requested: int | None, expected: int) -> None:
     handler = _handler()
 
     with _retrieval(handler) as stubs:
@@ -115,7 +115,7 @@ def test_search_clamps_requested_passage_count(requested: int | None, expected: 
     assert stubs.retrieve.call_args.args[1] == expected * DUPLICATE_OVERFETCH
 
 
-def test_search_reports_no_match_when_nothing_is_close_enough() -> None:
+def test_retrieve_reports_no_match_when_nothing_is_close_enough() -> None:
     handler = _handler()
 
     with _retrieval(handler, has_chunks=True):
@@ -125,7 +125,7 @@ def test_search_reports_no_match_when_nothing_is_close_enough() -> None:
     assert result.passages == []
 
 
-def test_search_reports_empty_corpus_without_embedding_the_question() -> None:
+def test_retrieve_reports_empty_corpus_without_embedding_the_question() -> None:
     handler = _handler()
 
     with _retrieval(handler, has_chunks=False) as stubs:
@@ -136,13 +136,13 @@ def test_search_reports_empty_corpus_without_embedding_the_question() -> None:
     stubs.embed.assert_not_called()
 
 
-def test_search_requests_extra_candidates_to_backfill_duplicates() -> None:
+def test_retrieve_requests_extra_candidates_to_backfill_duplicates() -> None:
     handler = _handler()
     repeated = "Deload when performance stalls."
-    chunks: list[tuple[Chunk, float]] = [
-        (_chunk(document_id=1, content=repeated), 0.2),
-        (_chunk(document_id=2, title="Deload Guidelines (copy)", content=repeated), 0.21),
-        (_chunk(document_id=3, title="RPE", content="Use RPE to autoregulate."), 0.22),
+    chunks = [
+        _chunk(document_id=1, content=repeated),
+        _chunk(document_id=2, title="Deload Guidelines (copy)", content=repeated),
+        _chunk(document_id=3, title="RPE", content="Use RPE to autoregulate."),
     ]
 
     with _retrieval(handler, chunks=chunks) as stubs:
@@ -152,7 +152,7 @@ def test_search_requests_extra_candidates_to_backfill_duplicates() -> None:
     assert [passage.document_id for passage in result.passages] == [1, 3]
 
 
-def test_search_rejects_an_embedding_of_the_wrong_dimension() -> None:
+def test_retrieve_rejects_an_embedding_of_the_wrong_dimension() -> None:
     handler = _handler()
 
     with (

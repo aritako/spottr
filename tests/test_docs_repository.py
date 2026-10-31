@@ -13,26 +13,16 @@ from app.engine.rag import MAX_COSINE_DISTANCE
 # the cutoff living in SQL rather than in Python.
 
 
-class _Rows:
-    """Stand-in for a SQLAlchemy Result holding (chunk, distance) tuples."""
-
-    def __init__(self, rows: list[tuple[Any, Any]]) -> None:
-        self._rows = rows
-
-    def all(self) -> list[tuple[Any, Any]]:
-        return self._rows
-
-
 class _CapturingSession:
     """Stand-in for a Session that records the statement instead of executing it."""
 
-    def __init__(self, rows: list[tuple[Any, Any]] | None = None) -> None:
+    def __init__(self, chunks: list[Any] | None = None) -> None:
         self.statement: Any = None
-        self.rows = _Rows(rows or [])
+        self.chunks = chunks or []
 
-    def execute(self, statement: Any) -> _Rows:
+    def scalars(self, statement: Any) -> list[Any]:
         self.statement = statement
-        return self.rows
+        return self.chunks
 
     def scalar(self, statement: Any) -> bool:
         self.statement = statement
@@ -69,12 +59,12 @@ def test_retrieve_applies_the_distance_cutoff_in_sql() -> None:
     assert 0.42 in session.statement.compile().params.values()
 
 
-def test_retrieve_returns_chunks_paired_with_their_distance() -> None:
+def test_retrieve_returns_the_closest_chunks() -> None:
     chunk = MagicMock()
-    session = _CapturingSession([(chunk, 0.31)])
+    session = _CapturingSession([chunk])
 
     assert _repository(session).retrieve([0.1] * 3, k=5, max_distance=MAX_COSINE_DISTANCE) == [
-        (chunk, 0.31)
+        chunk
     ]
 
 
