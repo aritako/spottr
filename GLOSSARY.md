@@ -30,7 +30,7 @@ _Avoid_: score, similarity cutoff
 **Citation**:
 A Passage the coach consulted, surfaced in the answer as a source reference. A citation records
 that the coach read the passage, not that the answer text depends on it.
-_Avoid_: reference, footnote, source (for the object itself)
+_Avoid_: reference, footnote, source (for the object itself), document (for a Document's title)
 
 **Retrieval**:
 Finding the Passages most relevant to a question. Distinct from ingestion, which stores them.

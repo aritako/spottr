@@ -29,18 +29,19 @@ class Coach:
             "search_coaching_docs": self.tools.search_coaching_docs,
         }
         self.TOOLS: list[FunctionToolParam] = list(TOOL_SCHEMAS)
+        # Tools whose results carry citable passages, so the loop never branches on a tool name.
+        self.CITATION_COLLECTORS = {
+            "search_coaching_docs": self._collect_citations,
+        }
 
         self.workoutsRepository = WorkoutsRepository(db)
-
-    def build_instructions(self) -> str:
-        return build_coach_instructions(date.today())
 
     def ask_coach(self, question: str, max_iterations: int = 5) -> dict[str, Any]:
         used_tools: list[str] = []
         citations: list[Citation] = []
 
         response = self.client.responses.create(
-            instructions=Coach.build_instructions(self),
+            instructions=build_coach_instructions(date.today()),
             model=self.QUERY_MODEL,
             input=question,
             tools=self.TOOLS,
@@ -74,8 +75,9 @@ class Coach:
 
                 fn = self.TOOL_REGISTRY[fn_name]
                 result = fn(**fn_args)
-                if fn_name == "search_coaching_docs":
-                    self._collect_citations(citations, result)
+                collect_citations = self.CITATION_COLLECTORS.get(fn_name)
+                if collect_citations:
+                    collect_citations(citations, result)
                 output_str = result if isinstance(result, str) else json.dumps(result)
 
                 tool_outputs.append(
@@ -106,10 +108,10 @@ class Coach:
         """Record every passage the coach consulted, deduplicated by document and chunk."""
         if not isinstance(result, dict):
             return
-        for passage in result.get("results", []):
+        for passage in result.get("passages", []):
             citation = Citation(
                 document_id=passage["document_id"],
-                document=passage["document"],
+                document_title=passage["document_title"],
                 chunk_index=passage["chunk_index"],
             )
             if not any(

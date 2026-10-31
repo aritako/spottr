@@ -23,7 +23,7 @@ class DocsRepository:
         query = select(Document).offset(page * page_size).limit(page_size)
         return list(self.db.scalars(query))
 
-    def search(
+    def retrieve(
         self, query_embedding: list[float], k: int, max_distance: float
     ) -> list[tuple[Chunk, float]]:
         """Return the closest chunks to an embedding, paired with their cosine distance.

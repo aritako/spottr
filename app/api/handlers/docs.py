@@ -10,9 +10,9 @@ from app.engine.rag import (
     get_embeddings,
     normalize_k,
 )
-from app.shared.enums.docs import SearchStatus
+from app.shared.enums.docs import RetrievalStatus
 from app.shared.errors.docs import EmbeddingDimensionError, EmptyDocumentError
-from app.shared.schemas.docs import DocumentRead, PassageRead, PassageSearch
+from app.shared.schemas.docs import DocumentRead, PassageRead, PassageRetrieval
 
 
 class DocsHandler:
@@ -39,10 +39,10 @@ class DocsHandler:
         documents = self.repository.list_(page, page_size)
         return [DocumentRead.model_validate(document) for document in documents]
 
-    def search(self, query: str, k: int | None = None) -> PassageSearch:
+    def retrieve(self, query: str, k: int | None = None) -> PassageRetrieval:
         """Find the passages of the coaching corpus most relevant to a question."""
         if not self.repository.has_chunks():
-            return PassageSearch(status=SearchStatus.EMPTY_CORPUS, results=[])
+            return PassageRetrieval(status=RetrievalStatus.EMPTY_CORPUS, passages=[])
 
         query_embedding = get_embeddings([query])[0]
         if len(query_embedding) != EMBEDDING_DIMENSIONS:
@@ -50,14 +50,14 @@ class DocsHandler:
 
         limit = normalize_k(k)
         passages = self._to_passages(
-            self.repository.search(
+            self.repository.retrieve(
                 query_embedding, limit * DUPLICATE_OVERFETCH, MAX_COSINE_DISTANCE
             ),
             limit,
         )
         if passages:
-            return PassageSearch(status=SearchStatus.OK, results=passages)
-        return PassageSearch(status=SearchStatus.NO_MATCH, results=[])
+            return PassageRetrieval(status=RetrievalStatus.OK, passages=passages)
+        return PassageRetrieval(status=RetrievalStatus.NO_MATCH, passages=[])
 
     @staticmethod
     def _to_passages(chunks: list[tuple[Chunk, float]], limit: int) -> list[PassageRead]:
@@ -75,14 +75,7 @@ class DocsHandler:
             if chunk.content in seen:
                 continue
             seen.add(chunk.content)
-            passages.append(
-                PassageRead(
-                    document_id=chunk.document_id,
-                    document=chunk.document.title,
-                    chunk_index=chunk.chunk_index,
-                    content=chunk.content,
-                )
-            )
+            passages.append(PassageRead.model_validate(chunk))
             if len(passages) == limit:
                 break
         return passages

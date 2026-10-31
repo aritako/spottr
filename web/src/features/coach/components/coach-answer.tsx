@@ -21,17 +21,17 @@ export function CoachAnswer({
           <div className="flex flex-wrap gap-1.5">
             {citations.map((citation, index) => (
               <span
-                key={`${citation.document}-${citation.chunk_index}`}
-                title={`${citation.document} · chunk ${citation.chunk_index + 1}`}
+                key={`${citation.document_title}-${citation.chunk_index}`}
+                title={`${citation.document_title} · chunk ${citation.chunk_index + 1}`}
                 className="bg-lab-800 ring-lab-600 flex h-8 max-w-full items-center gap-2 rounded-full px-3 text-[11px] ring-1 ring-inset"
               >
                 <Citation
                   index={index + 1}
-                  title={citation.document}
+                  title={citation.document_title}
                   className="align-[0]"
                 />
                 <span className="max-w-[13rem] truncate">
-                  {citation.document}
+                  {citation.document_title}
                 </span>
               </span>
             ))}

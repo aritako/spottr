@@ -47,10 +47,10 @@ def _compiled(statement: Any) -> str:
     return str(statement.compile(dialect=postgresql.dialect()))
 
 
-def test_search_orders_by_ascending_cosine_distance() -> None:
+def test_retrieve_orders_by_ascending_cosine_distance() -> None:
     session = _CapturingSession()
 
-    _repository(session).search([0.1] * 3, k=5, max_distance=MAX_COSINE_DISTANCE)
+    _repository(session).retrieve([0.1] * 3, k=5, max_distance=MAX_COSINE_DISTANCE)
 
     sql = _compiled(session.statement)
     assert "chunks.embedding <=> " in sql
@@ -59,21 +59,21 @@ def test_search_orders_by_ascending_cosine_distance() -> None:
     assert "LIMIT" in sql
 
 
-def test_search_applies_the_distance_cutoff_in_sql() -> None:
+def test_retrieve_applies_the_distance_cutoff_in_sql() -> None:
     session = _CapturingSession()
 
-    _repository(session).search([0.1] * 3, k=5, max_distance=0.42)
+    _repository(session).retrieve([0.1] * 3, k=5, max_distance=0.42)
 
     where_clause = _compiled(session.statement).split("WHERE", 1)[1].split("ORDER BY", 1)[0]
     assert "chunks.embedding <=>" in where_clause
     assert 0.42 in session.statement.compile().params.values()
 
 
-def test_search_returns_chunks_paired_with_their_distance() -> None:
+def test_retrieve_returns_chunks_paired_with_their_distance() -> None:
     chunk = MagicMock()
     session = _CapturingSession([(chunk, 0.31)])
 
-    assert _repository(session).search([0.1] * 3, k=5, max_distance=MAX_COSINE_DISTANCE) == [
+    assert _repository(session).retrieve([0.1] * 3, k=5, max_distance=MAX_COSINE_DISTANCE) == [
         (chunk, 0.31)
     ]
 

@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class Citation(BaseModel):
     document_id: int
-    document: str
+    document_title: str
     chunk_index: int
 
 

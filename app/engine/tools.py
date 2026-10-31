@@ -69,4 +69,4 @@ class Tools:
                 return {"result": "Metric not yet implemented."}
 
     def search_coaching_docs(self, query: str, k: int | None = None) -> dict[str, Any]:
-        return self.docsHandler.search(query, k).model_dump(mode="json")
+        return self.docsHandler.retrieve(query, k).model_dump(mode="json")

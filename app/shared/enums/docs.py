@@ -1,7 +1,7 @@
 from enum import StrEnum
 
 
-class SearchStatus(StrEnum):
+class RetrievalStatus(StrEnum):
     """Outcome of a retrieval attempt."""
 
     OK = "ok"

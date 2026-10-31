@@ -16,7 +16,7 @@ from app.engine.rag import (
     MAX_TOP_K,
     MIN_TOP_K,
 )
-from app.shared.enums.docs import SearchStatus
+from app.shared.enums.docs import RetrievalStatus
 from app.shared.errors.docs import EmbeddingDimensionError, EmptyDocumentError
 from app.shared.schemas.docs import DocumentRead
 
@@ -47,10 +47,10 @@ def _retrieval(
     vector = embedding if embedding is not None else [0.1] * EMBEDDING_DIMENSIONS
     with (
         patch("app.api.handlers.docs.get_embeddings", return_value=[vector]) as embed,
-        patch.object(handler.repository, "search", return_value=chunks or []) as search,
+        patch.object(handler.repository, "retrieve", return_value=chunks or []) as retrieve,
         patch.object(handler.repository, "has_chunks", return_value=has_chunks) as has_chunks_mock,
     ):
-        yield SimpleNamespace(embed=embed, search=search, has_chunks=has_chunks_mock)
+        yield SimpleNamespace(embed=embed, retrieve=retrieve, has_chunks=has_chunks_mock)
 
 
 def test_ingest_builds_chunks_from_text() -> None:
@@ -83,19 +83,19 @@ def test_search_returns_passages_from_retrieved_chunks() -> None:
     chunk = _chunk(chunk_index=2)
 
     with _retrieval(handler, chunks=[(chunk, 0.21)]) as stubs:
-        result = handler.search("should I deload?")
+        result = handler.retrieve("should I deload?")
 
     stubs.embed.assert_called_once_with(["should I deload?"])
-    assert stubs.search.call_args.args == (
+    assert stubs.retrieve.call_args.args == (
         [0.1] * EMBEDDING_DIMENSIONS,
         DEFAULT_TOP_K * DUPLICATE_OVERFETCH,
         MAX_COSINE_DISTANCE,
     )
-    assert result.status == SearchStatus.OK
-    assert [passage.model_dump() for passage in result.results] == [
+    assert result.status == RetrievalStatus.OK
+    assert [passage.model_dump() for passage in result.passages] == [
         {
             "document_id": 1,
-            "document": "Deload Guidelines",
+            "document_title": "Deload Guidelines",
             "chunk_index": 2,
             "content": "Deload every four to six weeks when performance stalls.",
         }
@@ -110,29 +110,29 @@ def test_search_clamps_requested_passage_count(requested: int | None, expected: 
     handler = _handler()
 
     with _retrieval(handler) as stubs:
-        handler.search("should I deload?", requested)
+        handler.retrieve("should I deload?", requested)
 
-    assert stubs.search.call_args.args[1] == expected * DUPLICATE_OVERFETCH
+    assert stubs.retrieve.call_args.args[1] == expected * DUPLICATE_OVERFETCH
 
 
 def test_search_reports_no_match_when_nothing_is_close_enough() -> None:
     handler = _handler()
 
     with _retrieval(handler, has_chunks=True):
-        result = handler.search("how do I run a marathon?")
+        result = handler.retrieve("how do I run a marathon?")
 
-    assert result.status == SearchStatus.NO_MATCH
-    assert result.results == []
+    assert result.status == RetrievalStatus.NO_MATCH
+    assert result.passages == []
 
 
 def test_search_reports_empty_corpus_without_embedding_the_question() -> None:
     handler = _handler()
 
     with _retrieval(handler, has_chunks=False) as stubs:
-        result = handler.search("should I deload?")
+        result = handler.retrieve("should I deload?")
 
-    assert result.status == SearchStatus.EMPTY_CORPUS
-    assert result.results == []
+    assert result.status == RetrievalStatus.EMPTY_CORPUS
+    assert result.passages == []
     stubs.embed.assert_not_called()
 
 
@@ -146,10 +146,10 @@ def test_search_requests_extra_candidates_to_backfill_duplicates() -> None:
     ]
 
     with _retrieval(handler, chunks=chunks) as stubs:
-        result = handler.search("should I deload?", 2)
+        result = handler.retrieve("should I deload?", 2)
 
-    assert stubs.search.call_args.args[1] == 2 * DUPLICATE_OVERFETCH
-    assert [passage.document_id for passage in result.results] == [1, 3]
+    assert stubs.retrieve.call_args.args[1] == 2 * DUPLICATE_OVERFETCH
+    assert [passage.document_id for passage in result.passages] == [1, 3]
 
 
 def test_search_rejects_an_embedding_of_the_wrong_dimension() -> None:
@@ -159,6 +159,6 @@ def test_search_rejects_an_embedding_of_the_wrong_dimension() -> None:
         _retrieval(handler, embedding=[0.1] * (EMBEDDING_DIMENSIONS - 1)) as stubs,
         pytest.raises(EmbeddingDimensionError),
     ):
-        handler.search("should I deload?")
+        handler.retrieve("should I deload?")
 
-    stubs.search.assert_not_called()
+    stubs.retrieve.assert_not_called()

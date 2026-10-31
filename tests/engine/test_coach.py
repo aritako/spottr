@@ -82,16 +82,16 @@ def test_ask_coach_cites_every_retrieved_passage(coach: Coach) -> None:
     second_response = _response([], "A deload is reasonable.", response_id="resp_2")
     passages = {
         "status": "ok",
-        "results": [
+        "passages": [
             {
                 "document_id": 1,
-                "document": "Deload Guidelines",
+                "document_title": "Deload Guidelines",
                 "chunk_index": 2,
                 "content": "Deload every four to six weeks.",
             },
             {
                 "document_id": 2,
-                "document": "RPE and Autoregulation",
+                "document_title": "RPE and Autoregulation",
                 "chunk_index": 0,
                 "content": "Use RPE to autoregulate.",
             },
@@ -108,15 +108,15 @@ def test_ask_coach_cites_every_retrieved_passage(coach: Coach) -> None:
 
     assert result["used_tools"] == ["search_coaching_docs"]
     assert result["citations"] == [
-        {"document_id": 1, "document": "Deload Guidelines", "chunk_index": 2},
-        {"document_id": 2, "document": "RPE and Autoregulation", "chunk_index": 0},
+        {"document_id": 1, "document_title": "Deload Guidelines", "chunk_index": 2},
+        {"document_id": 2, "document_title": "RPE and Autoregulation", "chunk_index": 0},
     ]
 
 
 def test_ask_coach_deduplicates_repeated_passages_across_searches(coach: Coach) -> None:
     passage = {
         "document_id": 1,
-        "document": "Deload Guidelines",
+        "document_title": "Deload Guidelines",
         "chunk_index": 2,
         "content": "Deload every four to six weeks.",
     }
@@ -130,12 +130,12 @@ def test_ask_coach_deduplicates_repeated_passages_across_searches(coach: Coach) 
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses),
-        _stub_tool(coach, "search_coaching_docs", {"status": "ok", "results": [passage]}),
+        _stub_tool(coach, "search_coaching_docs", {"status": "ok", "passages": [passage]}),
     ):
         result = coach.ask_coach("Should I deload?")
 
     assert result["citations"] == [
-        {"document_id": 1, "document": "Deload Guidelines", "chunk_index": 2}
+        {"document_id": 1, "document_title": "Deload Guidelines", "chunk_index": 2}
     ]
 
 
@@ -148,7 +148,7 @@ def test_ask_coach_reports_no_citations_when_nothing_matches(coach: Coach) -> No
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses),
-        _stub_tool(coach, "search_coaching_docs", {"status": "no_match", "results": []}),
+        _stub_tool(coach, "search_coaching_docs", {"status": "no_match", "passages": []}),
     ):
         result = coach.ask_coach("How should I train for a marathon?")
 
