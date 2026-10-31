@@ -61,11 +61,13 @@ class DocsHandler:
 
     @staticmethod
     def _to_passages(chunks: list[tuple[Chunk, float]], limit: int) -> list[PassageRead]:
-        """Map retrieved chunks to passages, dropping repeated content from re-ingested docs.
+        """Map retrieved chunks to passages, dropping duplicate rows from re-ingested documents.
 
-        Duplicates are removed after retrieval, so the caller over-fetches: without that, a
-        duplicated chunk could shrink the result below the requested count or, at k=1, turn a
-        real match into a false no-match.
+        Chunk overlap is intentional and leaves neighbouring chunks with different text, so this
+        never merges them; the duplicate this removes is the same passage stored twice because
+        the same document was ingested twice. Duplicates are removed after retrieval, so the
+        caller over-fetches: without that, a duplicated chunk could shrink the result below the
+        requested count.
         """
         seen: set[str] = set()
         passages: list[PassageRead] = []
