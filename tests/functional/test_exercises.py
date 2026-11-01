@@ -1,10 +1,10 @@
-from collections.abc import Callable
-
 from fastapi.testclient import TestClient
 
+from tests.functional.helpers import create_exercise
 
-def test_create_and_read_exercise(client: TestClient, create_exercise: Callable[..., int]) -> None:
-    exercise_id = create_exercise("Back Squat", category="squat", is_compound=True)
+
+def test_create_and_read_exercise(client: TestClient) -> None:
+    exercise_id = create_exercise(client, "Back Squat", category="squat", is_compound=True)
 
     read = client.get(f"/exercises/{exercise_id}")
     assert read.status_code == 200, read.text
@@ -14,11 +14,9 @@ def test_create_and_read_exercise(client: TestClient, create_exercise: Callable[
     assert body["is_compound"] is True
 
 
-def test_list_exercises_returns_created(
-    client: TestClient, create_exercise: Callable[..., int]
-) -> None:
-    create_exercise("Bench Press")
-    create_exercise("Deadlift")
+def test_list_exercises_returns_created(client: TestClient) -> None:
+    create_exercise(client, "Bench Press")
+    create_exercise(client, "Deadlift")
 
     listing = client.get("/exercises", params={"page": 0, "page_size": 10})
     assert listing.status_code == 200, listing.text

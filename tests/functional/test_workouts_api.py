@@ -1,7 +1,8 @@
-from collections.abc import Callable
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
+
+from tests.functional.helpers import create_exercise
 
 
 def _workout_payload(exercise_id: int) -> dict[str, object]:
@@ -17,10 +18,8 @@ def _workout_payload(exercise_id: int) -> dict[str, object]:
     }
 
 
-def test_create_workout_persists_sets_with_decimal_and_tz(
-    client: TestClient, create_exercise: Callable[..., int]
-) -> None:
-    exercise_id = create_exercise()
+def test_create_workout_persists_sets_with_decimal_and_tz(client: TestClient) -> None:
+    exercise_id = create_exercise(client)
 
     create = client.post("/workouts", json=_workout_payload(exercise_id))
     assert create.status_code == 201, create.text
@@ -45,10 +44,8 @@ def test_create_workout_unknown_exercise_returns_404(client: TestClient) -> None
     assert response.status_code == 404, response.text
 
 
-def test_delete_workout_cascades_sets(
-    client: TestClient, create_exercise: Callable[..., int]
-) -> None:
-    exercise_id = create_exercise()
+def test_delete_workout_cascades_sets(client: TestClient) -> None:
+    exercise_id = create_exercise(client)
     create = client.post("/workouts", json=_workout_payload(exercise_id))
     assert create.status_code == 201, create.text
     workout_id = create.json()["id"]
