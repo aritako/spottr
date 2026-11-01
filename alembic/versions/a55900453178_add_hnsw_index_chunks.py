@@ -19,7 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.execute(
-        "CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw"
+        "CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw "
         "ON chunks USING hnsw (embedding vector_cosine_ops)"
     )
 
