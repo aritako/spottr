@@ -32,7 +32,8 @@ TestingSessionLocal = sessionmaker(
 def _migrated_db() -> Generator[None, None, None]:
     """Run `alembic upgrade head` once per test session against the test DB."""
     cfg = AlembicConfig("alembic.ini")
-    cfg.set_main_option("sqlalchemy.url", str(engine.url))
+    # str(url) masks the password as "***"; render it in full for the connection.
+    cfg.set_main_option("sqlalchemy.url", engine.url.render_as_string(hide_password=False))
     alembic_command.upgrade(cfg, "head")
     yield
 
