@@ -196,11 +196,11 @@ Slice rules:
 
 ## Testing
 
-- Pure helpers: plain unit tests with no database.
-- API and repository tests: use the transactional-rollback fixture in `tests/conftest.py` once a
-  dedicated test database exists. Until then tests stay mock-based — stub the session, or compile
-  the statement and assert on its SQL — because the suite has to run without Docker. Don't write
-  tests that leave data behind.
+- Pure helpers and anything checkable without a database: plain unit tests under `tests/unit`.
+- Anything touching the database or HTTP: functional tests under `tests/functional`, using the
+  transactional-rollback fixtures (`db_session`, `client`) against the isolated test database.
+  Run them with `pnpm test:api`, which starts the `test-db` service. Don't write tests that leave
+  data behind.
 - Tests must never call the real OpenAI API. Mock `client.responses.create` (or inject a fake
   client) and assert on tool calls and final output.
 - New behavior needs a test. Bug fixes need a test that fails before the fix.

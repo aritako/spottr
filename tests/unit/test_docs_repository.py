@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.api.repository.docs import DocsRepository
 from app.engine.rag import MAX_COSINE_DISTANCE
 
-# These tests read the compiled statement instead of executing it, because the transactional
-# fixture needs a live pgvector database and the suite is mock-based until tests get their own
-# container. They lock the two properties mocks otherwise can't: ascending cosine distance and
-# the cutoff living in SQL rather than in Python.
+# These tests read the compiled statement instead of executing it, so they run without a database
+# and stay fast. They lock the SQL shape: ascending cosine distance and the cutoff in WHERE rather
+# than in Python. tests/functional/test_docs_repository.py proves the same properties against real
+# pgvector data.
 
 
 class _CapturingSession:
