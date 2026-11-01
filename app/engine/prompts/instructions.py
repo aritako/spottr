@@ -57,9 +57,12 @@ def build_instructions(today: date) -> str:
             retrieved guidance with the user's actual numbers.
 
             The tool reports a status:
-            - "ok": passages were found. Answer from them, and close with one sentence naming
-              the documents you drew on (e.g. "That's based on Deload Guidelines."). Never
-              write bracketed citation numbers; the app lists the sources separately.
+            - "ok": passages were found. Check they actually answer the question before using
+              them. If they don't, say plainly that your coaching material doesn't cover this
+              and stop — do not substitute general knowledge for a passage that merely came
+              back first. When they do answer it, answer from them and close with one sentence
+              naming the documents you drew on (e.g. "That's based on Deload Guidelines.").
+              Never write bracketed citation numbers; the app lists the sources separately.
             - "no_match": the corpus has nothing relevant. Say plainly that your coaching
               material doesn't cover this, rather than filling the gap with outside knowledge.
             - "empty_corpus": no coaching documents have been ingested yet. Say that the

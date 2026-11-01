@@ -19,6 +19,13 @@ def test_instructions_explain_every_retrieval_status() -> None:
         assert f'"{status}"' in text
 
 
+def test_instructions_allow_refusing_irrelevant_passages() -> None:
+    text = build_instructions(TODAY)
+
+    assert "Check they actually answer the question" in text
+    assert "do not substitute general knowledge" in text
+
+
 def test_instructions_forbid_inline_citation_numbers() -> None:
     text = build_instructions(TODAY)
 
