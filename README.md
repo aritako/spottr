@@ -231,9 +231,11 @@ Tests run in two tiers: fast mocked unit tests (handlers, OpenAI mocked) and rea
 `TestClient` tests (workouts, exercises) against the isolated `coach_test` database
 (`pgvector/pgvector:pg16`, so `Vector(1536)` and the HNSW index behave like prod).
 The script starts the `test-db` compose service if it isn't running, exports
-`TEST_DATABASE_URL`, runs `alembic upgrade head` once per session, then rolls each test
-back transactionally — and stops `test-db` afterwards only if it started it. The
-`test-db` service uses `profiles: ["test"]`, so plain `docker compose up` skips it.
+`TEST_DATABASE_URL`, then runs pytest, whose session fixture applies `alembic upgrade head`
+once and rolls each test back transactionally — and stops `test-db` afterwards only if it
+started it. The `test-db` service uses `profiles: ["test"]`, so plain `docker compose up`
+skips it. Functional tests refuse to run without a `TEST_DATABASE_URL` pointing at
+`coach_test`, so a bare `pytest` can never touch the dev database.
 
 In CI (`.github/workflows/backend.yml`), a `pgvector:pg16` service container plays the
 same role with `TEST_DATABASE_URL` pointed at it.

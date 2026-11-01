@@ -1,13 +1,10 @@
+from collections.abc import Callable
+
 from fastapi.testclient import TestClient
 
 
-def test_create_and_read_exercise(client: TestClient) -> None:
-    create = client.post(
-        "/exercises",
-        json={"name": "Back Squat", "category": "squat", "is_compound": True},
-    )
-    assert create.status_code == 201, create.text
-    exercise_id = create.json()["id"]
+def test_create_and_read_exercise(client: TestClient, create_exercise: Callable[..., int]) -> None:
+    exercise_id = create_exercise("Back Squat", category="squat", is_compound=True)
 
     read = client.get(f"/exercises/{exercise_id}")
     assert read.status_code == 200, read.text
@@ -17,9 +14,11 @@ def test_create_and_read_exercise(client: TestClient) -> None:
     assert body["is_compound"] is True
 
 
-def test_list_exercises_returns_created(client: TestClient) -> None:
-    client.post("/exercises", json={"name": "Bench Press"})
-    client.post("/exercises", json={"name": "Deadlift"})
+def test_list_exercises_returns_created(
+    client: TestClient, create_exercise: Callable[..., int]
+) -> None:
+    create_exercise("Bench Press")
+    create_exercise("Deadlift")
 
     listing = client.get("/exercises", params={"page": 0, "page_size": 10})
     assert listing.status_code == 200, listing.text

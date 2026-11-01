@@ -1,13 +1,10 @@
+from collections.abc import Callable
+from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 
 
-def _create_exercise(client: TestClient, name: str = "Back Squat") -> int:
-    response = client.post("/exercises", json={"name": name})
-    assert response.status_code == 201, response.text
-    return response.json()["id"]
-
-
-def _workout_payload(exercise_id: int) -> dict:
+def _workout_payload(exercise_id: int) -> dict[str, object]:
     return {
         "unit": "kg",
         "bodyweight": 80.5,
@@ -20,8 +17,10 @@ def _workout_payload(exercise_id: int) -> dict:
     }
 
 
-def test_create_workout_persists_sets_with_decimal_and_tz(client: TestClient) -> None:
-    exercise_id = _create_exercise(client)
+def test_create_workout_persists_sets_with_decimal_and_tz(
+    client: TestClient, create_exercise: Callable[..., int]
+) -> None:
+    exercise_id = create_exercise()
 
     create = client.post("/workouts", json=_workout_payload(exercise_id))
     assert create.status_code == 201, create.text
@@ -35,8 +34,10 @@ def test_create_workout_persists_sets_with_decimal_and_tz(client: TestClient) ->
     assert len(body["sets"]) == 2
     assert sorted(s["set_index"] for s in body["sets"]) == [0, 1]
     assert {s["weight"] for s in body["sets"]} == {100.0, 102.5}
-    # Timezone-aware round-trip: stored TIMESTAMPTZ must keep the instant.
-    assert body["performed_at"].startswith("2026-10-26T12:00:00")
+    # TIMESTAMPTZ must round-trip the exact instant and stay timezone-aware.
+    performed_at = datetime.fromisoformat(body["performed_at"].replace("Z", "+00:00"))
+    assert performed_at == datetime(2026, 10, 26, 12, tzinfo=UTC)
+    assert performed_at.utcoffset() == UTC.utcoffset(None)
 
 
 def test_create_workout_unknown_exercise_returns_404(client: TestClient) -> None:
@@ -44,9 +45,13 @@ def test_create_workout_unknown_exercise_returns_404(client: TestClient) -> None
     assert response.status_code == 404, response.text
 
 
-def test_delete_workout_cascades_sets(client: TestClient) -> None:
-    exercise_id = _create_exercise(client)
-    workout_id = client.post("/workouts", json=_workout_payload(exercise_id)).json()["id"]
+def test_delete_workout_cascades_sets(
+    client: TestClient, create_exercise: Callable[..., int]
+) -> None:
+    exercise_id = create_exercise()
+    create = client.post("/workouts", json=_workout_payload(exercise_id))
+    assert create.status_code == 201, create.text
+    workout_id = create.json()["id"]
 
     delete = client.delete(f"/workouts/{workout_id}")
     assert delete.status_code == 204, delete.text
