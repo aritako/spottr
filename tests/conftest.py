@@ -1,23 +1,45 @@
+import os
 from collections.abc import Generator
 
 import pytest
+from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from alembic import command as alembic_command
 from app.core.config import settings
 from app.core.db import get_db
 from app.main import app
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+
+def _test_database_url() -> str:
+    """Test DB URL: explicit TEST_DATABASE_URL wins, else the dev DATABASE_URL."""
+    return settings.test_database_url or os.getenv("TEST_DATABASE_URL") or settings.database_url
+
+
+engine = create_engine(_test_database_url(), pool_pre_ping=True)
 TestingSessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False,
+    join_transaction_mode="create_savepoint",
 )
 
 
+@pytest.fixture(scope="session")
+def _migrated_db() -> Generator[None, None, None]:
+    """Run `alembic upgrade head` once per test session against the test DB."""
+    cfg = AlembicConfig("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", str(engine.url))
+    alembic_command.upgrade(cfg, "head")
+    yield
+
+
 @pytest.fixture(scope="function")
-def db_session() -> Generator[Session, None, None]:
-    """Yield a DB session that runs inside a transaction rolled back after the test."""
+def db_session(_migrated_db: None) -> Generator[Session, None, None]:
+    """Yield a session inside a rolled-back transaction (SAVEPOINT-safe)."""
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)

@@ -103,6 +103,7 @@ docker compose up --build
 | Web | http://localhost:3000 | Next.js dev server with live reload |
 | pgAdmin | http://localhost:5050 | `admin@admin.com` / `admin` |
 | PostgreSQL | localhost:5432 | user `coach`, password `coach`, db `coach` |
+| PostgreSQL (test) | localhost:5433 | `test-db` service (`profiles: ["test"]`), db `coach_test` — test runs only |
 
 After changing `pnpm-lock.yaml` or any `package.json`, refresh the web container's
 dependencies (compose reuses the old volumes otherwise):
@@ -222,12 +223,24 @@ ruff format .
 ### Run tests
 
 ```bash
-pytest
+pnpm test:api                   # full suite (starts test-db if needed, stops it after)
+pnpm test:api -- -k cascade     # pytest args pass through after --
 ```
 
-Any database-backed command run from the host (seed, Alembic, DB-hitting tests) needs the
-`DATABASE_URL` override shown in the seed step above, since the default resolves to the Docker
-`db` hostname.
+Tests run in two tiers: fast mocked unit tests (handlers, OpenAI mocked) and real-DB
+`TestClient` tests (workouts, exercises) against the isolated `coach_test` database
+(`pgvector/pgvector:pg16`, so `Vector(1536)` and the HNSW index behave like prod).
+The script starts the `test-db` compose service if it isn't running, exports
+`TEST_DATABASE_URL`, runs `alembic upgrade head` once per session, then rolls each test
+back transactionally — and stops `test-db` afterwards only if it started it. The
+`test-db` service uses `profiles: ["test"]`, so plain `docker compose up` skips it.
+
+In CI (`.github/workflows/backend.yml`), a `pgvector:pg16` service container plays the
+same role with `TEST_DATABASE_URL` pointed at it.
+
+Other database-backed commands run from the host (seed, Alembic against the dev DB) still
+need the `DATABASE_URL` override shown in the seed step above, since the default resolves
+to the Docker `db` hostname.
 
 ---
 

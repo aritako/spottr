@@ -59,7 +59,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+    # Prefer an explicitly configured URL (e.g. tests set TEST_DATABASE_URL
+    # via AlembicConfig before calling upgrade); fall back to app settings.
+    url = config.get_main_option("sqlalchemy.url") or settings.database_url
+    config.set_main_option("sqlalchemy.url", url)
 
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
