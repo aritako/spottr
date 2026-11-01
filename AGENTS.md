@@ -79,7 +79,10 @@ app/
 │   ├── models.py            # All ORM models
 │   └── openai/client.py     # Shared OpenAI client
 ├── engine/
-│   ├── coach.py             # Coach: tool schemas, registry, Responses API loop
+│   ├── coach.py             # Coach: tool registry, Responses API loop
+│   ├── prompts/
+│   │   ├── instructions.py  # build_instructions(today): the system prompt
+│   │   └── tool_schemas.py  # TOOL_SCHEMAS: the model-facing tool schemas
 │   ├── tools.py             # Tool implementations (call handlers, not repositories)
 │   └── helpers.py           # PURE functions only: metrics and time bucketing
 └── shared/
@@ -170,8 +173,8 @@ Slice rules:
 - The engine uses the OpenAI **Responses API**. Follow-up calls chain with `previous_response_id`
   and **must re-send `tools=self.TOOLS`**, or the model loses its tool menu.
 - Adding a tool requires three things that must stay in sync:
-  1. The implementation in `engine/tools.py` (calls handlers, returns JSON-serializable data)
-  2. The JSON schema in `Coach.TOOLS`
+  1. The implementation in `app/engine/tools.py` (calls handlers, returns JSON-serializable data)
+  2. The JSON schema in `app/engine/prompts/tool_schemas.py` (exposed to the model as `Coach.TOOLS`)
   3. The entry in `Coach.TOOL_REGISTRY`
 - Prefer `"strict": True` schemas. With strict mode, every property must be listed in `required`,
   optional values use `["type", "null"]`, and `additionalProperties` must be `False`.
@@ -193,9 +196,11 @@ Slice rules:
 
 ## Testing
 
-- Pure helpers: plain unit tests with no database.
-- API and repository tests: use the transactional-rollback fixture (each test runs inside a
-  transaction that is rolled back) once it exists. Don't write tests that leave data behind.
+- Pure helpers and anything checkable without a database: plain unit tests under `tests/unit`.
+- Anything touching the database or HTTP: functional tests under `tests/functional`, using the
+  transactional-rollback fixtures (`db_session`, `client`) against the isolated test database.
+  Run them with `pnpm test:api`, which starts the `test-db` service. Don't write tests that leave
+  data behind.
 - Tests must never call the real OpenAI API. Mock `client.responses.create` (or inject a fake
   client) and assert on tool calls and final output.
 - New behavior needs a test. Bug fixes need a test that fails before the fix.
@@ -245,3 +250,7 @@ See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 Single-context: root `GLOSSARY.md` plus `docs/adr/`. See `docs/agents/domain.md`.
+
+<API_TASKS>
+Before responding to any non-trivial API engineering task — designing, implementing, mocking, testing, monitoring, documenting, or deploying an API or Postman Flow — read `postman/skills/api-engineer/SKILL.md` and follow it. It is the default entry point for API work in this repository. Pure questions and trivial one-line edits do not need it.
+</API_TASKS>

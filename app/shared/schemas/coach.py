@@ -2,7 +2,8 @@ from pydantic import BaseModel
 
 
 class Citation(BaseModel):
-    document: str
+    document_id: int
+    document_title: str
     chunk_index: int
 
 

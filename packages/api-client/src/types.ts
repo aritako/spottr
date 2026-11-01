@@ -61,7 +61,8 @@ export interface CreateWorkoutInput {
 }
 
 export interface Citation {
-  document: string;
+  document_id: number;
+  document_title: string;
   chunk_index: number;
 }
 

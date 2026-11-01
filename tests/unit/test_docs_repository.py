@@ -1,0 +1,75 @@
+from typing import Any, cast
+from unittest.mock import MagicMock
+
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import Session
+
+from app.api.repository.docs import DocsRepository
+from app.engine.rag import MAX_COSINE_DISTANCE
+
+# These tests read the compiled statement instead of executing it, so they run without a database
+# and stay fast. They lock the SQL shape: ascending cosine distance and the cutoff in WHERE rather
+# than in Python. tests/functional/test_docs_repository.py proves the same properties against real
+# pgvector data.
+
+
+class _CapturingSession:
+    """Stand-in for a Session that records the statement instead of executing it."""
+
+    def __init__(self, chunks: list[Any] | None = None) -> None:
+        self.statement: Any = None
+        self.chunks = chunks or []
+
+    def scalars(self, statement: Any) -> list[Any]:
+        self.statement = statement
+        return self.chunks
+
+    def scalar(self, statement: Any) -> bool:
+        self.statement = statement
+        return False
+
+
+def _repository(session: _CapturingSession) -> DocsRepository:
+    return DocsRepository(cast(Session, session))
+
+
+def _compiled(statement: Any) -> str:
+    return str(statement.compile(dialect=postgresql.dialect()))
+
+
+def test_retrieve_orders_by_ascending_cosine_distance() -> None:
+    session = _CapturingSession()
+
+    _repository(session).retrieve([0.1] * 3, k=5, max_distance=MAX_COSINE_DISTANCE)
+
+    sql = _compiled(session.statement)
+    assert "chunks.embedding <=> " in sql
+    assert "ORDER BY" in sql
+    assert "DESC" not in sql
+    assert "LIMIT" in sql
+
+
+def test_retrieve_applies_the_distance_cutoff_in_sql() -> None:
+    session = _CapturingSession()
+
+    _repository(session).retrieve([0.1] * 3, k=5, max_distance=0.42)
+
+    where_clause = _compiled(session.statement).split("WHERE", 1)[1].split("ORDER BY", 1)[0]
+    assert "chunks.embedding <=>" in where_clause
+    assert 0.42 in session.statement.compile().params.values()
+
+
+def test_retrieve_returns_the_closest_chunks() -> None:
+    chunk = MagicMock()
+    session = _CapturingSession([chunk])
+
+    assert _repository(session).retrieve([0.1] * 3, k=5, max_distance=MAX_COSINE_DISTANCE) == [
+        chunk
+    ]
+
+
+def test_has_chunks_reports_whether_any_chunk_exists() -> None:
+    session = _CapturingSession()
+    session.scalar = lambda statement: True
+
+    assert _repository(session).has_chunks() is True

@@ -68,6 +68,11 @@ class Chunk(Base):
     embedding: Mapped[list[float]] = mapped_column(Vector(1536))
     document: Mapped["Document"] = relationship(back_populates="chunks")
 
+    @property
+    def document_title(self) -> str:
+        """The title of the owning document, named so it reads as a title, not a document."""
+        return self.document.title
+
 
 class Document(TimestampMixin, Base):
     __tablename__ = "documents"
