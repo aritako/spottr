@@ -1,0 +1,21 @@
+# Fatigue and Recovery Management
+
+Fatigue is the temporary reduction in performance capacity that training and life impose. It is not a character flaw and not a signal to push harder; it is a physiological state to be managed. The fitness-fatigue model describes why: every hard session raises fitness, which decays slowly, and fatigue, which accumulates and decays faster. Performance at any moment is roughly fitness minus fatigue, so managing fatigue is half of managing performance.
+
+Fatigue comes from more than the gym. Training volume and intensity contribute, but insufficient sleep, psychological stress, illness, and under-eating all draw from the same recovery account. A lifter whose programming is flawless can still regress during a period of bad sleep and heavy work stress, and the correct response is to acknowledge the deficit, usually by trimming volume, rather than to attack the program.
+
+Sleep is the highest-leverage recovery input. Reviews of sleep and athletic performance show that sleep restriction and deprivation impair exercise performance, mood, reaction time, and the recovery processes that training depends on, and that athletes chronically under-sleep relative to their needs. The practical target is seven to nine hours with a consistent schedule, treating it as part of the program rather than an optional extra. Naps count.
+
+Soreness deserves demotion. Delayed onset muscle soreness, DOMS, is not caused by lactic acid, which clears from muscle within a couple of hours, but by unaccustomed mechanical stress, especially from eccentric loading, followed by inflammation; it peaks 24 to 72 hours after the session. Crucially, soreness is a novelty signal, not a growth signal: it is worst after new exercises, new rep ranges, and returning after a layoff, while a productive block of familiar hard training may produce almost none. Reviews of the evidence conclude that post-exercise soreness is a poor indicator of muscle growth, so chasing soreness by constantly rotating exercises undermines the progressive overload that actually drives adaptation. The repeated-bout effect means the same training hurts less over time, which is adaptation, not stagnation.
+
+Recovery tools rank by evidence and leverage. Sleep and adequate food come first, and nothing else comes close. Planned deloads and volume management come second. Light activity on sore days, easy walking, cycling, and comfortable movement, comes third and genuinely helps. Massage, cold water immersion, compression, and gadgets sit far behind: they can feel good and may marginally modify soreness, but they do not substitute for the first three.
+
+Overreaching versus overtraining: functional overreaching is a planned, short-term dip in performance followed by a rebound above baseline, essentially what a hard final week of a mesocycle does on purpose. Overtraining syndrome is a prolonged performance decline, weeks to months, accompanied by disturbed mood, sleep, and motivation, that does not resolve with a few easy days. It is uncommon in recreational lifters, but it is real, and a lifter whose performance and wellbeing have been sliding for several weeks despite rest should treat it seriously and consider medical evaluation.
+
+Spottr helps watch the fatigue side of the ledger. A persistent multi-week decline in weekly tonnage or estimated one-rep max on unchanged programming is a fatigue flag worth acting on, usually with a deload or a volume cut, well before it becomes a forced layoff.
+
+## Sources
+
+- Fullagar, H. H., Skorski, S., Duffield, R., Hammes, D., Coutts, A. J., & Meyer, T. (2015). Sleep and athletic performance: the effects of sleep loss on exercise performance, and physiological and cognitive responses to exercise. Sports Medicine, 45(1), 161-186. https://doi.org/10.1007/s40279-014-0260-0
+- Cheung, K., Hume, P., & Maxwell, L. (2003). Delayed onset muscle soreness: treatment strategies and performance factors. Sports Medicine, 33(2), 145-164. https://doi.org/10.2165/00007256-200333020-00005
+- Schoenfeld, B. J., & Contreras, B. (2013). Is postexercise muscle soreness a valid indicator of muscular adaptations? Strength and Conditioning Journal, 35(5), 16-21. https://doi.org/10.1519/SSC.0b013e3182a61820

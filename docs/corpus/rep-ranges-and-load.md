@@ -1,0 +1,21 @@
+# Rep Ranges and Load
+
+A persistent myth in strength training is that one narrow rep range builds muscle and everything else is wasted effort. The evidence says otherwise: hypertrophy can be achieved across a wide spectrum of loads, provided sets are worked hard enough. A meta-analysis comparing low-load training at or below 60 percent of one-rep max against high-load training at 65 percent and above found similar muscle growth between conditions, while maximal strength gains were clearly greater with high loads. Muscle grows across the load spectrum; strength is built where the load is heavy.
+
+There is a floor to the load spectrum. In a twelve-week trial with volume load equated, intensities from 40 to 80 percent of one-rep max all increased muscle size and strength, while the lowest intensity tested, 20 percent of one-rep max, was clearly suboptimal even when sets were taken to failure. Extremely light sets require very long, grinding efforts to approach failure and deliver a weaker stimulus per set. As a practical floor, loads below roughly 40 percent of one-rep max are usually an inefficient way to train for size, though they retain some value for technique work and very light pump-downs.
+
+This yields simple practical defaults. For general hypertrophy, spend most working sets in the 6 to 15 rep range: it is efficient per unit of time, easy to progress, and kind to the joints. For strength-biased work on the main lifts, use 1 to 6 reps with heavy loads, because strength is specific to heavy loading and must be practiced with heavy loads. High-rep work, roughly 15 to 30 reps, is a legitimate tool for isolation lifts and times when joints need a break from heavy loading, but the sets must genuinely approach failure to count.
+
+Effort is the equalizer across rep ranges. A set of 8 and a set of 25 can produce similar growth when both end within a few reps of failure, which is why proximity to failure, rather than the exact rep count, is the better programming dial. A moderate 6 to 15 rep range may hold a modest efficiency advantage per minute of training time, but that advantage is far smaller than most gym folklore claims. Choosing a rep range for convenience, joint comfort, and progression quality matters more than optimizing a mythical hypertrophy window.
+
+Rep ranges carry different costs. Heavy low-rep work demands long rest periods, roughly three to five minutes, to repeat performance on the next set, and it taxes the nervous system and technique. Very high-rep work to failure is psychologically brutal, takes long sets, and produces deep fatigue and soreness in a way that can interfere with the rest of the session. Moderate rep ranges with one to three minutes of rest strike the balance most lifters can sustain across many exercises in one workout.
+
+When translating between weight and reps, remember that percentages of one-rep max map to roughly predictable rep maximums: most lifters get about 5 to 6 reps at 85 percent, 8 reps near 80 percent, 10 to 12 reps near 75 percent, and 15 reps near 65 percent, with individual variation. Estimated one-rep max, which Spottr computes from every logged set with the Epley formula, lets a lifter compare strength across different rep ranges without repeatedly testing true maxes.
+
+The practical summary: pick the rep range that fits the goal and the joints, keep most sets within about three reps of failure, and let progressive overload decide when the weight goes up. The specific number of reps per set is a means, not the message.
+
+## Sources
+
+- Schoenfeld, B. J., Grgic, J., Ogborn, D., & Krieger, J. W. (2017). Strength and hypertrophy adaptations between low- versus high-load resistance training: a systematic review and meta-analysis. Journal of Strength and Conditioning Research, 31(12), 3508-3523. https://doi.org/10.1519/JSC.0000000000002200
+- Lasevicius, T., et al. (2018). Effects of different intensities of resistance training with equated volume load on muscle strength and hypertrophy. European Journal of Sport Science, 18(6). https://doi.org/10.1080/17461391.2018.1450898
+- Nuckols, G., & Stronger by Science. The hypertrophy rep range: fact or fiction. https://www.strongerbyscience.com/hypertrophy-range-fact-fiction/
