@@ -14,6 +14,5 @@ label strings used in this repo's issue tracker.
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label
 string from this table.
 
-Issues currently live as markdown under `.scratch/` (see `docs/agents/issue-tracker.md`), so the
-tracker-side label is the `Status:` line at the top of the issue file. The same five strings become
-real tracker labels when the repo moves to GitHub Issues.
+Issues live as GitHub issues in this repo (see `docs/agents/issue-tracker.md`). The five strings
+above are real GitHub labels — apply them with `gh issue edit <n> --add-label <label>`.
