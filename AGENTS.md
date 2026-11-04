@@ -85,6 +85,11 @@ app/
 │   │   └── tool_schemas.py  # TOOL_SCHEMAS: the model-facing tool schemas
 │   ├── tools.py             # Tool implementations (call handlers, not repositories)
 │   └── helpers.py           # PURE functions only: metrics and time bucketing
+├── eval/
+│   ├── golden/              # authored retrieval golden set (YAML)
+│   ├── golden_set.py        # golden-set format and validating loader
+│   ├── metrics.py           # PURE retrieval scoring: recall, no_match, margins
+│   └── sweep.py             # PURE cutoff/top-k sweeps and lock rules
 └── shared/
     ├── enums/               # StrEnum definitions
     ├── errors/              # Domain exceptions
@@ -104,6 +109,9 @@ Layer rules:
   refactor existing handlers unless the task asks for it.
 - **`engine/helpers.py` must stay pure:** no ORM imports, no DB, no I/O. Pass plain values or
   dataclasses in, get plain values out. This keeps metrics trivially unit-testable.
+- **`app/eval` must stay pure and offline:** no ORM, database, network, or OpenAI imports outside
+  `app/eval/golden_set.py`'s filesystem loader. Scoring and lock rules take plain dataclasses so
+  the eval tier stays cheap and deterministic.
 
 ### Frontend (`web/`)
 
