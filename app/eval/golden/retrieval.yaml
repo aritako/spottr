@@ -1,0 +1,9 @@
+# Scaffold for the retrieval golden set. Issue #20 replaces this with the full authored set.
+# Each entry pairs a question with exactly one expectation:
+#   expected_document: the corpus source filename that retrieval must return
+#   no_match: true     a Negative question that retrieval must return no Passage for
+entries:
+  - question: "When should I take a deload week?"
+    expected_document: "deloads.md"
+  - question: "What was my squat one-rep max last month?"
+    no_match: true
