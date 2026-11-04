@@ -27,7 +27,8 @@ class CutoffLock:
     """The outcome of sweeping the relevance cutoff at ``k = 5``.
 
     ``margin`` is ``best Negative passage distance - worst positive hit distance``, measured at
-    the returned cutoff: the gap whose centre the lock prefers.
+    the returned cutoff. It can differ from the candidate gap whose centre selected that cutoff,
+    because centring may pull in farther positive hits.
     """
 
     qualifies: bool
@@ -65,7 +66,8 @@ def lock_cutoff(results: Sequence[QuestionResult], k: int = CUTOFF_K) -> CutoffL
     A cutoff qualifies when recall@k on positive questions is at least 95% and at least 90% of
     Negative questions report no match. Among the qualifying cutoffs, the widest margin between
     the worst positive hit and the best Negative-question passage wins (when margins tie, the
-    first, lowest candidate is kept), and the lock is placed at that margin's centre. When no
+    first, lowest candidate is kept), and the lock is placed at that margin's centre. If the
+    centred cutoff loses a bar when re-scored, the uncentred candidate is kept instead. When no
     cutoff meets both bars, the result says so instead of passing.
     """
     missing = _missing_expectations(results)
@@ -83,11 +85,11 @@ def lock_cutoff(results: Sequence[QuestionResult], k: int = CUTOFF_K) -> CutoffL
     best_recall = 0.0
     best_no_match = 0.0
 
-    for candidate in _candidate_cutoffs(results):
-        report = score(results, k=k, cutoff=candidate)
-        best_recall = max(best_recall, report.recall)
-        best_no_match = max(best_no_match, report.no_match_rate)
-        if not _meets_bars(report):
+    for candidate_report in sweep_cutoffs(results, k=k):
+        candidate = candidate_report.cutoff
+        best_recall = max(best_recall, candidate_report.recall)
+        best_no_match = max(best_no_match, candidate_report.no_match_rate)
+        if not _meets_bars(candidate_report):
             continue
 
         worst_positive, best_negative = _margin_bounds(results, k=k, cutoff=candidate)
@@ -99,7 +101,7 @@ def lock_cutoff(results: Sequence[QuestionResult], k: int = CUTOFF_K) -> CutoffL
         centered_report = score(results, k=k, cutoff=centered)
         if not _meets_bars(centered_report):
             centered = candidate
-            centered_report = report
+            centered_report = candidate_report
 
         if best_margin is None or margin > best_margin:
             best_margin = margin
@@ -212,7 +214,7 @@ def _negative_passages(results: Sequence[QuestionResult]) -> list[float]:
 def _candidate_cutoffs(results: Sequence[QuestionResult]) -> tuple[float, ...]:
     distances = {passage.distance for result in results for passage in result.passages}
     bounds = sorted({COSINE_DISTANCE_FLOOR, COSINE_DISTANCE_CEILING, *distances})
-    return tuple((lower + upper) / 2 for lower, upper in pairwise(bounds) if upper > lower)
+    return tuple((lower + upper) / 2 for lower, upper in pairwise(bounds))
 
 
 def _margin_bounds(
