@@ -1,9 +1,381 @@
-# Scaffold for the retrieval golden set. Issue #20 replaces this with the full authored set.
-# Each entry pairs a question with exactly one expectation:
-#   expected_document: the corpus source filename that retrieval must return
-#   no_match: true     a Negative question that retrieval must return no Passage for
+# Retrieval golden set (#20).
+#
+# Ground truth for the retrieval harness (#19 / #21 / #23). Design: resolution comment on #8.
+#
+# Format (app/eval/golden_set.py):
+#   - Positive:  question + expected_document (the corpus source filename)
+#   - Negative:  question + no_match: true
+#   Document-level only: no chunk indexes, no anchor snippets.
+#
+# Every "# ans:" comment points at the sentence in the expected Document that answers the
+# question. Comments only; the loader ignores them. "# also:" marks another Document that
+# partly answers the same question. Those are fine for recall@5 but will lower precision.
+#
+# Status: authored and verified against every Document (#20).
+
 entries:
-  - question: "When should I take a deload week?"
-    expected_document: "deloads.md"
-  - question: "What was my squat one-rep max last month?"
+  # ---------------------------------------------------------------- autoregulation-rir-rpe.md
+  - question: What does RPE 8 mean in terms of how many reps I have left?
+    expected_document: autoregulation-rir-rpe.md
+    # ans: RPE 8 is about two reps left on the Zourdos scale.
+
+  - question: I'm new to lifting and never know how close to failure I am. Am I just bad at judging it?
+    expected_document: autoregulation-rir-rpe.md
+    # ans: novices report near-failure with 3+ reps left; calibrate with failure sets on isolation/machines.
+
+  - question: Should I pick my weights from a percentage of my max or from how the bar feels that day?
+    expected_document: autoregulation-rir-rpe.md
+    # ans: RIR/RPE prescriptions adjust load to daily readiness; fixed percentages assume constant strength.
+
+  - question: How do I decide when to stop doing back-off sets on a given day?
+    expected_document: autoregulation-rir-rpe.md
+    # ans: the RPE stop: end back-off sets once RPE climbs a set amount above the first set.
+
+  - question: Is it worth going to absolute failure on every set?
+    expected_document: autoregulation-rir-rpe.md
+    # ans: "failure is a spice, not a staple"; occasional isolation sets only.
+    # also: rep-ranges-and-load.md, volume-landmarks.md (proximity to failure)
+
+  # ---------------------------------------------------------------- deloads.md
+  - question: If I'm taking an easier week, should I cut sets or just use lighter weights?
+    expected_document: deloads.md
+    # ans: halve working sets, same exercises and frequency, moderate loads, ~3-5 RIR.
+
+  - question: Can I just skip the gym completely for a week instead of training light?
+    expected_document: deloads.md
+    # ans: full rest gives up skill practice and the active-recovery benefit.
+
+  - question: I feel great right now. Do I still need to take a deload?
+    expected_document: deloads.md
+    # ans: skipping deloads because you feel fine works until it doesn't; forced layoffs cost more.
+
+  - question: After my recovery week, do I go straight back to the volume I was doing before?
+    expected_document: deloads.md
+    # ans: restart at about two-thirds of the pre-deload working sets and build back up.
+
+  - question: Since I'll be fresh, can I test my maxes during my deload week?
+    expected_document: deloads.md
+    # ans: no rep-max testing; turning the deload into a test week re-adds fatigue.
+
+  # ---------------------------------------------------------------- exercise-selection-and-ordering.md
+  - question: What kinds of exercises do I need so my program covers the whole body?
+    expected_document: exercise-selection-and-ordering.md
+    # ans: movement-pattern map: squat, hinge, horizontal/vertical push and pull, optional carry/core.
+
+  - question: Should I do squats before or after leg extensions?
+    expected_document: exercise-selection-and-ordering.md
+    # ans: heavy, technical compound first; isolation later.
+
+  - question: When does it make sense to swap an exercise out of my program?
+    expected_document: exercise-selection-and-ordering.md
+    # ans: to attack a weak point, route around a cranky joint, or get an effect the list lacks; not novelty.
+
+  - question: Does the order I do my exercises in change how much muscle I build?
+    expected_document: exercise-selection-and-ordering.md
+    # ans: order barely affects hypertrophy; strength and performance favor exercises done first.
+
+  - question: My triceps are lagging. Should I just tack more sets onto the end of my workout?
+    expected_document: exercise-selection-and-ordering.md
+    # ans: move the priority muscle to the front of the session instead of adding tired volume at the end.
+
+  # ---------------------------------------------------------------- fatigue-and-recovery.md
+  - question: How many hours of sleep do I need to recover from lifting?
+    expected_document: fatigue-and-recovery.md
+    # ans: seven to nine hours on a consistent schedule; naps count.
+
+  - question: If I'm not sore the day after, does that mean the workout didn't work?
+    expected_document: fatigue-and-recovery.md
+    # ans: soreness is a novelty signal and a poor indicator of growth.
+
+  - question: Are ice baths and massage guns worth it for recovery?
+    expected_document: fatigue-and-recovery.md
+    # ans: massage, cold water, compression, gadgets rank far behind sleep, food, deloads, light activity.
+
+  - question: Work has been really stressful and I'm getting weaker. Is my program the problem?
+    expected_document: fatigue-and-recovery.md
+    # ans: life stress draws on the same recovery account; trim volume rather than attack the program.
+    # also: judging-trends.md (declining numbers: check sleep and stress before blaming the program)
+
+  - question: How can I tell if I'm actually overtrained or just tired?
+    expected_document: fatigue-and-recovery.md
+    # ans: functional overreaching rebounds; overtraining syndrome is weeks-to-months decline with mood/sleep changes.
+
+  # ---------------------------------------------------------------- judging-trends.md
+  - question: I had a really bad session today. Should I be worried about my progress?
+    expected_document: judging-trends.md
+    # ans: single workouts are noisy; one bad session disproves nothing.
+    # also: deloads.md ("One bad session means nothing")
+
+  - question: How many weeks of logged workouts do I need before a trend actually means something?
+    expected_document: judging-trends.md
+    # ans: roughly three to four weeks, more if the series is jumpy.
+
+  - question: I had a huge week where everything felt light, and the next week was just normal. Am I regressing?
+    expected_document: judging-trends.md
+    # ans: regression to the mean; the exceptional week isn't the new normal.
+
+  - question: Is it normal for my lifts to go up, stall, and even dip instead of climbing every week?
+    expected_document: judging-trends.md
+    # ans: progress comes in waves; a sawtooth with a rising ceiling is healthy.
+    # also: progressive-overload.md (wave pattern at intermediate level)
+
+  - question: Can my logged numbers tell me whether I'm building muscle or recovering well?
+    expected_document: judging-trends.md
+    # ans: tonnage and e1RM don't directly measure fatigue, growth, or recovery; corroborate with how you feel.
+    # also: reading-your-spottr-numbers.md ("a volume signal, not a growth signal")
+
+  # ---------------------------------------------------------------- main-lift-technique.md
+  - question: How should I breathe and brace for a heavy squat?
+    expected_document: main-lift-technique.md
+    # ans: big breath into the belly, brace the trunk as if for a punch, hold through the rep.
+
+  - question: Is squatting below parallel bad for my knees?
+    expected_document: main-lift-technique.md
+    # ans: deep squats aren't inherently dangerous for healthy knees; partials may be the worse bet.
+
+  - question: How do I decide between high-bar and low-bar squats?
+    expected_document: main-lift-technique.md
+    # ans: depends on anthropometry; low-bar adds hip hinge and lean, high-bar stays upright.
+
+  - question: Should I keep grinding out reps once my form starts to break down?
+    expected_document: main-lift-technique.md
+    # ans: end heavy work when form breaks, not when the set count says so.
+
+  - question: How do I finish a deadlift at the top without leaning way back?
+    expected_document: main-lift-technique.md
+    # ans: lock out by standing tall with the glutes, not hyperextending the lower back.
+
+  # ---------------------------------------------------------------- periodization-basics.md
+  - question: Can I just repeat the same workout every week, or do I need to plan in some variation?
+    expected_document: periodization-basics.md
+    # ans: unvaried stress accumulates fatigue until performance stalls; planned variation lets it drain.
+    # also: progressive-overload.md (a normal workload no longer forces adaptation)
+
+  - question: What do you call a program where I squat heavy Monday, medium Wednesday, and light Friday?
+    expected_document: periodization-basics.md
+    # ans: undulating periodization varies intensity and volume within the week.
+
+  - question: What's an accumulation block, and how is it different from an intensification block?
+    expected_document: periodization-basics.md
+    # ans: accumulation = higher volume for muscle/work capacity; intensification trades volume for load.
+
+  - question: Should I run a peaking program even though I don't compete?
+    expected_document: periodization-basics.md
+    # ans: copying a peaking program outside a competition cycle means training perpetually tired.
+
+  - question: Does the type of periodization I pick really change my results much?
+    expected_document: periodization-basics.md
+    # ans: periodized beats non-periodized, but differences between models are small.
+
+  # ---------------------------------------------------------------- progressive-overload.md
+  - question: If I can't add weight to the bar, how else can I keep making progress?
+    expected_document: progressive-overload.md
+    # ans: levers: reps, sets, frequency, range of motion, harder variations, shorter rest.
+
+  - question: I'm doing sets of 8 to 12. When should I move up in weight?
+    expected_document: progressive-overload.md
+    # ans: double progression: all sets at the top of the range with reps in reserve, then +2.5-5%.
+
+  - question: Why could I add weight every session at the start but now I can't?
+    expected_document: progressive-overload.md
+    # ans: early gains are mostly neural; progression slows after about three to six months.
+
+  - question: Do isolation lifts like curls really need to get heavier over time too?
+    expected_document: progressive-overload.md
+    # ans: adding weight to isolation lifts matters as much as adding it to squats.
+
+  - question: Do half reps count toward my rep target?
+    expected_document: progressive-overload.md
+    # ans: count only clean reps; a rep that misses the intended range doesn't count.
+
+  # ---------------------------------------------------------------- reading-your-spottr-numbers.md
+  - question: How does the app calculate my estimated one-rep max?
+    expected_document: reading-your-spottr-numbers.md
+    # ans: Epley: weight x (1 + reps / 30), from every set.
+    # also: rep-ranges-and-load.md (mentions Epley in passing)
+
+  - question: Why does the e1RM from my set of 20 look so off?
+    expected_document: reading-your-spottr-numbers.md
+    # ans: prediction equations are most reliable under ~10 reps; high-rep estimates are noisy.
+    # also: judging-trends.md (e1RM from 5-rep and 15-rep sets aren't comparable)
+
+  - question: Ten sets of three and three sets of ten give the same tonnage, so what is tonnage actually good for?
+    expected_document: reading-your-spottr-numbers.md
+    # ans: tonnage conflates load and reps; it's a volume trend signal, not a growth signal.
+
+  - question: What day does a week start on in my weekly charts?
+    expected_document: reading-your-spottr-numbers.md
+    # ans: ISO weeks (e.g. 2026-W44), starting Monday.
+
+  - question: Does Spottr track my personal records or how many sets I did?
+    expected_document: reading-your-spottr-numbers.md
+    # ans: set counts and PR detection are planned future metrics; only tonnage and e1RM exist today.
+
+  # ---------------------------------------------------------------- rep-ranges-and-load.md
+  - question: Can I build muscle with really light weights, like 20% of my max?
+    expected_document: rep-ranges-and-load.md
+    # ans: 20% 1RM was clearly suboptimal; practical floor is roughly 40%.
+
+  - question: How many reps can I usually get with 80% of my max?
+    expected_document: rep-ranges-and-load.md
+    # ans: about 8 reps near 80%.
+
+  - question: Why do my sets of 25 to failure wreck the rest of my workout?
+    expected_document: rep-ranges-and-load.md
+    # ans: very high-rep work to failure produces deep fatigue and soreness that can interfere with the session.
+
+  - question: Is 8 to 12 reps really the best range for building muscle?
+    expected_document: rep-ranges-and-load.md
+    # ans: no magic window; growth happens across loads when sets are hard; effort is the dial.
+    # also: strength-vs-hypertrophy.md (8-12 vs 25-35 trial)
+
+  - question: How long should I rest between sets of 10?
+    expected_document: rep-ranges-and-load.md
+    # ans: moderate rep ranges with one to three minutes of rest.
+
+  # ---------------------------------------------------------------- strength-vs-hypertrophy.md
+  - question: If my muscles get bigger, will I automatically get stronger?
+    expected_document: strength-vs-hypertrophy.md
+    # ans: related but distinct adaptations; force expression is a skill learned with heavy practice.
+
+  - question: I only train light for the pump. Will that still push my squat max up?
+    expected_document: strength-vs-hypertrophy.md
+    # ans: light training built similar muscle but roughly half the squat 1RM gain of heavy training.
+    # also: rep-ranges-and-load.md (strength gains clearly greater with high loads)
+
+  - question: How heavy should I go and how many reps should I do if my main goal is a bigger total?
+    expected_document: strength-vs-hypertrophy.md
+    # ans: ~80%+ of 1RM, 1-6 reps, 3-5 min rest, moderate volume, frequent fresh exposures.
+    # also: rep-ranges-and-load.md (1-6 reps for strength)
+
+  - question: Should I train for size and strength in the same program, or one at a time?
+    expected_document: strength-vs-hypertrophy.md
+    # ans: sequence the goals in alternating blocks rather than blending them.
+    # also: periodization-basics.md (alternate emphases across blocks)
+
+  - question: As I get more experienced, does muscle size start to matter more for how strong I am?
+    expected_document: strength-vs-hypertrophy.md
+    # ans: with training age, muscle mass becomes a stronger predictor of strength.
+
+  # ---------------------------------------------------------------- training-frequency.md
+  - question: Is hitting each muscle once a week enough?
+    expected_document: training-frequency.md
+    # ans: once-a-week splits work but make high volumes harder; 2-3x per muscle is the default.
+
+  - question: If my total weekly sets stay the same, does training a muscle more often build more muscle?
+    expected_document: training-frequency.md
+    # ans: volume-equated, the frequency difference is trivial; frequency mainly distributes volume.
+
+  - question: Can I tell from my logs if I'm cramming too much of one muscle's work into a single day?
+    expected_document: training-frequency.md
+    # ans: tonnage concentrated in one day suggests redistributing across two or three days.
+
+  - question: Should I squat more days per week just to get better at the movement, even with lighter weights?
+    expected_document: training-frequency.md
+    # ans: main lifts are skills; more frequent practice at moderate loads improves coordination.
+    # also: strength-vs-hypertrophy.md (skill practice thrives on frequency)
+
+  - question: Can I train the same muscle hard every single day?
+    expected_document: training-frequency.md
+    # ans: no evidence extreme frequencies beat sensible distribution; recovery limits bind quickly.
+
+  # ---------------------------------------------------------------- volume-landmarks.md
+  - question: How many sets per week should I be doing for each muscle?
+    expected_document: volume-landmarks.md
+    # ans: starting estimates: MV ~4-8, MEV ~6-10, MAV ~12-20, MRV low twenties; calibrate to yourself.
+
+  - question: What's the difference between MEV and MRV?
+    expected_document: volume-landmarks.md
+    # ans: MEV = lowest weekly sets that grow muscle; MRV = ceiling where fatigue outpaces recovery.
+
+  - question: Do easy sets that are nowhere near failure count toward my weekly volume?
+    expected_document: volume-landmarks.md
+    # ans: hard sets are 0-3 reps from failure; easy sets don't count toward the landmarks.
+
+  - question: My chest hasn't grown in months. Should I add more sets?
+    expected_document: volume-landmarks.md
+    # ans: not growing on current sets suggests you're below MEV.
+    # also: progressive-overload.md (flat for a month: add a set)
+
+  - question: How do I know if I'm doing too much volume for a muscle?
+    expected_document: volume-landmarks.md
+    # ans: dropping performance, aching joints, feeling run down before sessions = above MRV.
+    # also: deloads.md (reactive deload warning signs)
+
+  # ---------------------------------------------------------------- warmups-and-injury-prevention.md
+  - question: How many warm-up sets should I do before getting to my working weight?
+    expected_document: warmups-and-injury-prevention.md
+    # ans: empty bar for 8-10, then three to five ramping steps with falling reps.
+    # also: main-lift-technique.md (mentions ramping sets)
+
+  - question: Will static stretching before lifting make me weaker?
+    expected_document: warmups-and-injury-prevention.md
+    # ans: long static holds cut strength/power a few percent; keep it brief or move it after training.
+
+  - question: Does lifting weights actually lower my risk of getting injured?
+    expected_document: warmups-and-injury-prevention.md
+    # ans: strength training cut injuries to under a third of control rates; stretching showed no effect.
+
+  - question: My elbow aches on and off after hard sessions. When should I actually worry about pain?
+    expected_document: warmups-and-injury-prevention.md
+    # ans: transient aches are normal; worsening, sharp, or joint-localized pain means modify and get evaluated.
+
+  - question: Do I need a long cardio session before I start lifting?
+    expected_document: warmups-and-injury-prevention.md
+    # ans: general phase is five to ten minutes of light activity.
+
+  # ================================================================ Negative questions
+  # Data questions belong to query_workouts / query_exercises, not the corpus. These are the
+  # hard negatives: they share vocabulary (e1RM, tonnage, PR) with reading-your-spottr-numbers.md
+  # and judging-trends.md, so they are the most likely to break the 90% no_match bar.
+
+  - question: What was my best bench press e1RM last month?
     no_match: true
+    # data
+
+  - question: How much total tonnage did I do on squats this week?
+    no_match: true
+    # data
+
+  - question: Did my deadlift go up or down over the last eight weeks?
+    no_match: true
+    # data
+
+  - question: Which exercises have I logged so far?
+    no_match: true
+    # data (query_exercises)
+
+  - question: When did I hit my last squat PR?
+    no_match: true
+    # data
+
+  - question: Compare my overhead press volume in October with September.
+    no_match: true
+    # data
+
+  # Out-of-domain. The first two are near-domain on purpose: the corpus mentions "adequate
+  # food" and "under-eating" but never answers a nutrition question.
+
+  - question: How much protein should I eat per day to build muscle?
+    no_match: true
+    # out-of-domain (near: fatigue-and-recovery.md mentions food)
+
+  - question: Is creatine worth taking?
+    no_match: true
+    # out-of-domain (near)
+
+  - question: What's a good training plan for my first 10K run?
+    no_match: true
+    # out-of-domain
+
+  - question: How do I fix my posture from sitting at a desk all day?
+    no_match: true
+    # out-of-domain
+
+  - question: Which lifting shoes should I buy?
+    no_match: true
+    # out-of-domain
+
+  - question: What's the capital of Australia?
+    no_match: true
+    # out-of-domain (sanity floor)
