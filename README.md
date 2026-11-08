@@ -39,7 +39,7 @@ containerization, and an evaluation harness.
   answers grounded in retrieved passages with source citations.
 - 🔀 **Hybrid answers** — questions like "Given my recent volume, should I deload?" combine
   your data *and* coaching principles in one response.
-- ✅ **Evaluation harness** — automated checks for tool-use accuracy and retrieval quality.
+- ✅ **Evaluation harness** — a golden set and lock rules for retrieval quality.
 - 🐳 **Fully Dockerized** — `docker compose up` and you're running.
 
 ---
