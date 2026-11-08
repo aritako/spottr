@@ -22,10 +22,14 @@ Keep all business logic in this backend so every client (web, Expo) reuses it.
 
 ## Git
 
-- Never run `git commit`, `git push`, `git stash`, `git reset`, or `git checkout` on files.
-- Leave all changes as unstaged modifications in the working tree. Do not run `git add`.
-- The human reviews the diff and commits manually.
-- The agent can only execute `git` commands if the human explicitly says so.
+- You may create branches, stage changes, commit, and push without asking. Use Conventional
+  Commits for messages (`feat(scope): ...`, `fix(scope): ...`), matching the existing history.
+- **Stop before the PR.** Do not open, merge, or close a pull request. Finish with a summary and
+  a proposed PR title/body, and leave the PR for the human to create.
+- Destructive history operations still need explicit instruction: no `--force`/`--force-with-lease`
+  pushes, no rewriting published history, and no `git reset --hard` or `git checkout`/`git restore`
+  that would discard work you did not create. Ask before stashing or discarding uncommitted work.
+- Never commit `.env` files, secrets, or unrelated changes.
 
 ## Commands
 
