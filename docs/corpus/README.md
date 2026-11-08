@@ -46,3 +46,6 @@ Follow the same conventions. Ground every new document in sources that can be
 verified online (title plus DOI or URL), and never cite a reference that has
 not been checked. Write to the metrics and tools that actually exist in the
 app at the time of writing.
+
+Every Document needs at least three golden questions pointing at it in
+`app/eval/golden/retrieval.yaml`; the default test run enforces this.
