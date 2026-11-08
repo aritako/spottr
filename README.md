@@ -39,8 +39,7 @@ containerization, and an evaluation harness.
   answers grounded in retrieved passages with source citations.
 - 🔀 **Hybrid answers** — questions like "Given my recent volume, should I deload?" combine
   your data *and* coaching principles in one response.
-- ✅ **Evaluation harness** — a golden set and lock rules for retrieval quality, with a local
-  sweep harness for calibrating the retrieval constants.
+- ✅ **Evaluation harness** — a golden set and lock rules for retrieval quality.
 - 🐳 **Fully Dockerized** — `docker compose up` and you're running.
 
 ---
@@ -244,55 +243,6 @@ same role with `TEST_DATABASE_URL` pointed at it.
 Other database-backed commands run from the host (seed, Alembic against the dev DB) still
 need the `DATABASE_URL` override shown in the seed step above, since the default resolves
 to the Docker `db` hostname.
-
-### Retrieval calibration sweep
-
-The retrieval constants in `app/engine/rag.py` (`MAX_COSINE_DISTANCE` and `DEFAULT_TOP_K`) are
-tuned with a local sweep against the authored golden set in `app/eval/golden/retrieval.yaml`.
-`scripts/eval_retrieval.py` runs the sweep and prints the evidence. The checked-in cutoff is
-still the starting guess until that run happens and updates it.
-
-It needs a **real** `OPENAI_API_KEY` (CI only has a dummy key), a database with the corpus
-ingested, and the project's dependencies installed on the host (`pip install -e ".[dev]"`).
-From the repository root:
-
-```bash
-# 1. Start the database and API, then apply migrations.
-docker compose up -d db app
-docker compose exec app alembic upgrade head
-
-# 2. Ingest the corpus (host script; needs the API on http://localhost:8000).
-python scripts/ingest_corpus.py
-
-# 3. Run the sweep against the published database port.
-DATABASE_URL=postgresql+psycopg://coach:coach@localhost:5432/coach \
-    python scripts/eval_retrieval.py
-```
-
-Pass `--database-url` instead of the environment prefix if you prefer, and `--golden-set PATH`
-to sweep a different golden set. The run costs one embedding call for all ~80 questions (pennies)
-and one local pgvector query per question per candidate configuration; it never calls the HTTP
-API.
-
-The report prints one row per candidate cutoff at `k=5` and one row per `k` at the locked
-cutoff, with recall@k, Negative no_match, precision and the distance margins. It then names the
-recommended `MAX_COSINE_DISTANCE` and `DEFAULT_TOP_K` with their evidence, or states plainly that
-the bars cannot be met and why. Per-entry failures name the question and the Passages that were
-retrieved instead, and a summary highlights Documents hijacking retrievals. It fails with an
-actionable message when the corpus has not been ingested, and exits non-zero when no pair meets
-the bars.
-
-Run it:
-
-- **When calibrating**, then update the constants in `app/engine/rag.py` in the same reviewed
-  change as the report evidence (and record the values in the ADR).
-- **After any corpus change** — a new, edited or removed document moves chunk distances. The
-  sweep is trusted but not gated: it does not have to pass to merge a corpus PR, but it is a
-  checklist item on one.
-- **After editing the golden set**, since the ground truth changed.
-
-It is not part of the default test suite. The unit tier covers the metrics, lock rules and this
-report with synthetic vectors, so normal `pytest` runs never need a real key.
 
 ---
 
