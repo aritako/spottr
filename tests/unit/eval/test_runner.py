@@ -48,7 +48,11 @@ def _golden_set(*entries: GoldenEntry) -> GoldenSet:
     return GoldenSet(entries=list(entries))
 
 
-def _evaluate(results: list[QuestionResult]) -> "eval_retrieval.SweepEvaluation":
+def _evaluate(
+    results: list[QuestionResult],
+    *,
+    corpus: list[tuple[str, list[float]]] | None = None,
+) -> "eval_retrieval.SweepEvaluation":
     """Run the real evaluator through a tiny in-memory retriever.
 
     Each synthetic question gets a distinct unit vector so the retriever can recover its
@@ -67,7 +71,9 @@ def _evaluate(results: list[QuestionResult]) -> "eval_retrieval.SweepEvaluation"
         matching = passages_by_embedding[tuple(query_embedding)]
         return tuple(passage for passage in matching if passage.distance < max_distance)[:k]
 
-    return eval_retrieval.evaluate_results(_golden_set(*entries), embeddings, retrieve)
+    return eval_retrieval.evaluate_results(
+        _golden_set(*entries), embeddings, retrieve, corpus=corpus
+    )
 
 
 def _entry_for(result: QuestionResult) -> GoldenEntry:
@@ -106,6 +112,9 @@ class _FakeRepository:
 
     def has_chunks(self) -> bool:
         return bool(self.chunks)
+
+    def list_chunks(self) -> list[_FakeChunk]:
+        return list(self.chunks)
 
     def retrieve(
         self, query_embedding: list[float], k: int, max_distance: float
@@ -203,6 +212,77 @@ def test_run_sweep_rejects_chunks_without_a_source() -> None:
 def test_to_retrieved_passage_rejects_an_unusable_chunk_embedding() -> None:
     with pytest.raises(eval_retrieval.RunnerError, match="unusable embedding"):
         eval_retrieval._to_retrieved_passage(_FakeChunk(1, "a.md"), _vector(1.0))
+
+
+def test_true_ranks_rank_every_chunk_and_keep_ties_behind_the_expected_document() -> None:
+    results = [
+        _result("positive", "a.md", ("a.md", 0, 0.3)),
+        _result("negative", None),
+    ]
+    embeddings = [_vector(1.0), _vector(0.0, 0.0, 1.0)]
+    corpus = [
+        ("b.md", _vector(1.0)),  # distance 0, so it ranks ahead of the expected chunk
+        ("a.md", _vector(0.0, 1.0)),  # the expected Document's nearest chunk at distance 1
+        ("a.md", _vector(0.0, 1.0)),  # a tie, which does not rank ahead
+    ]
+
+    ranks = eval_retrieval.true_ranks(results, embeddings, corpus)
+
+    assert set(ranks) == {"positive"}
+    rank, distance = ranks["positive"] or (None, None)
+    assert rank == 2
+    assert distance == pytest.approx(1.0)
+
+
+def test_true_ranks_report_none_when_the_expected_document_has_no_chunks() -> None:
+    results = [_result("positive", "a.md", ("a.md", 0, 0.2))]
+
+    ranks = eval_retrieval.true_ranks(
+        results,
+        [_vector(1.0)],
+        [("b.md", _vector(1.0))],
+    )
+
+    assert ranks == {"positive": None}
+
+
+def test_format_report_appends_a_true_rank_to_a_recall_failure() -> None:
+    results = [
+        _result(
+            "positive question",
+            "a.md",
+            ("c.md", 0, 0.1),
+            ("c.md", 1, 0.2),
+            ("c.md", 2, 0.3),
+            ("c.md", 3, 0.4),
+            ("c.md", 4, 0.5),
+            ("a.md", 5, 0.95),
+        ),
+        _result("negative question", None, ("c.md", 6, 0.1)),
+    ]
+
+    evaluation = _evaluate(
+        results,
+        corpus=[
+            ("b.md", _vector(1.0)),  # the positive question's vector is _vector(1.0)
+            ("a.md", _vector(0.0, 1.0)),
+        ],
+    )
+
+    report = eval_retrieval.format_report(evaluation)
+
+    assert "true rank 2 at distance 1.0000" in report
+
+
+def test_format_report_says_when_a_missed_document_has_no_chunks() -> None:
+    results = [
+        _result("positive question", "a.md", ("c.md", 0, 0.2)),
+        _result("negative question", None, ("c.md", 1, 0.1)),
+    ]
+
+    evaluation = _evaluate(results, corpus=[("b.md", _vector(1.0))])
+
+    assert "expected Document has no chunks" in eval_retrieval.format_report(evaluation)
 
 
 def test_format_report_names_the_recommended_constants_with_evidence() -> None:

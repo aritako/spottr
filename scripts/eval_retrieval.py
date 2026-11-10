@@ -21,7 +21,7 @@ import math
 import sys
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -51,6 +51,7 @@ from app.eval.metrics import (  # noqa: E402
     relevant_passages,
     score,
     select_passages,
+    wilson_interval,
 )
 from app.eval.sweep import (  # noqa: E402
     COSINE_DISTANCE_CEILING,
@@ -63,6 +64,9 @@ from app.eval.sweep import (  # noqa: E402
     TopKLock,
     lock_cutoff,
     lock_top_k,
+    margin_bounds,
+    negative_distance,
+    positive_distance,
     sweep_cutoffs,
 )
 
@@ -118,6 +122,8 @@ class SweepEvaluation:
     locked_cutoff_report: ScoringReport | None
     top_k_reports: tuple[ScoringReport, ...]
     top_k_lock: TopKLock | None
+    ranking_ceiling: tuple[ScoringReport, ...] = ()
+    true_ranks: dict[str, tuple[int, float] | None] = field(default_factory=dict)
 
     @property
     def recommended(self) -> tuple[float, int] | None:
@@ -144,6 +150,36 @@ def cosine_distance(left: Sequence[float], right: Sequence[float]) -> float:
     return 1.0 - similarity
 
 
+def true_ranks(
+    results: Sequence[QuestionResult],
+    embeddings: Sequence[Sequence[float]],
+    corpus: Sequence[tuple[str, Sequence[float]]],
+) -> dict[str, tuple[int, float] | None]:
+    """For each positive question, the 1-based rank and distance of the nearest chunk of its
+    expected Document among all chunks, or None when that Document has no chunk.
+    ``corpus`` is (document source, embedding) per chunk. Ranks use cosine_distance."""
+    ranks: dict[str, tuple[int, float] | None] = {}
+    for result, embedding in zip(results, embeddings, strict=True):
+        if result.is_negative:
+            continue
+
+        distances = [cosine_distance(embedding, chunk_embedding) for _, chunk_embedding in corpus]
+        expected = [
+            distance
+            for (source, _), distance in zip(corpus, distances, strict=True)
+            if source == result.expected_document
+        ]
+        if not expected:
+            ranks[result.question] = None
+            continue
+
+        nearest = min(expected)
+        rank = 1 + sum(1 for distance in distances if distance < nearest)
+        ranks[result.question] = (rank, nearest)
+
+    return ranks
+
+
 def make_repository_retriever(repository: DocsRepository) -> Retriever:
     """Adapt ``DocsRepository.retrieve`` to the plain passages the eval core consumes."""
 
@@ -156,7 +192,7 @@ def make_repository_retriever(repository: DocsRepository) -> Retriever:
     return retrieve
 
 
-def _to_retrieved_passage(chunk: Chunk, query_embedding: Sequence[float]) -> RetrievedPassage:
+def _chunk_source(chunk: Chunk) -> str:
     source = chunk.document.source if chunk.document is not None else None
     if not source:
         raise RunnerError(
@@ -164,6 +200,11 @@ def _to_retrieved_passage(chunk: Chunk, query_embedding: Sequence[float]) -> Ret
             "Re-ingest the corpus with scripts/ingest_corpus.py, which records the corpus "
             "filename as the source, then re-run the sweep."
         )
+    return source
+
+
+def _to_retrieved_passage(chunk: Chunk, query_embedding: Sequence[float]) -> RetrievedPassage:
+    source = _chunk_source(chunk)
     try:
         distance = cosine_distance(query_embedding, chunk.embedding)
     except ValueError as error:
@@ -217,6 +258,8 @@ def evaluate_results(
     golden_set: GoldenSet,
     embeddings: Sequence[Sequence[float]],
     retrieve: Retriever,
+    *,
+    corpus: Sequence[tuple[str, Sequence[float]]] | None = None,
 ) -> SweepEvaluation:
     """Score every candidate configuration through the repository's cutoff path.
 
@@ -232,6 +275,9 @@ def evaluate_results(
         retrieve,
         k=DISCOVERY_TOP_K,
         cutoff=DISCOVERY_CUTOFF,
+    )
+    ranking_ceiling = tuple(
+        score(discovery, k=k, cutoff=DISCOVERY_CUTOFF) for k in range(MIN_SWEEP_K, MAX_SWEEP_K + 1)
     )
 
     candidate_cutoffs = [report.cutoff for report in sweep_cutoffs(discovery, k=CUTOFF_K)]
@@ -272,6 +318,8 @@ def evaluate_results(
         locked_cutoff_report=locked_cutoff_report,
         top_k_reports=top_k_reports,
         top_k_lock=top_k_lock,
+        ranking_ceiling=ranking_ceiling,
+        true_ranks=true_ranks(discovery, embeddings, corpus) if corpus is not None else {},
     )
 
 
@@ -288,9 +336,15 @@ def run_sweep(
     if not repository.has_chunks():
         raise RunnerError(EMPTY_CORPUS_MESSAGE)
 
+    corpus = [(_chunk_source(chunk), chunk.embedding) for chunk in repository.list_chunks()]
     questions = [entry.question for entry in golden_set.entries]
     embeddings = embed(questions)
-    return evaluate_results(golden_set, embeddings, make_repository_retriever(repository))
+    return evaluate_results(
+        golden_set,
+        embeddings,
+        make_repository_retriever(repository),
+        corpus=corpus,
+    )
 
 
 def failure_pair(evaluation: SweepEvaluation) -> FailurePair:
@@ -388,44 +442,24 @@ def _percent(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
+def _rate_with_interval(successes: int, total: int) -> str:
+    if total == 0:
+        return "n/a"
+    low, high = wilson_interval(successes, total)
+    return f"{successes / total * 100:.1f}% [{low * 100:.1f}-{high * 100:.1f}]"
+
+
 def _distance(value: float | None) -> str:
-    return "n/a" if value is None else f"{value:.3f}"
-
-
-def _margin_bounds(
-    results: Sequence[QuestionResult], report: ScoringReport
-) -> tuple[float | None, float | None, float | None]:
-    """Worst selected positive hit, best Negative-question passage, and their gap."""
-    worst_positive = max(
-        (
-            margin.worst_positive_distance
-            for margin in report.margins
-            if margin.worst_positive_distance is not None
-        ),
-        default=None,
-    )
-    best_negative = min(
-        (
-            passage.distance
-            for result in results
-            if result.is_negative
-            for passage in result.passages
-        ),
-        default=None,
-    )
-    margin = (
-        best_negative - worst_positive
-        if worst_positive is not None and best_negative is not None
-        else None
-    )
-    return worst_positive, best_negative, margin
+    if value is None or math.isinf(value):
+        return "none"
+    return f"{value:.4f}"
 
 
 def _passage_list(passages: Sequence[RetrievedPassage]) -> str:
     if not passages:
         return "(no Passage above the cutoff)"
     return ", ".join(
-        f"{passage.document_source} #{passage.chunk_index} at {passage.distance:.3f}"
+        f"{passage.document_source} #{passage.chunk_index} at {passage.distance:.4f}"
         for passage in passages
     )
 
@@ -448,12 +482,19 @@ def format_report(evaluation: SweepEvaluation) -> str:
         f"CUTOFF SWEEP AT k={CUTOFF_K} "
         f"(bars: recall >= {RECALL_BAR:.0%}, Negative no_match >= {NO_MATCH_BAR:.0%})"
     )
+    if first_report.positives and first_report.negatives:
+        p_bound, d_bound = margin_bounds(evaluation.discovery_results, k=CUTOFF_K)
+        lines.append(
+            f"Recall bound P={_distance(p_bound)}, negative bound D={_distance(d_bound)}, "
+            f"margin D-P={_distance(d_bound - p_bound)} "
+            "(cutoffs in (P, D] meet both bars)"
+        )
     lines.append(
-        "      cutoff   recall@5   no_match   precision   worst+ hit   best- passage   margin"
+        "      cutoff   recall@5 [95% CI]      no_match [95% CI]   doc precision   "
+        "passage precision"
     )
     recommended_cutoff = evaluation.recommended[0] if evaluation.recommended else None
     for report in evaluation.cutoff_reports:
-        worst_positive, best_negative, margin = _margin_bounds(evaluation.discovery_results, report)
         marker = (
             "  <- locked"
             if recommended_cutoff is not None
@@ -461,29 +502,28 @@ def format_report(evaluation: SweepEvaluation) -> str:
             else ""
         )
         lines.append(
-            f"  {report.cutoff:>10.4f}   {_percent(report.recall):>8}   "
-            f"{_percent(report.no_match_rate):>8}   {_percent(report.precision):>9}   "
-            f"{_distance(worst_positive):>11}   {_distance(best_negative):>13}   "
-            f"{_distance(margin):>7}{marker}"
+            f"  {report.cutoff:>10.4f}   "
+            f"{_rate_with_interval(report.recalled, report.positives):>20}   "
+            f"{_rate_with_interval(report.no_matches, report.negatives):>19}   "
+            f"{_percent(report.document_precision):>13}   "
+            f"{_percent(report.precision):>17}{marker}"
         )
-    lines.append(
-        "  Note: margin = best Negative-question passage distance - worst selected positive hit."
-    )
-    lines.append(
-        "  The best Negative passage is shown even when it is below the cutoff, because that "
-        "separation is what the lock rule measures."
-    )
     if recommended_cutoff is not None and not any(
         math.isclose(report.cutoff, recommended_cutoff, abs_tol=1e-12)
         for report in evaluation.cutoff_reports
     ):
         lines.append(
-            "  The locked cutoff is centred between candidate cutoffs; its own metrics are in "
-            "RECOMMENDATION."
+            "  The locked cutoff is not a candidate cutoff; its own metrics are in RECOMMENDATION."
         )
     lines.append("")
 
     lines.extend(_format_top_k(evaluation))
+    lines.append("")
+
+    lines.extend(_format_ranking_ceiling(evaluation))
+    lines.append("")
+
+    lines.extend(_format_distances(evaluation))
     lines.append("")
 
     pair = failure_pair(evaluation)
@@ -504,13 +544,20 @@ def format_report(evaluation: SweepEvaluation) -> str:
                 lines.append(
                     "    expected Document nearest: "
                     f"{nearest.document_source} #{nearest.chunk_index} at "
-                    f"{nearest.distance:.3f} ({_not_selected_reason(nearest.distance, pair)})"
+                    f"{nearest.distance:.4f} ({_not_selected_reason(nearest.distance, pair)})"
                 )
             else:
                 lines.append(
                     "    expected Document nearest: not in the retrieved candidates "
                     f"(top {DISCOVERY_TOP_K} at the discovery cutoff)"
                 )
+            if failure.question in evaluation.true_ranks:
+                true_rank = evaluation.true_ranks[failure.question]
+                if true_rank is None:
+                    lines.append("    expected Document has no chunks")
+                else:
+                    rank, distance = true_rank
+                    lines.append(f"    true rank {rank} at distance {_distance(distance)}")
         else:
             lines.append(f'  [no_match] "{failure.question}"')
             lines.append("    expected   no match")
@@ -554,26 +601,29 @@ def _format_recommendation(evaluation: SweepEvaluation) -> list[str]:
             lines.append(f"  DEFAULT_TOP_K = {k}")
             lines.append("  Evidence:")
             if cutoff_report is not None:
-                worst_positive, best_negative, margin = _margin_bounds(
-                    evaluation.discovery_results, cutoff_report
-                )
+                p_bound, d_bound = margin_bounds(evaluation.discovery_results, k=k)
                 lines.append(
                     f"    cutoff at k={CUTOFF_K}: recall@{CUTOFF_K} = "
-                    f"{_percent(cutoff_report.recall)} (bar >= {RECALL_BAR:.0%}), no_match = "
-                    f"{_percent(cutoff_report.no_match_rate)} (bar >= {NO_MATCH_BAR:.0%}), "
-                    f"precision = {_percent(cutoff_report.precision)}"
+                    f"{_rate_with_interval(cutoff_report.recalled, cutoff_report.positives)} "
+                    f"(bar >= {RECALL_BAR:.0%}), no_match = "
+                    f"{_rate_with_interval(cutoff_report.no_matches, cutoff_report.negatives)} "
+                    f"(bar >= {NO_MATCH_BAR:.0%}), doc precision = "
+                    f"{_percent(cutoff_report.document_precision)}, passage precision = "
+                    f"{_percent(cutoff_report.precision)}"
                 )
                 lines.append(
-                    f"    separation: worst positive hit {_distance(worst_positive)}, "
-                    f"best Negative passage {_distance(best_negative)}, "
-                    f"margin {_distance(margin)}"
+                    f"    separation: recall bound P={_distance(p_bound)}, "
+                    f"negative bound D={_distance(d_bound)}, "
+                    f"margin D-P={_distance(d_bound - p_bound)}"
                 )
             if final_report is not None:
                 lines.append(
                     f"    final pair (cutoff={cutoff:.4f}, k={k}): recall@{k} = "
-                    f"{_percent(final_report.recall)}, no_match = "
-                    f"{_percent(final_report.no_match_rate)}, precision = "
-                    f"{_percent(final_report.precision)}"
+                    f"{_rate_with_interval(final_report.recalled, final_report.positives)}, "
+                    f"no_match = "
+                    f"{_rate_with_interval(final_report.no_matches, final_report.negatives)}, "
+                    f"doc precision = {_percent(final_report.document_precision)}, "
+                    f"passage precision = {_percent(final_report.precision)}"
                 )
             lines.append(
                 "  The bars are satisfied; update app/engine/rag.py with these values in the "
@@ -614,18 +664,73 @@ def _format_top_k(evaluation: SweepEvaluation) -> list[str]:
         ]
 
     cutoff = evaluation.cutoff_lock.cutoff
+    _, d_bound = margin_bounds(evaluation.discovery_results, k=CUTOFF_K)
     lines = [f"TOP-K SWEEP AT LOCKED CUTOFF {cutoff:.4f}"]
-    lines.append("       k   recall@k   no_match   precision   worst+ hit   best- passage   margin")
+    lines.append(f"Negative bound D={_distance(d_bound)}")
+    lines.append(
+        "  k   recall@k [95% CI]   no_match [95% CI]   doc precision   passage precision   P"
+    )
     recommended_k = evaluation.top_k_lock.k if evaluation.top_k_lock.qualifies else None
     for report in evaluation.top_k_reports:
-        worst_positive, best_negative, margin = _margin_bounds(evaluation.discovery_results, report)
+        p_bound, _ = margin_bounds(evaluation.discovery_results, k=report.k)
         marker = "  <- locked" if recommended_k == report.k else ""
         lines.append(
-            f"  {report.k:>6}   {_percent(report.recall):>8}   "
-            f"{_percent(report.no_match_rate):>8}   {_percent(report.precision):>9}   "
-            f"{_distance(worst_positive):>11}   {_distance(best_negative):>13}   "
-            f"{_distance(margin):>7}{marker}"
+            f"  {report.k:>2}   "
+            f"{_rate_with_interval(report.recalled, report.positives):>20}   "
+            f"{_rate_with_interval(report.no_matches, report.negatives):>19}   "
+            f"{_percent(report.document_precision):>13}   "
+            f"{_percent(report.precision):>17}   {_distance(p_bound):>7}{marker}"
         )
+    return lines
+
+
+def _format_ranking_ceiling(evaluation: SweepEvaluation) -> list[str]:
+    lines = ["RANKING CEILING (no cutoff)"]
+    lines.append("  k   recall@k [95% CI]")
+    for report in evaluation.ranking_ceiling:
+        lines.append(
+            f"  {report.k:>2}   {_rate_with_interval(report.recalled, report.positives):>20}"
+        )
+    return lines
+
+
+def _format_distances(evaluation: SweepEvaluation) -> list[str]:
+    lines = [f"NEGATIVE AND POSITIVE DISTANCES AT k={CUTOFF_K}"]
+    recommended_cutoff = evaluation.recommended[0] if evaluation.recommended else None
+
+    negatives = sorted(
+        (
+            (negative_distance(result), result)
+            for result in evaluation.discovery_results
+            if result.is_negative
+        ),
+        key=lambda pair: pair[0],
+    )
+    if negatives:
+        lines.append("  Negatives, nearest first:")
+        for distance, result in negatives:
+            nearest = select_passages(result.passages, k=1, cutoff=COSINE_DISTANCE_CEILING)
+            document = nearest[0].document_source if nearest else "none"
+            marker = (
+                "  <- leaks"
+                if recommended_cutoff is not None and distance < recommended_cutoff
+                else ""
+            )
+            lines.append(f"    {_distance(distance):>8}  {document:<40}  {result.question}{marker}")
+
+    positives = sorted(
+        (
+            (positive_distance(result, CUTOFF_K), result)
+            for result in evaluation.discovery_results
+            if not result.is_negative
+        ),
+        key=lambda pair: pair[0],
+        reverse=True,
+    )[:10]
+    if positives:
+        lines.append("  Ten positives with the largest distance at k=5:")
+        for distance, result in positives:
+            lines.append(f"    {_distance(distance):>8}  {result.question}")
     return lines
 
 
