@@ -1,4 +1,5 @@
-export { createSpottrClient, SpottrApiError } from "./client";
+export { createSpottrClient } from "./client";
+export { ApiError } from "./errors";
 export type { FetchLike, SpottrClient, SpottrClientOptions } from "./client";
 export type {
   AskCoachResponse,

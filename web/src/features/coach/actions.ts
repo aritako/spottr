@@ -1,6 +1,6 @@
 "use server";
 
-import { createSpottrClient, SpottrApiError } from "@spottr/api-client";
+import { createSpottrClient, ApiError } from "@spottr/api-client";
 
 import { env } from "~/env";
 import { readStringField } from "~/lib/form-value";
@@ -36,7 +36,7 @@ export async function askCoach(
     const response = await client.askCoach(question);
     return { status: "answer", question, response };
   } catch (error) {
-    if (error instanceof SpottrApiError) {
+    if (error instanceof ApiError) {
       return {
         status: "error",
         question,

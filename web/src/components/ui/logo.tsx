@@ -5,7 +5,7 @@ export interface LogoProps {
   season?: string;
 }
 
-export function Logo({ className, season = "25" }: LogoProps) {
+export function Logo({ className }: LogoProps) {
   return (
     <span
       className={cn(
@@ -14,8 +14,6 @@ export function Logo({ className, season = "25" }: LogoProps) {
       )}
     >
       Spottr
-      <span className="text-accent">/</span>
-      <span className="text-ash-300">{season}</span>
     </span>
   );
 }

@@ -8,16 +8,7 @@ import type {
   Workout,
 } from "./types";
 
-export class SpottrApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly detail: string,
-    message = `Spottr API request failed (${status}): ${detail}`,
-  ) {
-    super(message);
-    this.name = "SpottrApiError";
-  }
-}
+import { ApiError } from "./errors";
 
 export type FetchLike = (
   input: string,
@@ -87,7 +78,7 @@ export function createSpottrClient({
       });
 
       if (!response.ok) {
-        throw new SpottrApiError(response.status, await readError(response));
+        throw new ApiError(response.status, await readError(response));
       }
 
       if (response.status === 204) {
