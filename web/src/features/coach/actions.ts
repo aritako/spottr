@@ -1,6 +1,6 @@
 "use server";
 
-import { createSpottrClient, ApiError } from "@spottr/api-client";
+import { createAppClient, ApiError } from "@spottr/api-client";
 
 import { env } from "~/env";
 import { readStringField } from "~/lib/form-value";
@@ -30,7 +30,7 @@ export async function askCoach(
     };
   }
 
-  const client = createSpottrClient({ baseUrl: env.SPOTTR_API_URL });
+  const client = createAppClient({ baseUrl: env.SPOTTR_API_URL });
 
   try {
     const response = await client.askCoach(question);

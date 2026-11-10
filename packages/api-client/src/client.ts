@@ -51,7 +51,7 @@ async function readError(response: Response): Promise<string> {
   }
 }
 
-export function createSpottrClient({
+export function createAppClient({
   baseUrl,
   fetch: fetchImpl,
   headers,
@@ -124,4 +124,4 @@ export function createSpottrClient({
   };
 }
 
-export type SpottrClient = ReturnType<typeof createSpottrClient>;
+export type AppClient = ReturnType<typeof createAppClient>;
