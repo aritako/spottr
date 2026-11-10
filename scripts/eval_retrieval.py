@@ -40,6 +40,7 @@ from app.core.models import Chunk  # noqa: E402
 from app.engine.rag import EMBEDDING_DIMENSIONS, get_embeddings  # noqa: E402
 from app.eval.golden_set import (  # noqa: E402
     DEFAULT_GOLDEN_SET_PATH,
+    GoldenEntry,
     GoldenSet,
     GoldenSetError,
     load_golden_set,
@@ -124,6 +125,7 @@ class SweepEvaluation:
     top_k_lock: TopKLock | None
     ranking_ceiling: tuple[ScoringReport, ...] = ()
     true_ranks: dict[str, tuple[int, float] | None] = field(default_factory=dict)
+    routing_results: tuple[QuestionResult, ...] = ()
 
     @property
     def recommended(self) -> tuple[float, int] | None:
@@ -268,10 +270,34 @@ def evaluate_results(
     same SQL ``distance < cutoff`` path the coach uses. The lock rule itself only needs the
     distances, so it runs on the discovery results; its metrics are re-checked against the
     repository-scored reports at the final pair.
+
+    Routing negatives are retrieved for the report but excluded from every gated computation:
+    the coach routes them to the data tools, so they are the agent eval's subject, not the
+    relevance cutoff's.
     """
+    entries = golden_set.entries
+    if len(embeddings) != len(entries):
+        raise RunnerError(
+            f"Embedding count mismatch: {len(embeddings)} vectors for {len(entries)} questions. "
+            "The embedding client must return exactly one vector per golden-set question."
+        )
+
+    gated_entries: list[GoldenEntry] = []
+    gated_embeddings: list[Sequence[float]] = []
+    routing_entries: list[GoldenEntry] = []
+    routing_embeddings: list[Sequence[float]] = []
+    for entry, embedding in zip(entries, embeddings, strict=True):
+        if entry.no_match and entry.negative_kind == "routing":
+            routing_entries.append(entry)
+            routing_embeddings.append(embedding)
+        else:
+            gated_entries.append(entry)
+            gated_embeddings.append(embedding)
+
+    gated_set = GoldenSet(entries=gated_entries)
     discovery = build_question_results(
-        golden_set,
-        embeddings,
+        gated_set,
+        gated_embeddings,
         retrieve,
         k=DISCOVERY_TOP_K,
         cutoff=DISCOVERY_CUTOFF,
@@ -283,7 +309,9 @@ def evaluate_results(
     candidate_cutoffs = [report.cutoff for report in sweep_cutoffs(discovery, k=CUTOFF_K)]
     cutoff_reports = tuple(
         score(
-            build_question_results(golden_set, embeddings, retrieve, k=CUTOFF_K, cutoff=candidate),
+            build_question_results(
+                gated_set, gated_embeddings, retrieve, k=CUTOFF_K, cutoff=candidate
+            ),
             k=CUTOFF_K,
             cutoff=candidate,
         )
@@ -297,19 +325,31 @@ def evaluate_results(
     if cutoff_lock.qualifies and cutoff_lock.cutoff is not None:
         cutoff = cutoff_lock.cutoff
         locked_cutoff_report = score(
-            build_question_results(golden_set, embeddings, retrieve, k=CUTOFF_K, cutoff=cutoff),
+            build_question_results(
+                gated_set, gated_embeddings, retrieve, k=CUTOFF_K, cutoff=cutoff
+            ),
             k=CUTOFF_K,
             cutoff=cutoff,
         )
         top_k_reports = tuple(
             score(
-                build_question_results(golden_set, embeddings, retrieve, k=k, cutoff=cutoff),
+                build_question_results(gated_set, gated_embeddings, retrieve, k=k, cutoff=cutoff),
                 k=k,
                 cutoff=cutoff,
             )
             for k in range(MIN_SWEEP_K, MAX_SWEEP_K + 1)
         )
         top_k_lock = lock_top_k(discovery, cutoff=cutoff)
+
+    routing_results: tuple[QuestionResult, ...] = ()
+    if routing_entries:
+        routing_results = build_question_results(
+            GoldenSet(entries=routing_entries),
+            routing_embeddings,
+            retrieve,
+            k=DISCOVERY_TOP_K,
+            cutoff=DISCOVERY_CUTOFF,
+        )
 
     return SweepEvaluation(
         discovery_results=discovery,
@@ -319,7 +359,8 @@ def evaluate_results(
         top_k_reports=top_k_reports,
         top_k_lock=top_k_lock,
         ranking_ceiling=ranking_ceiling,
-        true_ranks=true_ranks(discovery, embeddings, corpus) if corpus is not None else {},
+        true_ranks=(true_ranks(discovery, gated_embeddings, corpus) if corpus is not None else {}),
+        routing_results=routing_results,
     )
 
 
@@ -470,8 +511,10 @@ def format_report(evaluation: SweepEvaluation) -> str:
     first_report = evaluation.cutoff_reports[0]
     lines.append("RETRIEVAL CALIBRATION SWEEP")
     lines.append(
-        f"Golden entries: {len(evaluation.discovery_results)} "
-        f"({first_report.positives} positive, {first_report.negatives} Negative questions)"
+        f"Golden entries: "
+        f"{len(evaluation.discovery_results) + len(evaluation.routing_results)} "
+        f"({first_report.positives} positive, {first_report.negatives} retrieval Negative, "
+        f"{len(evaluation.routing_results)} routing Negative questions)"
     )
     lines.append("")
 
@@ -563,6 +606,11 @@ def format_report(evaluation: SweepEvaluation) -> str:
             lines.append("    expected   no match")
             lines.append(f"    retrieved  {_passage_list(failure.selected)}")
     lines.append("")
+
+    routing_lines = _format_routing_negatives(evaluation)
+    if routing_lines:
+        lines.extend(routing_lines)
+        lines.append("")
 
     hijacking_documents = unexpected_documents(
         evaluation.discovery_results, k=pair.k, cutoff=pair.cutoff
@@ -731,6 +779,28 @@ def _format_distances(evaluation: SweepEvaluation) -> list[str]:
         lines.append("  Ten positives with the largest distance at k=5:")
         for distance, result in positives:
             lines.append(f"    {_distance(distance):>8}  {result.question}")
+    return lines
+
+
+def _format_routing_negatives(evaluation: SweepEvaluation) -> list[str]:
+    if not evaluation.routing_results:
+        return []
+
+    pair = failure_pair(evaluation)
+    lines = ["ROUTING NEGATIVES (reported, not gated)"]
+    lines.append(
+        "These are intended to be routed to the data tools by the coach; gating them is the "
+        "agent eval's job (#17)."
+    )
+    lines.append(f"  distance  nearest Document  status at cutoff {pair.cutoff:.4f}  question")
+    for result in evaluation.routing_results:
+        distance = negative_distance(result)
+        nearest = select_passages(result.passages, k=1, cutoff=COSINE_DISTANCE_CEILING)
+        document = nearest[0].document_source if nearest else "none"
+        status = "would leak" if distance < pair.cutoff else "no match"
+        lines.append(
+            f'  {_distance(distance):>8}  {document:<40}  {status:<10}  "{result.question}"'
+        )
     return lines
 
 

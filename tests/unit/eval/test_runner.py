@@ -52,6 +52,7 @@ def _evaluate(
     results: list[QuestionResult],
     *,
     corpus: list[tuple[str, list[float]]] | None = None,
+    routing: set[str] | None = None,
 ) -> "eval_retrieval.SweepEvaluation":
     """Run the real evaluator through a tiny in-memory retriever.
 
@@ -63,7 +64,10 @@ def _evaluate(
         tuple(embedding): result.passages
         for embedding, result in zip(embeddings, results, strict=True)
     }
-    entries = [_entry_for(result) for result in results]
+    routing_questions = routing or set()
+    entries = [
+        _entry_for(result, routing=result.question in routing_questions) for result in results
+    ]
 
     def retrieve(
         query_embedding: list[float], k: int, max_distance: float
@@ -76,9 +80,13 @@ def _evaluate(
     )
 
 
-def _entry_for(result: QuestionResult) -> GoldenEntry:
+def _entry_for(result: QuestionResult, *, routing: bool = False) -> GoldenEntry:
     if result.expected_document is None:
-        return GoldenEntry(question=result.question, no_match=True)
+        return GoldenEntry(
+            question=result.question,
+            no_match=True,
+            negative_kind="routing" if routing else "retrieval",
+        )
     return GoldenEntry(question=result.question, expected_document=result.expected_document)
 
 
@@ -166,7 +174,7 @@ def test_run_sweep_embeds_each_question_once_and_locks_the_constants() -> None:
     )
     golden_set = _golden_set(
         GoldenEntry(question="positive question", expected_document="a.md"),
-        GoldenEntry(question="negative question", no_match=True),
+        GoldenEntry(question="negative question", no_match=True, negative_kind="retrieval"),
     )
     embedded_questions: list[str] = []
 
@@ -386,6 +394,44 @@ def test_evaluate_results_skips_the_top_k_sweep_when_no_cutoff_locks() -> None:
     assert evaluation.top_k_reports == ()
     assert "TOP-K SWEEP" in eval_retrieval.format_report(evaluation)
     assert "Skipped" in eval_retrieval.format_report(evaluation)
+
+
+def test_evaluate_results_gates_only_retrieval_negatives() -> None:
+    results = [
+        _result("positive", "a.md", ("a.md", 0, 0.2)),
+        _result("retrieval negative", None, ("b.md", 0, 0.9)),
+        _result("routing negative", None, ("c.md", 0, 0.1)),
+    ]
+
+    evaluation = _evaluate(results, routing={"routing negative"})
+
+    assert evaluation.cutoff_lock.qualifies is True
+    assert evaluation.cutoff_lock.cutoff == pytest.approx(0.55)
+    assert [result.question for result in evaluation.discovery_results] == [
+        "positive",
+        "retrieval negative",
+    ]
+    assert [result.question for result in evaluation.routing_results] == ["routing negative"]
+    assert all(report.negatives == 1 for report in evaluation.cutoff_reports)
+
+    report = eval_retrieval.format_report(evaluation)
+
+    assert "1 retrieval Negative" in report
+    assert "1 routing Negative" in report
+    assert "ROUTING NEGATIVES (reported, not gated)" in report
+    assert "routing negative" in report
+    assert "would leak" in report
+
+
+def test_format_report_omits_the_routing_section_without_routing_negatives() -> None:
+    results = [
+        _result("positive", "a.md", ("a.md", 0, 0.2)),
+        _result("negative", None, ("b.md", 0, 0.9)),
+    ]
+
+    report = eval_retrieval.format_report(_evaluate(results))
+
+    assert "ROUTING NEGATIVES" not in report
 
 
 def test_format_report_renders_rates_as_percentages() -> None:

@@ -19,6 +19,7 @@ entries:
     expected_document: "deloads.md"
   - question: "What was my squat e1RM last month?"
     no_match: true
+    negative_kind: retrieval
 """,
     )
 
@@ -167,3 +168,57 @@ def test_load_golden_set_accepts_the_shipped_scaffold() -> None:
 
     assert any(entry.no_match for entry in golden_set.entries)
     assert any(not entry.no_match for entry in golden_set.entries)
+
+
+def test_load_golden_set_reads_both_negative_kinds(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path / "retrieval.yaml",
+        """
+entries:
+  - question: "When should I take a deload?"
+    expected_document: "deloads.md"
+  - question: "What was my squat e1RM last month?"
+    no_match: true
+    negative_kind: retrieval
+  - question: "How much protein should I eat?"
+    no_match: true
+    negative_kind: routing
+""",
+    )
+
+    golden_set = load_golden_set(path)
+
+    assert [entry.negative_kind for entry in golden_set.entries] == [None, "retrieval", "routing"]
+
+
+def test_load_golden_set_rejects_negative_kind_on_a_positive(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path / "retrieval.yaml",
+        """
+entries:
+  - question: "When should I take a deload?"
+    expected_document: "deloads.md"
+    negative_kind: retrieval
+""",
+    )
+
+    with pytest.raises(GoldenSetError) as error:
+        load_golden_set(path)
+
+    assert "only valid on a Negative question" in str(error.value)
+
+
+def test_load_golden_set_rejects_a_negative_without_a_kind(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path / "retrieval.yaml",
+        """
+entries:
+  - question: "What was my squat e1RM last month?"
+    no_match: true
+""",
+    )
+
+    with pytest.raises(GoldenSetError) as error:
+        load_golden_set(path)
+
+    assert "negative_kind" in str(error.value)
