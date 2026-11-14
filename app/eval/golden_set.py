@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -5,10 +6,15 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 DEFAULT_GOLDEN_SET_PATH = Path(__file__).resolve().parent / "golden" / "retrieval.yaml"
+DEFAULT_AGENT_QUERIES_PATH = Path(__file__).resolve().parent / "golden" / "agent_queries.yaml"
 
 
 class GoldenSetError(ValueError):
     """A golden set could not be read or does not match the authored format."""
+
+
+class AgentQueriesError(ValueError):
+    """An agent-query fixture could not be read or does not match the authored format."""
 
 
 class GoldenEntry(BaseModel):
@@ -53,6 +59,34 @@ class GoldenSet(BaseModel):
     entries: list[GoldenEntry] = Field(min_length=1)
 
 
+class AgentDocsCall(BaseModel):
+    """One search_coaching_docs call the coach wrote for a golden question."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+
+    query: str = Field(min_length=1)
+    k: int | None = None
+
+
+class AgentQueryEntry(BaseModel):
+    """The docs calls the coach wrote for one golden question. Empty means no call."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    docs_calls: tuple[AgentDocsCall, ...] = ()
+
+
+class AgentQueries(BaseModel):
+    """A frozen sample of the queries the coach actually sends to the docs tool."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query_model: str = Field(min_length=1)
+    captured_at: datetime
+    instructions_sha: str = Field(min_length=7)
+    entries: dict[str, AgentQueryEntry] = Field(min_length=1)
+
+
 def load_golden_set(path: str | Path = DEFAULT_GOLDEN_SET_PATH) -> GoldenSet:
     """Load and validate a golden set from YAML.
 
@@ -83,8 +117,66 @@ def load_golden_set(path: str | Path = DEFAULT_GOLDEN_SET_PATH) -> GoldenSet:
         raise GoldenSetError(_format_validation_error(path, error)) from error
 
 
-def _format_validation_error(path: Path, error: ValidationError) -> str:
-    lines = [f"Invalid golden set at {path}:"]
+def load_agent_queries(
+    path: str | Path = DEFAULT_AGENT_QUERIES_PATH,
+    golden_set: GoldenSet | None = None,
+) -> AgentQueries:
+    """Load and validate a captured agent-query fixture from YAML.
+
+    When ``golden_set`` is supplied, every golden question must have exactly one record and
+    the fixture may not contain records for unknown questions.
+
+    Raises:
+        AgentQueriesError: The file is missing, is not valid YAML, does not match the format,
+            or does not cover the golden set exactly.
+    """
+    path = Path(path)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as error:
+        raise AgentQueriesError(f"Agent-query fixture not found: {path}") from error
+
+    try:
+        raw = yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        raise AgentQueriesError(
+            f"Agent-query fixture at {path} is not valid YAML: {error}"
+        ) from error
+
+    if not isinstance(raw, dict):
+        raise AgentQueriesError(
+            f"Agent-query fixture at {path} must be a mapping with an 'entries' mapping, "
+            f"not {type(raw).__name__}."
+        )
+
+    try:
+        agent_queries = AgentQueries.model_validate(raw)
+    except ValidationError as error:
+        raise AgentQueriesError(
+            _format_validation_error(path, error, label="agent-query fixture")
+        ) from error
+
+    if golden_set is not None:
+        expected = {entry.question for entry in golden_set.entries}
+        actual = set(agent_queries.entries)
+        missing = sorted(expected - actual)
+        unknown = sorted(actual - expected)
+        if missing:
+            raise AgentQueriesError(
+                f"Agent-query fixture at {path} is missing questions: {', '.join(missing)}"
+            )
+        if unknown:
+            raise AgentQueriesError(
+                f"Agent-query fixture at {path} has unknown questions: {', '.join(unknown)}"
+            )
+
+    return agent_queries
+
+
+def _format_validation_error(
+    path: Path, error: ValidationError, *, label: str = "golden set"
+) -> str:
+    lines = [f"Invalid {label} at {path}:"]
     for detail in error.errors():
         location = ".".join(str(part) for part in detail["loc"]) or "root"
         lines.append(f"  - {location}: {detail['msg']}")

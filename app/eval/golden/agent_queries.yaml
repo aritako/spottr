@@ -1,0 +1,437 @@
+# Captured by scripts/capture_agent_queries.py. This is one nondeterministic sample;
+# re-capture when the model or the instructions change.
+query_model: gpt-5.4-nano
+captured_at: '2026-11-14T12:56:02.906866Z'
+instructions_sha: 9615ec7df2f0cd8888ff63678619b9284d5579da
+entries:
+  What does RPE 8 mean in terms of how many reps I have left?:
+    docs_calls:
+    - query: RPE 8 means how many reps in reserve how many reps left (RIR) guidance
+      k: 5
+  I'm new to lifting and never know how close to failure I am. Am I just bad at judging it?:
+    docs_calls:
+    - query: new lifter judging proximity to failure RPE RIR how to estimate effort
+        can't judge failure cues autoregulation guidance
+      k: 5
+  Should I pick my weights from a percentage of my max or from how the bar feels that day?:
+    docs_calls:
+    - query: guidance choosing training loads percentage of max vs autoregulation
+        bar feel RPE RIR top set deload intensity selection
+      k: 5
+  How do I decide when to stop doing back-off sets on a given day?:
+    docs_calls:
+    - query: how to decide when to stop back-off sets on a given day stopping rule
+        autoregulation RPE reps in reserve maintain performance fatigue
+      k: 5
+  Is it worth going to absolute failure on every set?:
+    docs_calls:
+    - query: going to absolute failure every set advice autoregulation limits frequency
+        percent sets to failure recovery volume injury risk
+      k: 5
+  If I'm taking an easier week, should I cut sets or just use lighter weights?:
+    docs_calls:
+    - query: easier week deload cut sets or reduce weight lighter weights sets guidance
+        autoregulation
+      k: 5
+  Can I just skip the gym completely for a week instead of training light?:
+    docs_calls:
+    - query: guidance on skipping the gym completely for a week vs training light;
+        deload; recovery; detraining; when to take a full rest week
+      k: 5
+  I feel great right now. Do I still need to take a deload?:
+    docs_calls:
+    - query: deload guidance when feeling good right now; how to decide deload based
+        on fatigue, performance, volume; autoregulation deload criteria
+      k: 5
+  After my recovery week, do I go straight back to the volume I was doing before?:
+    docs_calls:
+    - query: after a recovery week deload should you return directly to previous volume
+        or ramp up how to progress volume after deload
+      k: 5
+  Since I'll be fresh, can I test my maxes during my deload week?:
+    docs_calls:
+    - query: deload week testing maxes can I test my max during a deload week advice
+        autoregulation avoid testing maxes
+      k: 5
+  What kinds of exercises do I need so my program covers the whole body?:
+    docs_calls: []
+  Should I do squats before or after leg extensions?:
+    docs_calls:
+    - query: exercise order squats before or after leg extensions
+      k: 5
+  When does it make sense to swap an exercise out of my program?:
+    docs_calls:
+    - query: when to swap an exercise out of a training program criteria pain injury
+        plateau redundancy inability to recover progression variation autoregulation
+        deload substitution guidance
+      k: 5
+  Does the order I do my exercises in change how much muscle I build?:
+    docs_calls:
+    - query: Does exercise order affect muscle hypertrophy? guidance on workout sequencing
+        for hypertrophy, rest intervals, early vs late exercise performance.
+      k: 5
+  My triceps are lagging. Should I just tack more sets onto the end of my workout?:
+    docs_calls:
+    - query: triceps lagging add sets at end of workout incremental volume autoregulation
+        deload guidance for bringing up a lagging muscle group
+      k: 5
+  How many hours of sleep do I need to recover from lifting?:
+    docs_calls:
+    - query: sleep duration needed to recover from lifting strength training how many
+        hours for recovery guidance
+      k: 5
+  If I'm not sore the day after, does that mean the workout didn't work?:
+    docs_calls:
+    - query: soreness day after indicates workout effectiveness not sore means workout
+        didn't work guidance DOMS recovery autoregulation
+      k: 5
+  Are ice baths and massage guns worth it for recovery?:
+    docs_calls:
+    - query: ice bath cold water immersion massage gun percussive therapy worth it
+        for recovery guidance
+      k: 5
+  Work has been really stressful and I'm getting weaker. Is my program the problem?:
+    docs_calls:
+    - query: autoregulaton when stressed getting weaker program problem indicators
+        deload recovery check volume intensity fatigue how to adjust when performance
+        drops
+      k: 5
+  How can I tell if I'm actually overtrained or just tired?:
+    docs_calls:
+    - query: how to distinguish overtraining vs fatigue signs performance recovery
+        guidance deload autoregulation
+      k: 5
+  I had a really bad session today. Should I be worried about my progress?:
+    docs_calls: []
+  How many weeks of logged workouts do I need before a trend actually means something?:
+    docs_calls:
+    - query: minimum number of weeks of training data required for a trend to be meaningful
+        (strength/tonnage trends), guidance on interpreting trends vs small sample
+        size
+      k: 5
+  I had a huge week where everything felt light, and the next week was just normal. Am I regressing?:
+    docs_calls:
+    - query: autoregulation if one week feels light then next week normal; guidance
+        on whether to deload/regress or interpret as variation; fatigue management
+        and performance variability
+      k: 5
+  Is it normal for my lifts to go up, stall, and even dip instead of climbing every week?:
+    docs_calls:
+    - query: should strength training progress every week or is it normal for lifts
+        to stall dip; how to interpret week to week fluctuations; autoregulation deload
+        when progress stalls; fatigue management
+      k: 5
+  Can my logged numbers tell me whether I'm building muscle or recovering well?:
+    docs_calls: []
+  How should I breathe and brace for a heavy squat?:
+    docs_calls:
+    - query: heavy squat breathing bracing cues Valsalva technique intra-abdominal
+        pressure brace
+      k: 5
+  Is squatting below parallel bad for my knees?:
+    docs_calls:
+    - query: squatting below parallel bad for knees depth guidance pain knee health
+        range of motion coaching cues
+      k: 5
+  How do I decide between high-bar and low-bar squats?:
+    docs_calls:
+    - query: high-bar vs low-bar squat how to decide factors coach guidance equipment
+        mobility back squat technique high bar low bar selection
+      k: 5
+  Should I keep grinding out reps once my form starts to break down?:
+    docs_calls:
+    - query: should keep grinding reps once form starts to break down autoregulation
+        reps form breakdown coaching guidance
+      k: 5
+  How do I finish a deadlift at the top without leaning way back?:
+    docs_calls:
+    - query: deadlift finish at the top without leaning way back coaching cues brace
+        glutes lats ribcage hip lockout chin position
+      k: 5
+  Can I just repeat the same workout every week, or do I need to plan in some variation?:
+    docs_calls:
+    - query: repeat same workout every week variation necessary programming advice
+        autoregulation deload minimal effective dose
+      k: 5
+  What do you call a program where I squat heavy Monday, medium Wednesday, and light Friday?:
+    docs_calls: []
+  What's an accumulation block, and how is it different from an intensification block?:
+    docs_calls:
+    - query: accumulation block intensification block difference strength training
+        block periodization definition
+      k: 5
+  Should I run a peaking program even though I don't compete?:
+    docs_calls:
+    - query: peaking program without competition purpose; should train to peak if
+        no meet; guidance on peaking vs general strength, taper, periodization
+      k: 5
+  Does the type of periodization I pick really change my results much?:
+    docs_calls:
+    - query: Does the type of periodization (linear, undulating, block, concurrent)
+        really change results much? guidance about importance of periodization vs
+        total volume intensity frequency; deload; training consistency.
+      k: 5
+  If I can't add weight to the bar, how else can I keep making progress?:
+    docs_calls:
+    - query: progression when cannot add weight to the bar; options for continuing
+        to make progress without increasing load; autoregulation; technique volume
+        reps; programming principles
+      k: 5
+  I'm doing sets of 8 to 12. When should I move up in weight?:
+    docs_calls:
+    - query: progressive overload for strength training with rep ranges 8-12 how to
+        decide when to increase weight RIR RPE autoregulation
+      k: 5
+  Why could I add weight every session at the start but now I can't?:
+    docs_calls:
+    - query: progressive overload plateaus adding weight every session possible reasons
+        fatigue recovery autoregulation deload beginners novelty fatigue technique
+      k: 5
+  Do isolation lifts like curls really need to get heavier over time too?:
+    docs_calls:
+    - query: do isolation lifts like curls need to get heavier over time progressive
+        overload guidance accessory isolation lifts
+      k: 5
+  Do half reps count toward my rep target?:
+    docs_calls:
+    - query: half reps count toward rep target should partial reps be credited for
+        training volume rep scheme guidance
+      k: 5
+  How does the app calculate my estimated one-rep max?:
+    docs_calls:
+    - query: estimated one-rep max e1rm calculation method how app calculates
+      k: 5
+  Why does the e1RM from my set of 20 look so off?:
+    docs_calls: []
+  Ten sets of three and three sets of ten give the same tonnage, so what is tonnage actually good for?:
+    docs_calls:
+    - query: tonnage metric usefulness what does tonnage represent training volume
+        guidance interpretation sets reps load
+      k: 5
+  What day does a week start on in my weekly charts?:
+    docs_calls: []
+  Does Spottr track my personal records or how many sets I did?:
+    docs_calls: []
+  Can I build muscle with really light weights, like 20% of my max?:
+    docs_calls:
+    - query: building muscle with very light weights 20% of max; hypertrophy low load
+        high reps; recommendations; proximity to failure; volume; rest; deload
+      k: 5
+  How many reps can I usually get with 80% of my max?:
+    docs_calls: []
+  Why do my sets of 25 to failure wreck the rest of my workout?:
+    docs_calls:
+    - query: sets of 25 to failure wreck the rest of the workout autoregulation fatigue
+        metabolite accumulation guidelines controlling proximity to failure high-rep
+        training technique rest effects
+      k: 5
+  Is 8 to 12 reps really the best range for building muscle?:
+    docs_calls:
+    - query: best rep range for hypertrophy muscle building 8-12 reps guidance
+      k: 5
+  How long should I rest between sets of 10?:
+    docs_calls:
+    - query: rest between sets of 10 reps how long rest interval guidance hypertrophy
+        strength endurance
+      k: 5
+  If my muscles get bigger, will I automatically get stronger?:
+    docs_calls:
+    - query: relationship between hypertrophy (muscle size) and strength; does gaining
+        muscle automatically increase strength; neural factors; specificity; strength
+        vs hypertrophy guidance
+      k: 5
+  I only train light for the pump. Will that still push my squat max up?:
+    docs_calls:
+    - query: training only light loads for pump hypertrophy will it increase 1RM squat
+        max strength neural adaptations guidance
+      k: 5
+  How heavy should I go and how many reps should I do if my main goal is a bigger total?:
+    docs_calls:
+    - query: guidance for selecting working weight and rep ranges when goal is bigger
+        total tonnage; how to balance heavy sets vs volume; strength endurance; recommendations
+        for percentage intensity and rep ranges
+      k: 5
+  Should I train for size and strength in the same program, or one at a time?:
+    docs_calls:
+    - query: train for size and strength same program or one at a time guidance hypertrophy
+        strength concurrent programming
+      k: 5
+  As I get more experienced, does muscle size start to matter more for how strong I am?:
+    docs_calls:
+    - query: Does muscle size (hypertrophy) matter more as lifters get more experienced
+        for strength? Relationship between muscle size and strength over time. Principle
+        guidance for advanced trainees.
+      k: 5
+  Is hitting each muscle once a week enough?:
+    docs_calls:
+    - query: Is training each muscle once per week enough? minimum effective dose
+        frequency per week hypertrophy strength guidance
+      k: 5
+  If my total weekly sets stay the same, does training a muscle more often build more muscle?:
+    docs_calls:
+    - query: if weekly sets stay the same, does training a muscle more often (higher
+        frequency) build more muscle? guidance on frequency and hypertrophy; set distribution
+        across week
+      k: 5
+  Can I tell from my logs if I'm cramming too much of one muscle's work into a single day?:
+    docs_calls:
+    - query: guidance on detecting excessive same-muscle workload in a single day
+        using logs; cues for when to spread volume; per-day volume/intensity overload
+        and autoregulation
+      k: 5
+  Should I squat more days per week just to get better at the movement, even with lighter weights?:
+    docs_calls:
+    - query: squat frequency more days per week to improve movement lighter weights
+        autoregulation deload practice frequency recommendations
+      k: 5
+  Can I train the same muscle hard every single day?:
+    docs_calls:
+    - query: train the same muscle every single day can you? guidance frequency daily
+        training same muscle recovery autoregulation deload
+      k: 5
+  How many sets per week should I be doing for each muscle?:
+    docs_calls:
+    - query: How many sets per week should I be doing for each muscle group guidelines
+        hypertrophy frequency sets per week per muscle
+      k: 5
+  What's the difference between MEV and MRV?:
+    docs_calls:
+    - query: difference between MEV and MRV minimum effective volume maximum recoverable
+        volume coaching guidance
+      k: 5
+  Do easy sets that are nowhere near failure count toward my weekly volume?:
+    docs_calls:
+    - query: easy sets not near failure count toward weekly volume definition autoregulation
+        RIR volume tracking do they count
+      k: 5
+  My chest hasn't grown in months. Should I add more sets?:
+    docs_calls:
+    - query: chest growth plateau add more sets deload autoregulation volume guidelines
+        hypertrophy plateaus how to adjust sets
+      k: 5
+  How do I know if I'm doing too much volume for a muscle?:
+    docs_calls:
+    - query: How to know if you're doing too much volume for a muscle signs, indicators
+        autoregulation volume management deload
+      k: 5
+  How many warm-up sets should I do before getting to my working weight?:
+    docs_calls:
+    - query: warm-up sets before working weight how many sets guidance ramp-up
+      k: 5
+  Will static stretching before lifting make me weaker?:
+    docs_calls:
+    - query: static stretching before lifting performance strength weaker guidance
+        warm up effect
+      k: 5
+  Does lifting weights actually lower my risk of getting injured?:
+    docs_calls:
+    - query: does lifting weights reduce injury risk evidence guidance strength training
+        injury prevention risk reduction
+      k: 5
+  My elbow aches on and off after hard sessions. When should I actually worry about pain?:
+    docs_calls:
+    - query: elbow pain aches after hard sessions when to worry red flags persistent
+        pain warning signs seek medical advice deload guidance tendonitis golfer's
+        elbow tennis elbow
+      k: 5
+  Do I need a long cardio session before I start lifting?:
+    docs_calls:
+    - query: need long cardio session before lifting warm-up guidance cardio before
+        strength training duration intensity
+      k: 5
+  What was my best bench press e1RM last month?:
+    docs_calls: []
+  How much total tonnage did I do on squats this week?:
+    docs_calls: []
+  Did my deadlift go up or down over the last eight weeks?:
+    docs_calls: []
+  Which exercises have I logged so far?:
+    docs_calls: []
+  When did I hit my last squat PR?:
+    docs_calls: []
+  Compare my overhead press volume in October with September.:
+    docs_calls: []
+  How much protein should I eat per day to build muscle?:
+    docs_calls:
+    - query: protein intake per day to build muscle recommendation grams per day per
+        kg lean mass or bodyweight hypertrophy
+      k: 5
+  Is creatine worth taking?:
+    docs_calls:
+    - query: creatine supplementation worth taking benefits evidence dosing safety
+        guidance for strength training
+      k: 5
+  What's a good training plan for my first 10K run?:
+    docs_calls:
+    - query: first 10K run training plan beginner guidance progression weekly mileage
+        tempo long run intervals how to structure program
+      k: 5
+  How do I fix my posture from sitting at a desk all day?:
+    docs_calls:
+    - query: desk sitting posture fix guidance cues stretching ergonomic checklist
+        thoracic spine shoulders hips
+      k: 5
+  Which lifting shoes should I buy?:
+    docs_calls:
+    - query: 'recommendations for choosing lifting shoes: criteria heel height stability
+        fit for squats/weightlifting'
+      k: 5
+  What's the capital of Australia?:
+    docs_calls: []
+  How many calories should I eat to lose fat without losing muscle?:
+    docs_calls:
+    - query: calories to lose fat without losing muscle deficit guidance autoregulation
+        protein recommendations
+      k: 5
+  What's the most accurate way to measure my body fat percentage?:
+    docs_calls:
+    - query: body fat percentage measurement most accurate method for athletes coaching
+        guidance DEXA BIA calipers pitfalls hydration
+      k: 5
+  How much water should I drink during a workout?:
+    docs_calls:
+    - query: water intake during a workout how much should I drink hydration guidelines
+      k: 5
+  How much caffeine should I take before training?:
+    docs_calls:
+    - query: caffeine timing dosage before training guidance strength training
+      k: 5
+  Does low testosterone stop me from building muscle?:
+    docs_calls:
+    - query: low testosterone effects on muscle building strength training guidance
+      k: 5
+  Is it safe to lift weights while pregnant?:
+    docs_calls:
+    - query: pregnant lifting weights safe guidelines resistance training pregnancy
+        contraindications warning signs consult clinician
+      k: 5
+  What should I pack in my gym bag?:
+    docs_calls:
+    - query: gym bag checklist what to pack for lifting hydration accessories warm
+        up cooldown
+      k: 5
+  How much does a personal trainer usually cost?:
+    docs_calls: []
+  How do I reset my Wi-Fi router?:
+    docs_calls: []
+  What's a good recipe for banana bread?:
+    docs_calls: []
+  Who won the 2018 FIFA World Cup?:
+    docs_calls: []
+  How do I convert Celsius to Fahrenheit?:
+    docs_calls: []
+  What's the fastest way to learn Spanish?:
+    docs_calls:
+    - query: fastest way to learn a language or Spanish learning strategy spaced repetition
+        immersion input output
+      k: 5
+  How do I file my taxes as a freelancer?:
+    docs_calls:
+    - query: freelancer taxes how to file guidance
+      k: 5
+  What time zone is Tokyo in?:
+    docs_calls: []
+  How do I unclog a kitchen sink?:
+    docs_calls:
+    - query: how to unclog a kitchen sink guidance
+      k: 5

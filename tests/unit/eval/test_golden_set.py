@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from app.eval.golden_set import DEFAULT_GOLDEN_SET_PATH, GoldenSetError, load_golden_set
+from app.eval.golden_set import (
+    DEFAULT_GOLDEN_SET_PATH,
+    AgentQueriesError,
+    GoldenEntry,
+    GoldenSet,
+    GoldenSetError,
+    load_agent_queries,
+    load_golden_set,
+)
 
 
 def _write(path: Path, text: str) -> Path:
@@ -222,3 +230,76 @@ entries:
         load_golden_set(path)
 
     assert "negative_kind" in str(error.value)
+
+
+def _golden_set_for(*questions: str) -> GoldenSet:
+    return GoldenSet(
+        entries=[
+            GoldenEntry(question=question, expected_document="deloads.md") for question in questions
+        ]
+    )
+
+
+def _agent_fixture(*questions: str, query: str = "deload timing") -> str:
+    entries = "\n".join(
+        f'  "{question}":\n    docs_calls:\n      - query: "{query}"\n        k: null'
+        for question in questions
+    )
+    return (
+        "query_model: gpt-test\n"
+        'captured_at: "2026-11-14T10:00:00+00:00"\n'
+        'instructions_sha: "0123456789abcdef0123456789abcdef01234567"\n'
+        f"entries:\n{entries}\n"
+    )
+
+
+def test_load_agent_queries_reads_the_fixture_and_covers_the_golden_set(
+    tmp_path: Path,
+) -> None:
+    question = "When should I take a deload?"
+    path = _write(tmp_path / "agent_queries.yaml", _agent_fixture(question))
+
+    agent_queries = load_agent_queries(path, _golden_set_for(question))
+
+    assert agent_queries.query_model == "gpt-test"
+    assert agent_queries.entries[question].docs_calls[0].query == "deload timing"
+    assert agent_queries.entries[question].docs_calls[0].k is None
+
+
+def test_load_agent_queries_rejects_a_missing_question(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path / "agent_queries.yaml",
+        _agent_fixture("When should I take a deload?"),
+    )
+
+    with pytest.raises(AgentQueriesError) as error:
+        load_agent_queries(
+            path,
+            _golden_set_for("When should I take a deload?", "How much volume?"),
+        )
+
+    assert "missing questions" in str(error.value)
+
+
+def test_load_agent_queries_rejects_an_unknown_question(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path / "agent_queries.yaml",
+        _agent_fixture("When should I take a deload?", "An unknown question?"),
+    )
+
+    with pytest.raises(AgentQueriesError) as error:
+        load_agent_queries(path, _golden_set_for("When should I take a deload?"))
+
+    assert "unknown questions" in str(error.value)
+
+
+def test_load_agent_queries_rejects_a_blank_query(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path / "agent_queries.yaml",
+        _agent_fixture("When should I take a deload?", query="   "),
+    )
+
+    with pytest.raises(AgentQueriesError) as error:
+        load_agent_queries(path, _golden_set_for("When should I take a deload?"))
+
+    assert "query" in str(error.value)

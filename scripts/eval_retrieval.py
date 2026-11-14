@@ -22,6 +22,7 @@ import sys
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -40,9 +41,12 @@ from app.core.models import Chunk  # noqa: E402
 from app.engine.rag import EMBEDDING_DIMENSIONS, get_embeddings  # noqa: E402
 from app.eval.golden_set import (  # noqa: E402
     DEFAULT_GOLDEN_SET_PATH,
+    AgentQueries,
+    AgentQueriesError,
     GoldenEntry,
     GoldenSet,
     GoldenSetError,
+    load_agent_queries,
     load_golden_set,
 )
 from app.eval.metrics import (  # noqa: E402
@@ -114,6 +118,23 @@ class EntryFailure:
 
 
 @dataclass(frozen=True)
+class AgentQuerySummary:
+    """Header counts for one frozen agent-query fixture."""
+
+    path: Path
+    query_model: str
+    captured_at: datetime
+    instructions_sha: str
+    entries: int
+    positives_without_docs_call: int
+    negatives_without_docs_call: int
+    entries_with_multiple_docs_calls: int
+    docs_calls_with_k: int
+    routing_negatives_with_docs_call: int
+    routing_negatives: int
+
+
+@dataclass(frozen=True)
 class SweepEvaluation:
     """Everything the report needs from the pure sweep core."""
 
@@ -126,6 +147,7 @@ class SweepEvaluation:
     ranking_ceiling: tuple[ScoringReport, ...] = ()
     true_ranks: dict[str, tuple[int, float] | None] = field(default_factory=dict)
     routing_results: tuple[QuestionResult, ...] = ()
+    agent_queries: AgentQuerySummary | None = None
 
     @property
     def recommended(self) -> tuple[float, int] | None:
@@ -154,15 +176,16 @@ def cosine_distance(left: Sequence[float], right: Sequence[float]) -> float:
 
 def true_ranks(
     results: Sequence[QuestionResult],
-    embeddings: Sequence[Sequence[float]],
+    embeddings: Sequence[Sequence[float] | None],
     corpus: Sequence[tuple[str, Sequence[float]]],
 ) -> dict[str, tuple[int, float] | None]:
     """For each positive question, the 1-based rank and distance of the nearest chunk of its
     expected Document among all chunks, or None when that Document has no chunk.
-    ``corpus`` is (document source, embedding) per chunk. Ranks use cosine_distance."""
+    ``corpus`` is (document source, embedding) per chunk. Ranks use cosine_distance. A missing
+    embedding means the coach wrote no docs query, so there is no rank to report."""
     ranks: dict[str, tuple[int, float] | None] = {}
     for result, embedding in zip(results, embeddings, strict=True):
-        if result.is_negative:
+        if result.is_negative or embedding is None:
             continue
 
         distances = [cosine_distance(embedding, chunk_embedding) for _, chunk_embedding in corpus]
@@ -223,13 +246,17 @@ def _to_retrieved_passage(chunk: Chunk, query_embedding: Sequence[float]) -> Ret
 
 def build_question_results(
     golden_set: GoldenSet,
-    embeddings: Sequence[Sequence[float]],
+    embeddings: Sequence[Sequence[float] | None],
     retrieve: Retriever,
     *,
     k: int,
     cutoff: float,
 ) -> tuple[QuestionResult, ...]:
-    """Turn the golden set and its query embeddings into the eval core's input."""
+    """Turn the golden set and its query embeddings into the eval core's input.
+
+    An embedding of ``None`` means the coach wrote no docs query for that question, so there
+    is nothing to retrieve and the question gets no passages.
+    """
     entries = golden_set.entries
     if len(embeddings) != len(entries):
         raise RunnerError(
@@ -239,13 +266,16 @@ def build_question_results(
 
     results: list[QuestionResult] = []
     for entry, embedding in zip(entries, embeddings, strict=True):
-        if len(embedding) != EMBEDDING_DIMENSIONS:
-            raise RunnerError(
-                f"The embedding for {entry.question!r} has {len(embedding)} dimensions, but the "
-                f"corpus uses {EMBEDDING_DIMENSIONS}. Check EMBEDDING_MODEL: the ingest and query "
-                "models must match."
-            )
-        passages = retrieve(list(embedding), k, cutoff)
+        if embedding is None:
+            passages: Sequence[RetrievedPassage] = ()
+        else:
+            if len(embedding) != EMBEDDING_DIMENSIONS:
+                raise RunnerError(
+                    f"The embedding for {entry.question!r} has {len(embedding)} dimensions, but "
+                    f"the corpus uses {EMBEDDING_DIMENSIONS}. Check EMBEDDING_MODEL: the ingest "
+                    "and query models must match."
+                )
+            passages = retrieve(list(embedding), k, cutoff)
         results.append(
             QuestionResult(
                 question=entry.question,
@@ -258,10 +288,12 @@ def build_question_results(
 
 def evaluate_results(
     golden_set: GoldenSet,
-    embeddings: Sequence[Sequence[float]],
+    embeddings: Sequence[Sequence[float] | None],
     retrieve: Retriever,
     *,
     corpus: Sequence[tuple[str, Sequence[float]]] | None = None,
+    agent_queries: AgentQueries | None = None,
+    agent_queries_path: Path | None = None,
 ) -> SweepEvaluation:
     """Score every candidate configuration through the repository's cutoff path.
 
@@ -283,9 +315,9 @@ def evaluate_results(
         )
 
     gated_entries: list[GoldenEntry] = []
-    gated_embeddings: list[Sequence[float]] = []
+    gated_embeddings: list[Sequence[float] | None] = []
     routing_entries: list[GoldenEntry] = []
-    routing_embeddings: list[Sequence[float]] = []
+    routing_embeddings: list[Sequence[float] | None] = []
     for entry, embedding in zip(entries, embeddings, strict=True):
         if entry.no_match and entry.negative_kind == "routing":
             routing_entries.append(entry)
@@ -361,7 +393,75 @@ def evaluate_results(
         ranking_ceiling=ranking_ceiling,
         true_ranks=(true_ranks(discovery, gated_embeddings, corpus) if corpus is not None else {}),
         routing_results=routing_results,
+        agent_queries=(
+            _summarize_agent_queries(golden_set, agent_queries, agent_queries_path)
+            if agent_queries is not None and agent_queries_path is not None
+            else None
+        ),
     )
+
+
+def _summarize_agent_queries(
+    golden_set: GoldenSet,
+    agent_queries: AgentQueries,
+    path: Path,
+) -> AgentQuerySummary:
+    """Count how the frozen fixture exercised the five agent-query rules."""
+    positives_without = 0
+    negatives_without = 0
+    multiple_calls = 0
+    calls_with_k = 0
+    routing_negatives = 0
+    routing_with_docs = 0
+
+    for entry in golden_set.entries:
+        record = agent_queries.entries.get(entry.question)
+        if record is None:
+            raise RunnerError(
+                f"Agent-query fixture has no record for question {entry.question!r}. "
+                "Re-capture the fixture from the same golden set."
+            )
+
+        calls = record.docs_calls
+        if not calls:
+            if entry.expected_document is None:
+                negatives_without += 1
+            else:
+                positives_without += 1
+        if len(calls) > 1:
+            multiple_calls += 1
+        calls_with_k += sum(1 for call in calls if call.k is not None)
+
+        if entry.expected_document is None and entry.negative_kind == "routing":
+            routing_negatives += 1
+            if calls:
+                routing_with_docs += 1
+
+    return AgentQuerySummary(
+        path=path,
+        query_model=agent_queries.query_model,
+        captured_at=agent_queries.captured_at,
+        instructions_sha=agent_queries.instructions_sha,
+        entries=len(golden_set.entries),
+        positives_without_docs_call=positives_without,
+        negatives_without_docs_call=negatives_without,
+        entries_with_multiple_docs_calls=multiple_calls,
+        docs_calls_with_k=calls_with_k,
+        routing_negatives_with_docs_call=routing_with_docs,
+        routing_negatives=routing_negatives,
+    )
+
+
+def _agent_query_text(entry: GoldenEntry, agent_queries: AgentQueries) -> str | None:
+    record = agent_queries.entries.get(entry.question)
+    if record is None:
+        raise RunnerError(
+            f"Agent-query fixture has no record for question {entry.question!r}. "
+            "Re-capture the fixture from the same golden set."
+        )
+    if not record.docs_calls:
+        return None
+    return record.docs_calls[0].query
 
 
 def run_sweep(
@@ -369,8 +469,14 @@ def run_sweep(
     repository: DocsRepository,
     *,
     embed: Embedder = get_embeddings,
+    agent_queries: AgentQueries | None = None,
+    agent_queries_path: Path | None = None,
 ) -> SweepEvaluation:
     """Embed the questions, retrieve their candidates, and score the sweep.
+
+    With ``agent_queries``, each entry is embedded with the first query the coach wrote for
+    it. An entry with no docs call is not embedded and retrieves nothing, which scores as a
+    recall miss for a positive and a correct no_match for a negative.
 
     The caller owns the session; this function only uses the repository it is handed.
     """
@@ -378,13 +484,33 @@ def run_sweep(
         raise RunnerError(EMPTY_CORPUS_MESSAGE)
 
     corpus = [(_chunk_source(chunk), chunk.embedding) for chunk in repository.list_chunks()]
-    questions = [entry.question for entry in golden_set.entries]
-    embeddings = embed(questions)
+    if agent_queries is None:
+        embedding_inputs: list[str | None] = [entry.question for entry in golden_set.entries]
+    else:
+        embedding_inputs = [_agent_query_text(entry, agent_queries) for entry in golden_set.entries]
+
+    texts = [text for text in embedding_inputs if text is not None]
+    if texts:
+        vectors = list(embed(texts))
+        if len(vectors) != len(texts):
+            raise RunnerError(
+                f"Embedding count mismatch: {len(vectors)} vectors for {len(texts)} texts. "
+                "The embedding client must return exactly one vector per embedded text."
+            )
+        remaining = iter(vectors)
+        embeddings: list[Sequence[float] | None] = [
+            next(remaining) if text is not None else None for text in embedding_inputs
+        ]
+    else:
+        embeddings = [None] * len(embedding_inputs)
+
     return evaluate_results(
         golden_set,
         embeddings,
         make_repository_retriever(repository),
         corpus=corpus,
+        agent_queries=agent_queries,
+        agent_queries_path=agent_queries_path,
     )
 
 
@@ -516,6 +642,8 @@ def format_report(evaluation: SweepEvaluation) -> str:
         f"({first_report.positives} positive, {first_report.negatives} retrieval Negative, "
         f"{len(evaluation.routing_results)} routing Negative questions)"
     )
+    if evaluation.agent_queries is not None:
+        lines.extend(_format_agent_queries(evaluation.agent_queries))
     lines.append("")
 
     lines.extend(_format_recommendation(evaluation))
@@ -630,6 +758,25 @@ def format_report(evaluation: SweepEvaluation) -> str:
         )
 
     return "\n".join(lines)
+
+
+def _format_agent_queries(summary: AgentQuerySummary) -> list[str]:
+    return [
+        "AGENT QUERIES",
+        f"  Fixture: {summary.path}",
+        f"  Entries: {summary.entries}",
+        f"  Model: {summary.query_model}, captured {summary.captured_at.isoformat()}, "
+        f"instructions {summary.instructions_sha}",
+        f"  Positives with no docs call: {summary.positives_without_docs_call} "
+        "(counted as recall misses)",
+        f"  Negatives with no docs call: {summary.negatives_without_docs_call} "
+        "(counted as no_match)",
+        f"  Entries with more than one docs call: "
+        f"{summary.entries_with_multiple_docs_calls} (first used)",
+        f"  Docs calls that set k: {summary.docs_calls_with_k} (k ignored; swept as before)",
+        f"  Routing negatives that called docs: "
+        f"{summary.routing_negatives_with_docs_call} of {summary.routing_negatives}",
+    ]
 
 
 def _format_recommendation(evaluation: SweepEvaluation) -> list[str]:
@@ -823,6 +970,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Database URL (default: DATABASE_URL from settings)",
     )
+    parser.add_argument(
+        "--agent-queries",
+        type=Path,
+        default=None,
+        help="Captured agent-query fixture (default: embed the raw golden questions)",
+    )
     return parser.parse_args(argv)
 
 
@@ -852,12 +1005,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"error: {error}", file=sys.stderr)
         return 1
 
+    agent_queries = None
+    if args.agent_queries is not None:
+        try:
+            agent_queries = load_agent_queries(args.agent_queries, golden_set)
+        except AgentQueriesError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+
     database_url = args.database_url or settings.database_url
     display_url = make_url(database_url).render_as_string(hide_password=True)
 
     try:
         with _open_session(database_url) as session:
-            evaluation = run_sweep(golden_set, DocsRepository(session))
+            evaluation = run_sweep(
+                golden_set,
+                DocsRepository(session),
+                agent_queries=agent_queries,
+                agent_queries_path=args.agent_queries,
+            )
     except OperationalError as error:
         print(
             f"error: cannot reach the database at {display_url}. Start the database and apply "
@@ -885,6 +1051,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     print(f"Golden set: {args.golden_set}")
+    if args.agent_queries is not None:
+        print(f"Agent queries: {args.agent_queries}")
     print(f"Database:   {display_url}")
     print()
     print(format_report(evaluation))

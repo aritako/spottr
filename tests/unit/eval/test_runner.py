@@ -2,13 +2,21 @@ import importlib.util
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from openai import OpenAIError
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.eval.golden_set import GoldenEntry, GoldenSet
+from app.eval.golden_set import (
+    AgentDocsCall,
+    AgentQueries,
+    AgentQueryEntry,
+    GoldenEntry,
+    GoldenSet,
+)
 from app.eval.metrics import QuestionResult, RetrievedPassage
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "eval_retrieval.py"
@@ -18,6 +26,14 @@ assert spec is not None and spec.loader is not None
 eval_retrieval = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = eval_retrieval
 spec.loader.exec_module(eval_retrieval)
+
+CAPTURE_SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "capture_agent_queries.py"
+
+capture_spec = importlib.util.spec_from_file_location("capture_agent_queries", CAPTURE_SCRIPT)
+assert capture_spec is not None and capture_spec.loader is not None
+capture_agent_queries = importlib.util.module_from_spec(capture_spec)
+sys.modules[capture_spec.name] = capture_agent_queries
+capture_spec.loader.exec_module(capture_agent_queries)
 
 DIMENSIONS = 1536
 
@@ -48,21 +64,42 @@ def _golden_set(*entries: GoldenEntry) -> GoldenSet:
     return GoldenSet(entries=list(entries))
 
 
+def _agent_queries(
+    entries: dict[str, tuple[tuple[str, int | None], ...]],
+) -> AgentQueries:
+    return AgentQueries(
+        query_model="test-model",
+        captured_at=datetime(2026, 11, 14, tzinfo=UTC),
+        instructions_sha="0" * 40,
+        entries={
+            question: AgentQueryEntry(
+                docs_calls=tuple(AgentDocsCall(query=query, k=k) for query, k in calls)
+            )
+            for question, calls in entries.items()
+        },
+    )
+
+
 def _evaluate(
     results: list[QuestionResult],
     *,
     corpus: list[tuple[str, list[float]]] | None = None,
     routing: set[str] | None = None,
+    embeddings: list[list[float] | None] | None = None,
+    agent_queries: AgentQueries | None = None,
+    agent_queries_path: Path | None = None,
 ) -> "eval_retrieval.SweepEvaluation":
     """Run the real evaluator through a tiny in-memory retriever.
 
     Each synthetic question gets a distinct unit vector so the retriever can recover its
     pre-built passages, then applies the same strict cutoff and limit a real query would.
     """
-    embeddings = [_vector(float(index + 1)) for index in range(len(results))]
+    if embeddings is None:
+        embeddings = [_vector(float(index + 1)) for index in range(len(results))]
     passages_by_embedding = {
         tuple(embedding): result.passages
         for embedding, result in zip(embeddings, results, strict=True)
+        if embedding is not None
     }
     routing_questions = routing or set()
     entries = [
@@ -76,7 +113,12 @@ def _evaluate(
         return tuple(passage for passage in matching if passage.distance < max_distance)[:k]
 
     return eval_retrieval.evaluate_results(
-        _golden_set(*entries), embeddings, retrieve, corpus=corpus
+        _golden_set(*entries),
+        embeddings,
+        retrieve,
+        corpus=corpus,
+        agent_queries=agent_queries,
+        agent_queries_path=agent_queries_path,
     )
 
 
@@ -148,6 +190,44 @@ def test_cosine_distance_rejects_mismatched_or_empty_vectors() -> None:
 
     with pytest.raises(ValueError, match="zero"):
         eval_retrieval.cosine_distance([0.0, 0.0], [1.0, 0.0])
+
+
+def test_parse_docs_calls_keeps_every_search_call() -> None:
+    output = [
+        SimpleNamespace(
+            type="function_call",
+            name="search_coaching_docs",
+            arguments='{"query": "first query", "k": 9}',
+        ),
+        SimpleNamespace(
+            type="function_call",
+            name="query_workouts",
+            arguments='{"metric": "e1rm"}',
+        ),
+        SimpleNamespace(
+            type="function_call",
+            name="search_coaching_docs",
+            arguments='{"query": "second query", "k": null}',
+        ),
+        SimpleNamespace(type="message", name=None),
+    ]
+
+    calls = capture_agent_queries.parse_docs_calls(output)
+
+    assert [(call.query, call.k) for call in calls] == [("first query", 9), ("second query", None)]
+
+
+def test_parse_docs_calls_rejects_a_missing_query() -> None:
+    output = [
+        SimpleNamespace(
+            type="function_call",
+            name="search_coaching_docs",
+            arguments='{"k": null}',
+        )
+    ]
+
+    with pytest.raises(capture_agent_queries.CaptureError, match="query"):
+        capture_agent_queries.parse_docs_calls(output)
 
 
 def test_run_sweep_fails_clearly_when_the_corpus_is_empty() -> None:
@@ -469,6 +549,108 @@ def test_format_report_omits_the_routing_section_without_routing_negatives() -> 
     assert "ROUTING NEGATIVES" not in report
 
 
+def test_run_sweep_uses_the_first_agent_query_and_skips_questions_without_one() -> None:
+    repository = _FakeRepository(
+        [
+            _FakeChunk(1, "a.md", embedding=_vector(1.0)),
+            _FakeChunk(2, "b.md", embedding=_vector(0.0, 1.0)),
+        ]
+    )
+    golden_set = _golden_set(
+        GoldenEntry(question="positive", expected_document="a.md"),
+        GoldenEntry(question="negative", no_match=True, negative_kind="retrieval"),
+    )
+    fixture = _agent_queries(
+        {
+            "positive": (("first query", None), ("second query", 9)),
+            "negative": (),
+        }
+    )
+    embedded: list[str] = []
+
+    def embed(texts: list[str]) -> list[list[float]]:
+        embedded.extend(texts)
+        return [_vector(1.0) for _ in texts]
+
+    evaluation = eval_retrieval.run_sweep(
+        golden_set,
+        repository,
+        embed=embed,
+        agent_queries=fixture,
+        agent_queries_path=Path("fixture.yaml"),
+    )
+
+    assert embedded == ["first query"]
+    summary = evaluation.agent_queries
+    assert summary is not None
+    assert summary.positives_without_docs_call == 0
+    assert summary.negatives_without_docs_call == 1
+    assert summary.entries_with_multiple_docs_calls == 1
+    assert summary.docs_calls_with_k == 1
+    assert summary.routing_negatives_with_docs_call == 0
+
+
+def test_agent_query_no_call_scores_a_positive_as_a_miss_and_a_negative_as_no_match() -> None:
+    results = [
+        _result("positive", "a.md", ("a.md", 0, 0.2)),
+        _result("negative", None, ("b.md", 0, 0.9)),
+    ]
+    fixture = _agent_queries({"positive": (), "negative": ()})
+
+    evaluation = _evaluate(
+        results,
+        embeddings=[None, None],
+        agent_queries=fixture,
+        agent_queries_path=Path("fixture.yaml"),
+    )
+
+    assert evaluation.discovery_results[0].passages == ()
+    assert evaluation.discovery_results[1].passages == ()
+    summary = evaluation.agent_queries
+    assert summary is not None
+    assert summary.positives_without_docs_call == 1
+    assert summary.negatives_without_docs_call == 1
+
+    report = eval_retrieval.format_report(evaluation)
+
+    assert "AGENT QUERIES" in report
+    assert "Positives with no docs call: 1" in report
+    assert "Negatives with no docs call: 1" in report
+    assert "Model: test-model" in report
+    assert "instructions 0000000" in report
+
+
+def test_agent_query_routing_negative_docs_call_is_counted_and_reported() -> None:
+    results = [
+        _result("positive", "a.md", ("a.md", 0, 0.1)),
+        _result("routing negative", None, ("c.md", 0, 0.2)),
+    ]
+    fixture = _agent_queries(
+        {
+            "positive": (("coach query", None),),
+            "routing negative": (("data query", 3),),
+        }
+    )
+
+    evaluation = _evaluate(
+        results,
+        routing={"routing negative"},
+        embeddings=[_vector(1.0), _vector(0.0, 0.0, 1.0)],
+        agent_queries=fixture,
+        agent_queries_path=Path("fixture.yaml"),
+    )
+
+    summary = evaluation.agent_queries
+    assert summary is not None
+    assert summary.routing_negatives == 1
+    assert summary.routing_negatives_with_docs_call == 1
+
+    report = eval_retrieval.format_report(evaluation)
+
+    assert "Routing negatives that called docs: 1 of 1" in report
+    assert "ROUTING NEGATIVES (reported, not gated)" in report
+
+
 def test_format_report_renders_rates_as_percentages() -> None:
     # Guard the display against silently switching to raw fractions: a 0.95 rate is 95.0%.
     results = [
@@ -550,7 +732,7 @@ def test_main_reports_an_embedding_error(monkeypatch: pytest.MonkeyPatch, capsys
     monkeypatch.setattr(eval_retrieval, "_open_session", fake_session)
     monkeypatch.setattr(eval_retrieval, "DocsRepository", lambda _session: object())
 
-    def failing_sweep(_golden_set, _repository):
+    def failing_sweep(_golden_set, _repository, **_kwargs):
         raise OpenAIError("boom")
 
     monkeypatch.setattr(eval_retrieval, "run_sweep", failing_sweep)
@@ -577,7 +759,11 @@ def test_main_returns_zero_when_the_sweep_recommends_a_pair(
     )
     monkeypatch.setattr(eval_retrieval, "_open_session", fake_session)
     monkeypatch.setattr(eval_retrieval, "DocsRepository", lambda _session: object())
-    monkeypatch.setattr(eval_retrieval, "run_sweep", lambda _golden_set, _repository: evaluation)
+    monkeypatch.setattr(
+        eval_retrieval,
+        "run_sweep",
+        lambda _golden_set, _repository, **_kwargs: evaluation,
+    )
 
     assert eval_retrieval.main([]) == 0
 
