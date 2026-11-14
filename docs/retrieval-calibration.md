@@ -31,10 +31,12 @@ DATABASE_URL=postgresql+psycopg://coach:coach@localhost:5432/coach \
     python scripts/eval_retrieval.py
 ```
 
-Pass `--database-url` instead of the environment prefix if you prefer, and `--golden-set PATH`
-to sweep a different golden set. The run costs one embedding call for all 98 questions
-(pennies) and one local pgvector query per question per candidate configuration; it never calls
-the HTTP API.
+Pass `--database-url` instead of the environment prefix if you prefer, `--golden-set PATH`
+to sweep a different golden set, and `--agent-queries PATH` to embed the coach-written queries
+from a captured fixture instead of the raw questions. Capture the fixture with
+`python scripts/capture_agent_queries.py` (needs a real key). The run costs one embedding call
+for at most 98 questions (pennies) and one local pgvector query per question per candidate
+configuration; it never calls the HTTP API.
 
 ## When to run it
 
@@ -81,6 +83,12 @@ recommended cutoff.
 **Routing negatives.** Reported, not gated. These are questions the coach is expected to route
 to the data tools, so the sweep lists whether each would leak at the reported cutoff and leaves
 the routing judgment to the agent eval (#17).
+
+**Agent queries.** With `--agent-queries`, the header lists the fixture's model, capture date and
+instructions SHA, plus the rule counts: positives and negatives with no docs call, entries with
+more than one call, calls that set `k`, and routing negatives that called docs. The sweep embeds
+the first query per entry; no call is a recall miss for a positive and a correct no_match for a
+negative. The agent's `k` is ignored; the sweep still controls `k`.
 
 ## Caveats
 
