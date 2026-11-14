@@ -8,7 +8,7 @@ MIN_TOP_K = 1
 MAX_TOP_K = 10
 # Retrieved chunks are deduplicated by content after the query, so ask for headroom.
 DUPLICATE_OVERFETCH = 3
-MAX_COSINE_DISTANCE = 0.55  # starting value, pending calibration against a real corpus
+MAX_COSINE_DISTANCE = 0.606  # fallback, see docs/adr/0003-retrieval-fallback-cutoff.md
 EMBEDDING_DIMENSIONS = 1536
 
 MIN_CHUNK_WORDS = 40
