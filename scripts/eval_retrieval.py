@@ -649,7 +649,7 @@ def _format_recommendation(evaluation: SweepEvaluation) -> list[str]:
             lines.append(f"  DEFAULT_TOP_K = {k}")
             lines.append("  Evidence:")
             if cutoff_report is not None:
-                p_bound, d_bound = margin_bounds(evaluation.discovery_results, k=k)
+                p_bound, d_bound = margin_bounds(evaluation.discovery_results, k=CUTOFF_K)
                 lines.append(
                     f"    cutoff at k={CUTOFF_K}: recall@{CUTOFF_K} = "
                     f"{_rate_with_interval(cutoff_report.recalled, cutoff_report.positives)} "

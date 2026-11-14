@@ -315,6 +315,41 @@ def test_format_report_names_the_recommended_constants_with_evidence() -> None:
     assert "None. Every positive question" in report
 
 
+def test_format_report_prints_the_cutoff_bound_at_k_5_not_the_locked_k() -> None:
+    results = [
+        *[
+            _result(f"near {index}", f"near-{index}.md", (f"near-{index}.md", 0, 0.1))
+            for index in range(18)
+        ],
+        _result(
+            "late",
+            "late.md",
+            ("a.md", 0, 0.01),
+            ("b.md", 0, 0.02),
+            ("c.md", 0, 0.03),
+            ("d.md", 0, 0.04),
+            ("late.md", 0, 0.2),
+        ),
+        _result("other", "other.md", ("other.md", 0, 0.4)),
+        _result("negative", None, ("other.md", 1, 0.9)),
+    ]
+
+    evaluation = _evaluate(results)
+
+    recommended = evaluation.recommended
+    assert recommended is not None
+    cutoff, k = recommended
+    assert cutoff == pytest.approx(0.55)
+    assert k == 1
+
+    report = eval_retrieval.format_report(evaluation)
+
+    # The separation line sits under "cutoff at k=5", so it must use the k=5 bound P=0.2,
+    # not the locked k=1 bound P=0.4.
+    assert "recall bound P=0.2000" in report
+    assert "recall bound P=0.4000" not in report
+
+
 def test_format_report_prints_a_row_for_every_candidate_cutoff() -> None:
     results = [
         _result("positive", "a.md", ("a.md", 0, 0.2)),
