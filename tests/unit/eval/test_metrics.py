@@ -1,6 +1,6 @@
 import pytest
 
-from app.eval.metrics import score
+from app.eval.metrics import score, wilson_interval
 from tests.unit.eval.helpers import negative as _negative
 from tests.unit.eval.helpers import positive as _positive
 
@@ -158,3 +158,47 @@ def test_scoring_without_entries_reports_zeroed_rates() -> None:
 def test_scoring_rejects_a_non_positive_k() -> None:
     with pytest.raises(ValueError):
         score([], k=0, cutoff=0.5)
+
+
+def test_document_precision_counts_selected_documents_not_passages() -> None:
+    results = [
+        _positive(
+            "When should I deload?",
+            "deloads.md",
+            ("deloads.md", 0.1),
+            ("deloads.md", 0.2),
+            ("other.md", 0.3),
+        )
+    ]
+
+    report = score(results, k=5, cutoff=1.0)
+
+    assert report.document_precision == pytest.approx(1 / 2)
+    assert report.precision == pytest.approx(2 / 3)
+
+
+def test_scoring_reports_the_counts_behind_the_rates() -> None:
+    results = [
+        _positive("hit", "a.md", ("a.md", 0.1)),
+        _positive("miss", "b.md", ("c.md", 0.2)),
+        _negative("no match", ("d.md", 0.9)),
+        _negative("leak", ("e.md", 0.1)),
+    ]
+
+    report = score(results, k=5, cutoff=0.5)
+
+    assert report.positives == 2
+    assert report.negatives == 2
+    assert report.recalled == 1
+    assert report.no_matches == 1
+
+
+def test_wilson_interval_matches_the_hand_calculation() -> None:
+    low, high = wilson_interval(66, 70)
+
+    assert low == pytest.approx(0.862, abs=0.001)
+    assert high == pytest.approx(0.978, abs=0.001)
+
+
+def test_wilson_interval_without_trials_is_the_whole_range() -> None:
+    assert wilson_interval(0, 0) == (0.0, 1.0)

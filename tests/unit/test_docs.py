@@ -65,7 +65,7 @@ def test_ingest_builds_chunks_from_text() -> None:
         result = handler.ingest("Deload", "deload.md", "deload every few weeks")
 
     assert result == DocumentRead.model_validate(created)
-    embed.assert_called_once()
+    embed.assert_called_once_with(["Deload\n\ndeload every few weeks"])
     document = create.call_args.args[0]
     assert len(document.chunks) == 1
     assert document.chunks[0].chunk_index == 0

@@ -20,14 +20,17 @@ coaching topic, written to be ingested through `POST /docs/ingest` as a
 
 ## Writing constraints
 
-The chunker (`app/engine/rag.py`, `chunk_text`) splits on whitespace into
-500-word chunks with 50 words of overlap. It ignores markdown structure, so
-corpus files are written to survive naive chunking:
+The chunker (`app/engine/rag.py`, `chunk_document`) splits documents by
+paragraph. Paragraphs under 40 words merge forward into the next paragraph,
+and paragraphs over 300 words are split. Each chunk is embedded with the
+document title in front of it; the trailing `## Sources` section is never
+embedded. Keep `text` in the ingest payload the whole file. Write so each
+paragraph stands alone:
 
-- Plain prose in short, self-contained sections under a few H2 headings.
+- Plain prose in short, self-contained paragraphs.
 - No tables, no code blocks, no nested bullet structures.
-- Key terms (progressive overload, RIR, deload, tonnage) are repeated
-  naturally so any 500-word window stands alone and stays retrievable.
+- Each paragraph should make sense on its own and name its key terms
+  (progressive overload, RIR, deload, tonnage) so it stays retrievable.
 - External docs run roughly 600-800 words; internal docs are shorter.
 
 ## Contents
