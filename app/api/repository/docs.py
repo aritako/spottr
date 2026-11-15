@@ -23,6 +23,11 @@ class DocsRepository:
         query = select(Document).offset(page * page_size).limit(page_size)
         return list(self.db.scalars(query))
 
+    def list_chunks(self) -> list[Chunk]:
+        """Return every chunk with its Document loaded, ordered by chunk id."""
+        query = select(Chunk).options(selectinload(Chunk.document)).order_by(Chunk.id)
+        return list(self.db.scalars(query))
+
     def retrieve(self, query_embedding: list[float], k: int, max_distance: float) -> list[Chunk]:
         """Return the chunks closest to an embedding, ordered by ascending cosine distance.
 

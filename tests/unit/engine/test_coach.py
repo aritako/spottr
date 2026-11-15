@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -33,6 +35,17 @@ def _stub_tool(coach: Coach, name: str, result: Any) -> Any:
     return patch.dict(coach.TOOL_REGISTRY, {name: MagicMock(return_value=result)})
 
 
+@contextmanager
+def _stub_search(coach: Coach, result: Any) -> Iterator[MagicMock]:
+    """Replace both dispatch paths the docs tool can take."""
+    mock = MagicMock(return_value=result)
+    with (
+        patch.object(coach.tools, "search_coaching_docs", mock),
+        patch.dict(coach.TOOL_REGISTRY, {"search_coaching_docs": mock}),
+    ):
+        yield mock
+
+
 def test_every_tool_schema_is_registered_and_strict(coach: Coach) -> None:
     names = [tool["name"] for tool in coach.TOOLS]
     assert set(names) == set(coach.TOOL_REGISTRY)
@@ -43,6 +56,13 @@ def test_every_tool_schema_is_registered_and_strict(coach: Coach) -> None:
         parameters = tool["parameters"]
         assert parameters["additionalProperties"] is False
         assert set(parameters["required"]) == set(parameters["properties"])
+
+
+def test_search_coaching_docs_schema_has_no_query_parameter(coach: Coach) -> None:
+    tool = next(tool for tool in coach.TOOLS if tool["name"] == "search_coaching_docs")
+
+    assert "query" not in tool["parameters"]["properties"]
+    assert tool["parameters"]["required"] == ["k"]
 
 
 def test_ask_coach_returns_structured_response(coach: Coach) -> None:
@@ -77,7 +97,7 @@ def test_ask_coach_tracks_used_tools(coach: Coach) -> None:
 
 
 def test_ask_coach_cites_every_retrieved_passage(coach: Coach) -> None:
-    tool_call = _tool_call("search_coaching_docs", '{"query": "should I deload?", "k": null}')
+    tool_call = _tool_call("search_coaching_docs", '{"k": null}')
     first_response = _response([tool_call])
     second_response = _response([], "A deload is reasonable.", response_id="resp_2")
     passages = {
@@ -102,7 +122,7 @@ def test_ask_coach_cites_every_retrieved_passage(coach: Coach) -> None:
         patch.object(
             coach.client.responses, "create", side_effect=[first_response, second_response]
         ),
-        _stub_tool(coach, "search_coaching_docs", passages),
+        _stub_search(coach, passages),
     ):
         result = coach.ask_coach("Should I deload?")
 
@@ -120,8 +140,8 @@ def test_ask_coach_deduplicates_repeated_passages_across_searches(coach: Coach) 
         "chunk_index": 2,
         "content": "Deload every four to six weeks.",
     }
-    first_call = _tool_call("search_coaching_docs", '{"query": "deload", "k": 5}', "call_1")
-    second_call = _tool_call("search_coaching_docs", '{"query": "deloading", "k": 5}', "call_2")
+    first_call = _tool_call("search_coaching_docs", '{"k": 5}', "call_1")
+    second_call = _tool_call("search_coaching_docs", '{"k": 5}', "call_2")
     responses = [
         _response([first_call]),
         _response([second_call], response_id="resp_2"),
@@ -130,7 +150,7 @@ def test_ask_coach_deduplicates_repeated_passages_across_searches(coach: Coach) 
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses),
-        _stub_tool(coach, "search_coaching_docs", {"status": "ok", "passages": [passage]}),
+        _stub_search(coach, {"status": "ok", "passages": [passage]}),
     ):
         result = coach.ask_coach("Should I deload?")
 
@@ -140,7 +160,7 @@ def test_ask_coach_deduplicates_repeated_passages_across_searches(coach: Coach) 
 
 
 def test_ask_coach_reports_no_citations_when_nothing_matches(coach: Coach) -> None:
-    tool_call = _tool_call("search_coaching_docs", '{"query": "marathon", "k": null}')
+    tool_call = _tool_call("search_coaching_docs", '{"k": null}')
     responses = [
         _response([tool_call]),
         _response([], "I don't have material on marathon training.", response_id="resp_2"),
@@ -148,9 +168,61 @@ def test_ask_coach_reports_no_citations_when_nothing_matches(coach: Coach) -> No
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses),
-        _stub_tool(coach, "search_coaching_docs", {"status": "no_match", "passages": []}),
+        _stub_search(coach, {"status": "no_match", "passages": []}),
     ):
         result = coach.ask_coach("How should I train for a marathon?")
 
     assert result["used_tools"] == ["search_coaching_docs"]
     assert result["citations"] == []
+
+
+def test_ask_coach_searches_with_the_exact_question(coach: Coach) -> None:
+    tool_call = _tool_call("search_coaching_docs", '{"k": null}')
+    responses = [
+        _response([tool_call]),
+        _response([], "No match.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses),
+        _stub_search(coach, {"status": "no_match", "passages": []}) as search,
+    ):
+        coach.ask_coach("Which lifting shoes should I buy?")
+
+    search.assert_called_once_with("Which lifting shoes should I buy?", k=None)
+
+
+def test_ask_coach_ignores_a_stray_query_argument(coach: Coach) -> None:
+    tool_call = _tool_call("search_coaching_docs", '{"query": "deload", "k": 5}')
+    responses = [
+        _response([tool_call]),
+        _response([], "No match.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses),
+        _stub_search(coach, {"status": "no_match", "passages": []}) as search,
+    ):
+        coach.ask_coach("Should I deload?")
+
+    search.assert_called_once_with("Should I deload?", k=5)
+
+
+def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -> None:
+    tool_call = _tool_call("query_workouts", '{"metric": "tonnage"}')
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+    ):
+        coach.ask_coach("How much did I squat this week?")
+
+    assert create.call_count == 2
+    first_instructions = create.call_args_list[0].kwargs["instructions"]
+    assert first_instructions
+    assert create.call_args_list[1].kwargs["instructions"] == first_instructions
+    assert create.call_args_list[1].kwargs["tools"] == coach.TOOLS

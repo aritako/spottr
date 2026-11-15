@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -57,6 +58,9 @@ class ScoringReport:
     positives: int
     negatives: int
     retrieved: int
+    recalled: int
+    no_matches: int
+    document_precision: float
 
 
 def score(results: Sequence[QuestionResult], k: int, cutoff: float) -> ScoringReport:
@@ -70,6 +74,9 @@ def score(results: Sequence[QuestionResult], k: int, cutoff: float) -> ScoringRe
     - precision: the fraction of selected Passages that belong to the question's expected
       Document. Negative questions expect no Document, so every Passage selected for one
       counts against precision.
+    - document precision: the fraction of selected Documents that are the question's expected
+      Document, pooled over all questions. Negative questions never expect a Document, so every
+      Document selected for one counts against it.
     """
     if k < 1:
         raise ValueError("k must be at least 1")
@@ -80,6 +87,8 @@ def score(results: Sequence[QuestionResult], k: int, cutoff: float) -> ScoringRe
     no_matches = 0
     retrieved = 0
     expected_retrieved = 0
+    retrieved_documents = 0
+    expected_documents = 0
     margins: list[EntryMargin] = []
 
     for result in results:
@@ -90,6 +99,11 @@ def score(results: Sequence[QuestionResult], k: int, cutoff: float) -> ScoringRe
         relevant = relevant_passages(selected, expected)
         expected_retrieved += len(relevant)
         margins.append(_margin(result.question, expected, selected))
+
+        documents = {passage.document_source for passage in selected}
+        retrieved_documents += len(documents)
+        if expected in documents:
+            expected_documents += 1
 
         if result.is_negative:
             negatives += 1
@@ -110,7 +124,26 @@ def score(results: Sequence[QuestionResult], k: int, cutoff: float) -> ScoringRe
         positives=positives,
         negatives=negatives,
         retrieved=retrieved,
+        recalled=recalled,
+        no_matches=no_matches,
+        document_precision=(
+            expected_documents / retrieved_documents if retrieved_documents else 0.0
+        ),
     )
+
+
+def wilson_interval(successes: int, total: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for a proportion. Returns (0.0, 1.0) when total is 0."""
+    if total == 0:
+        return 0.0, 1.0
+
+    proportion = successes / total
+    denominator = 1 + z * z / total
+    centre = (proportion + z * z / (2 * total)) / denominator
+    half_width = (
+        z * math.sqrt(proportion * (1 - proportion) / total + z * z / (4 * total * total))
+    ) / denominator
+    return max(0.0, centre - half_width), min(1.0, centre + half_width)
 
 
 def select_passages(

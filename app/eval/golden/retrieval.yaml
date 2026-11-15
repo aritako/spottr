@@ -4,7 +4,9 @@
 #
 # Format (app/eval/golden_set.py):
 #   - Positive:  question + expected_document (the corpus source filename)
-#   - Negative:  question + no_match: true
+#   - Negative:  question + no_match: true + negative_kind: retrieval | routing
+#   A retrieval negative gates the relevance threshold; a routing negative belongs to the data
+#   tools and is reported, not gated.
 #   Document-level only: no chunk indexes, no anchor snippets.
 #
 # Every "# ans:" comment points at the sentence in the expected Document that answers the
@@ -331,26 +333,32 @@ entries:
 
   - question: What was my best bench press e1RM last month?
     no_match: true
+    negative_kind: routing
     # data
 
   - question: How much total tonnage did I do on squats this week?
     no_match: true
+    negative_kind: routing
     # data
 
   - question: Did my deadlift go up or down over the last eight weeks?
     no_match: true
+    negative_kind: routing
     # data
 
   - question: Which exercises have I logged so far?
     no_match: true
+    negative_kind: routing
     # data (query_exercises)
 
   - question: When did I hit my last squat PR?
     no_match: true
+    negative_kind: routing
     # data
 
   - question: Compare my overhead press volume in October with September.
     no_match: true
+    negative_kind: routing
     # data
 
   # Out-of-domain. The first two are near-domain on purpose: the corpus mentions "adequate
@@ -358,24 +366,95 @@ entries:
 
   - question: How much protein should I eat per day to build muscle?
     no_match: true
+    negative_kind: retrieval
     # out-of-domain (near: fatigue-and-recovery.md mentions food)
 
   - question: Is creatine worth taking?
     no_match: true
+    negative_kind: retrieval
     # out-of-domain (near)
 
   - question: What's a good training plan for my first 10K run?
     no_match: true
+    negative_kind: retrieval
     # out-of-domain
 
   - question: How do I fix my posture from sitting at a desk all day?
     no_match: true
+    negative_kind: retrieval
     # out-of-domain
 
   - question: Which lifting shoes should I buy?
     no_match: true
+    negative_kind: retrieval
     # out-of-domain
 
   - question: What's the capital of Australia?
     no_match: true
+    negative_kind: retrieval
     # out-of-domain (sanity floor)
+
+  # Retrieval negatives added for #23 (approved in the handoff plan).
+  - question: How many calories should I eat to lose fat without losing muscle?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: What's the most accurate way to measure my body fat percentage?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: How much water should I drink during a workout?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: How much caffeine should I take before training?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: Does low testosterone stop me from building muscle?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: Is it safe to lift weights while pregnant?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: What should I pack in my gym bag?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: How much does a personal trainer usually cost?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: How do I reset my Wi-Fi router?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: What's a good recipe for banana bread?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: Who won the 2018 FIFA World Cup?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: How do I convert Celsius to Fahrenheit?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: What's the fastest way to learn Spanish?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: How do I file my taxes as a freelancer?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: What time zone is Tokyo in?
+    no_match: true
+    negative_kind: retrieval
+
+  - question: How do I unclog a kitchen sink?
+    no_match: true
+    negative_kind: retrieval

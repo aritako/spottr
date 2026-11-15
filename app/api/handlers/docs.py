@@ -6,7 +6,7 @@ from app.engine.rag import (
     DUPLICATE_OVERFETCH,
     EMBEDDING_DIMENSIONS,
     MAX_COSINE_DISTANCE,
-    chunk_text,
+    chunk_document,
     get_embeddings,
     normalize_k,
 )
@@ -20,11 +20,11 @@ class DocsHandler:
         self.repository = DocsRepository(db)
 
     def ingest(self, title: str, source: str | None, text: str) -> DocumentRead:
-        chunks = chunk_text(text)
+        chunks = chunk_document(text)
         if not chunks:
             raise EmptyDocumentError()
 
-        embeddings = get_embeddings(chunks)
+        embeddings = get_embeddings([f"{title}\n\n{chunk}" for chunk in chunks])
         document = Document(
             title=title,
             source=source,

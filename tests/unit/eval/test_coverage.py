@@ -71,7 +71,11 @@ def test_a_document_with_no_questions_is_reported() -> None:
 
 def test_negative_questions_do_not_count_toward_document_coverage() -> None:
     entries = [
-        GoldenEntry(question="What was my squat e1RM last month?", no_match=True),
+        GoldenEntry(
+            question="What was my squat e1RM last month?",
+            no_match=True,
+            negative_kind="retrieval",
+        ),
         _entry("deloads.md"),
         _entry("deloads.md"),
         _entry("deloads.md"),

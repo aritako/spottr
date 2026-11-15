@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -14,7 +15,9 @@ class GoldenEntry(BaseModel):
     """One authored question and the retrieval outcome it expects.
 
     A positive entry names the corpus source filename that must be retrieved. A Negative
-    question sets ``no_match`` instead, meaning retrieval must return no Passage at all.
+    question sets ``no_match`` instead, meaning retrieval must return no Passage at all. A
+    Negative question is either a ``retrieval`` negative, which gates the relevance threshold,
+    or a ``routing`` negative, which belongs to the data tools and is reported, not gated.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
@@ -22,6 +25,7 @@ class GoldenEntry(BaseModel):
     question: str = Field(min_length=1)
     expected_document: str | None = Field(default=None, min_length=1)
     no_match: bool = False
+    negative_kind: Literal["retrieval", "routing"] | None = None
 
     @model_validator(mode="after")
     def _validate_expectation(self) -> "GoldenEntry":
@@ -30,6 +34,10 @@ class GoldenEntry(BaseModel):
             raise ValueError("entry sets both expected_document and no_match; choose exactly one")
         if not has_document and not self.no_match:
             raise ValueError("entry needs expected_document or no_match: true")
+        if self.no_match and self.negative_kind is None:
+            raise ValueError("a Negative question needs negative_kind: retrieval or routing")
+        if has_document and self.negative_kind is not None:
+            raise ValueError("negative_kind is only valid on a Negative question")
         if has_document:
             document = self.expected_document or ""
             if document in {".", ".."} or "/" in document or "\\" in document:

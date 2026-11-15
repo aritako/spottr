@@ -68,3 +68,29 @@ def test_has_chunks_is_false_before_anything_is_ingested(db_session: Session) ->
     db_session.flush()
 
     assert repository.has_chunks() is True
+
+
+def test_list_chunks_returns_every_chunk_with_its_document(db_session: Session) -> None:
+    rpe = Document(
+        title="RPE Guide",
+        source="rpe.md",
+        chunks=[
+            Chunk(
+                chunk_index=0,
+                content="RPE 8 is about two reps left.",
+                embedding=[0.0, 1.0] + [0.0] * (DIMENSIONS - 2),
+            )
+        ],
+    )
+    db_session.add_all([_deload_document(), rpe])
+    db_session.flush()
+
+    chunks = DocsRepository(db_session).list_chunks()
+
+    assert len(chunks) == 3
+    assert all(chunk.document is not None for chunk in chunks)
+    assert [chunk.document.title for chunk in chunks] == [
+        "Deload Guidelines",
+        "Deload Guidelines",
+        "RPE Guide",
+    ]
