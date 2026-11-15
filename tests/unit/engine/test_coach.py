@@ -1,14 +1,27 @@
 import json
 import logging
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from app.engine.coach import Coach
-from app.engine.rejections import COULD_NOT_COMPLETE
+from app.engine.rejections import COULD_NOT_COMPLETE, NOTHING_FOUND
+
+PASSAGE = {
+    "document_id": 1,
+    "document_title": "Deload Guidelines",
+    "chunk_index": 2,
+    "content": "Deload every four to six weeks.",
+}
+
+CITATION = {
+    "document_id": 1,
+    "document_title": "Deload Guidelines",
+    "chunk_index": 2,
+}
 
 
 @pytest.fixture
@@ -62,6 +75,13 @@ def _stub_search(coach: Coach, result: Any) -> Iterator[MagicMock]:
         yield mock
 
 
+def _stub_result(coach: Coach, tool: str, result: Any) -> AbstractContextManager[Any]:
+    """Stub a tool result through the path the coach actually dispatches it."""
+    if tool == "search_coaching_docs":
+        return _stub_search(coach, result)
+    return _stub_tool(coach, tool, result)
+
+
 def test_every_tool_schema_is_registered_and_strict(coach: Coach) -> None:
     names = [tool["name"] for tool in coach.TOOLS]
     assert set(names) == set(coach.TOOL_REGISTRY)
@@ -81,10 +101,10 @@ def test_search_coaching_docs_schema_has_no_query_parameter(coach: Coach) -> Non
     assert tool["parameters"]["required"] == ["k"]
 
 
-def test_ask_coach_returns_structured_response(coach: Coach) -> None:
+def test_ask_coach_ships_a_no_tool_answer_unchanged(coach: Coach) -> None:
     response = _response([], "Your squat e1RM is trending up.")
 
-    with patch.object(coach.client.responses, "create", return_value=response):
+    with patch.object(coach.client.responses, "create", return_value=response) as create:
         result = coach.ask_coach("How is my squat trending?")
 
     assert result == {
@@ -92,6 +112,7 @@ def test_ask_coach_returns_structured_response(coach: Coach) -> None:
         "used_tools": [],
         "citations": [],
     }
+    assert create.call_count == 1
 
 
 def test_ask_coach_tracks_used_tools(coach: Coach) -> None:
@@ -103,7 +124,15 @@ def test_ask_coach_tracks_used_tools(coach: Coach) -> None:
         patch.object(
             coach.client.responses, "create", side_effect=[first_response, second_response]
         ),
-        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
     ):
         result = coach.ask_coach("How much did I squat this week?")
 
@@ -192,6 +221,157 @@ def test_ask_coach_reports_no_citations_when_nothing_matches(coach: Coach) -> No
     assert result["citations"] == []
 
 
+@pytest.mark.parametrize(
+    ("tool_name", "arguments", "result"),
+    [
+        ("search_coaching_docs", '{"k": null}', {"status": "no_match", "passages": []}),
+        ("search_coaching_docs", '{"k": null}', {"status": "empty_corpus", "passages": []}),
+        (
+            "query_workouts",
+            '{"metric": "tonnage"}',
+            {"result": "No matching workout data found."},
+        ),
+        ("query_exercises", "{}", []),
+    ],
+    ids=["retrieval-no-match", "empty-corpus", "no-workout-data", "empty-exercise-list"],
+)
+def test_ask_coach_normalizes_an_all_empty_outcome_to_nothing_found(
+    coach: Coach,
+    engine_logs: pytest.LogCaptureFixture,
+    tool_name: str,
+    arguments: str,
+    result: Any,
+) -> None:
+    tool_call = _tool_call(tool_name, arguments)
+    responses = [
+        _response([tool_call]),
+        _response([], "A paragraph reasoned over nothing.", response_id="resp_2"),
+    ]
+    question = "What did I lift last month?"
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_result(coach, tool_name, result),
+    ):
+        answer = coach.ask_coach(question)
+
+    assert answer == {
+        "answer": NOTHING_FOUND,
+        "used_tools": [tool_name],
+        "citations": [],
+    }
+    assert create.call_count == 2
+    assert tool_name in engine_logs.text
+    assert "nothing-found" in engine_logs.text
+    assert question not in engine_logs.text
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "arguments", "result", "expected_citations"),
+    [
+        (
+            "query_workouts",
+            '{"metric": "tonnage"}',
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+            [],
+        ),
+        ("query_exercises", "{}", [[1, "Back Squat"]], []),
+        (
+            "search_coaching_docs",
+            '{"k": null}',
+            {"status": "ok", "passages": [PASSAGE]},
+            [CITATION],
+        ),
+    ],
+    ids=["data-rows", "exercise-list", "retrieved-passages"],
+)
+def test_ask_coach_ships_an_answer_backed_by_each_substantive_shape(
+    coach: Coach,
+    tool_name: str,
+    arguments: str,
+    result: Any,
+    expected_citations: list[dict[str, Any]],
+) -> None:
+    tool_call = _tool_call(tool_name, arguments)
+    responses = [
+        _response([tool_call]),
+        _response([], "Backed by a tool result.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses),
+        _stub_result(coach, tool_name, result),
+    ):
+        answer = coach.ask_coach("What does my training show?")
+
+    assert answer == {
+        "answer": "Backed by a tool result.",
+        "used_tools": [tool_name],
+        "citations": expected_citations,
+    }
+
+
+def test_ask_coach_ships_a_mixed_answer_unchanged(coach: Coach) -> None:
+    tool_calls = [
+        _tool_call("search_coaching_docs", '{"k": null}', "call_search"),
+        _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts"),
+    ]
+    responses = [
+        _response(tool_calls),
+        _response(
+            [],
+            "Deload every four to six weeks; you have no squats logged.",
+            response_id="resp_2",
+        ),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_search(coach, {"status": "ok", "passages": [PASSAGE]}),
+        _stub_tool(coach, "query_workouts", {"result": "No matching workout data found."}),
+    ):
+        answer = coach.ask_coach("Should I deload, and how much did I squat?")
+
+    assert answer == {
+        "answer": "Deload every four to six weeks; you have no squats logged.",
+        "used_tools": ["search_coaching_docs", "query_workouts"],
+        "citations": [CITATION],
+    }
+    assert create.call_count == 2
+
+
+def test_ask_coach_collects_evidence_across_every_turn(coach: Coach) -> None:
+    workout_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")
+    search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
+    responses = [
+        _response([workout_call]),
+        _response([search_call], response_id="resp_2"),
+        _response([], "You lifted 10,000 kg this week.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses),
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
+        _stub_search(coach, {"status": "no_match", "passages": []}),
+    ):
+        answer = coach.ask_coach("How much did I squat, and should I deload?")
+
+    assert answer["answer"] == "You lifted 10,000 kg this week."
+    assert answer["used_tools"] == ["query_workouts", "search_coaching_docs"]
+
+
 def test_ask_coach_searches_with_the_exact_question(coach: Coach) -> None:
     tool_call = _tool_call("search_coaching_docs", '{"k": null}')
     responses = [
@@ -233,7 +413,15 @@ def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses) as create,
-        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
     ):
         coach.ask_coach("How much did I squat this week?")
 
@@ -324,7 +512,15 @@ def test_ask_coach_gives_every_tool_call_exactly_one_result(coach: Coach) -> Non
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses) as create,
-        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
     ):
         result = coach.ask_coach("How much did I squat this week?")
 

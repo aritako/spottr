@@ -11,9 +11,16 @@ from sqlalchemy.orm import Session
 
 from app.api.repository.workouts import WorkoutsRepository
 from app.core.openai.client import client
+from app.engine.guardrails import (
+    ScopeVerdict,
+    ToolEvidence,
+    error_evidence,
+    scope_verdict,
+    tool_evidence,
+)
 from app.engine.prompts import TOOL_SCHEMAS
 from app.engine.prompts import build_instructions as build_coach_instructions
-from app.engine.rejections import COULD_NOT_COMPLETE
+from app.engine.rejections import COULD_NOT_COMPLETE, NOTHING_FOUND, build_rejection
 from app.engine.tools import Tools
 from app.shared.enums.coach import Metric
 from app.shared.schemas.coach import Citation
@@ -49,6 +56,7 @@ class Coach:
     def ask_coach(self, question: str, max_iterations: int = 5) -> dict[str, Any]:
         used_tools: list[str] = []
         citations: list[Citation] = []
+        evidence: list[ToolEvidence] = []
 
         def search_coaching_docs(k: int | None = None, **arguments: Any) -> dict[str, Any]:
             # The model no longer writes the search text. A stray query from an older schema
@@ -74,6 +82,13 @@ class Coach:
             tool_calls = [item for item in response.output if item.type == "function_call"]
 
             if not tool_calls:
+                if scope_verdict(evidence) is ScopeVerdict.ALL_EMPTY:
+                    logger.warning(
+                        "coach answer normalized to nothing-found: every substantive tool result "
+                        "was empty; tools in flight: %s",
+                        ", ".join(used_tools) if used_tools else "none",
+                    )
+                    return build_rejection(NOTHING_FOUND, used_tools)
                 return {
                     "answer": response.output_text or COULD_NOT_COMPLETE,
                     "used_tools": used_tools,
@@ -88,6 +103,7 @@ class Coach:
                     logger.warning(
                         "coach called unknown tool %s; returning an error result", fn_name
                     )
+                    evidence.append(error_evidence(fn_name))
                     tool_outputs.append(
                         self._tool_error_output(
                             tool_call.call_id,
@@ -103,6 +119,7 @@ class Coach:
                     logger.warning(
                         "coach sent unreadable arguments for tool %s: %s", fn_name, error
                     )
+                    evidence.append(error_evidence(fn_name))
                     tool_outputs.append(
                         self._tool_error_output(
                             tool_call.call_id,
@@ -117,6 +134,7 @@ class Coach:
 
                 fn = tool_registry[fn_name]
                 result = fn(**fn_args)
+                evidence.append(tool_evidence(fn_name, result))
                 collect_citations = self.CITATION_COLLECTORS.get(fn_name)
                 if collect_citations:
                     collect_citations(citations, result)
@@ -145,11 +163,7 @@ class Coach:
             max_iterations,
             ", ".join(used_tools) if used_tools else "none",
         )
-        return {
-            "answer": COULD_NOT_COMPLETE,
-            "used_tools": used_tools,
-            "citations": [],
-        }
+        return build_rejection(COULD_NOT_COMPLETE, used_tools)
 
     @staticmethod
     def _decode_arguments(tool_call: Any) -> dict[str, Any]:
