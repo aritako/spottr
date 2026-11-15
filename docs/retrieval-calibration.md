@@ -32,7 +32,8 @@ DATABASE_URL=postgresql+psycopg://coach:coach@localhost:5432/coach \
 ```
 
 Pass `--database-url` instead of the environment prefix if you prefer, and `--golden-set PATH`
-to sweep a different golden set. The run costs one embedding call for all 98 questions
+to sweep a different golden set. The sweep embeds each golden question verbatim, which is the
+text production sends after ADR 0004. The run costs one embedding call for all 98 questions
 (pennies) and one local pgvector query per question per candidate configuration; it never calls
 the HTTP API.
 

@@ -20,12 +20,27 @@ On the 96-chunk paragraph corpus, 70 positives, 22 retrieval negatives and 6 rou
 - 0.606 and 0.610 produce the same recall, but 0.610 also leaks the 0.6094 negative (lifting
   shoes), so 0.606 keeps one more negative clear.
 
+These are raw-question numbers. Before [ADR 0004](0004-retrieval-searches-the-users-question.md),
+production embedded coach-written queries; the coach-written measurement is below.
+
 The value is the midpoint of the k=7 qualifying interval (`P = 0.5970`, `D = 0.6151`), applied at
 `k = 5`. It is not justified by a k=5 lock, because `P` is infinite there. The 92.9% recall is the
 price of keeping the cutoff inside the interval that also holds the no-match bar.
 
 The bars gate on point estimates only. Wilson 95% intervals are printed for run-to-run drift
 monitoring and never gate a lock.
+
+## Measured on coach-written queries
+
+Before [ADR 0004](0004-retrieval-searches-the-users-question.md), production embedded the query
+the coach wrote, not the user's question. On the frozen fixture from branch
+`feat/eval-agent-queries` at `0072489` (98 questions, 77 `search_coaching_docs` calls, one
+`gpt-5.4-nano` sample), no_match at this cutoff was 11 of 22 = 50.0%, or 4 of 15 = 26.7% among
+the retrieval negatives where the coach actually searched. The fallback therefore did not protect
+production before ADR 0004.
+
+ADR 0004 makes `search_coaching_docs` embed the user's question verbatim. From that change on,
+the raw-question figures above (65 of 70 recall, 21 of 22 no_match) describe production.
 
 ## Why not k=7
 
@@ -53,7 +68,9 @@ This paragraph is written before the agent-query sweep (Phase 3), so the choice 
 seeing its result. If the agent-query sweep still fails the bars, the one change tested next is
 `text-embedding-3-large` with `dimensions=1536`. That model keeps `Vector(1536)` and the
 closed-form lock, but ingest and query must use the same model and dimensions, and the corpus must
-be cleared and re-ingested.
+be cleared and re-ingested. The agent-query sweep has since run; see
+[ADR 0004](0004-retrieval-searches-the-users-question.md). It does not change this pre-registered
+next step, which is now run on raw questions.
 
 Hybrid lexical search is out of scope until a human approves it. Fused lexical and vector scores
 are not distances, so they break the `P`/`D` lock this harness depends on.
@@ -61,7 +78,9 @@ are not distances, so they break the `P`/`D` lock this harness depends on.
 ## Consequences
 
 - Production retrieves with a cutoff that knowingly misses the 95% recall bar on the authored
-  set while meeting the 90% no-match bar.
+  set. The 90% no-match bar holds only because
+  [ADR 0004](0004-retrieval-searches-the-users-question.md) makes production embed the user's
+  question; before that change, coach-written queries gave 11 of 22 no_match at this cutoff.
 - Any corpus edit, chunking change, golden-set change, embedding-model change, or completed
   agent-query experiment requires a fresh sweep and a review of this fallback.
 - The calibration ADR that ADR 0001 deferred is still owed; this document records a fallback, not
