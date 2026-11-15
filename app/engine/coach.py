@@ -51,8 +51,9 @@ class Coach:
             "search_coaching_docs": search_coaching_docs,
         }
 
+        instructions = build_coach_instructions(date.today())
         response = self.client.responses.create(
-            instructions=build_coach_instructions(date.today()),
+            instructions=instructions,
             model=self.QUERY_MODEL,
             input=question,
             tools=self.TOOLS,
@@ -102,6 +103,7 @@ class Coach:
             # Feed results back; previous_response_id chains the conversation
             # server-side so we don't rebuild the full message history.
             response = self.client.responses.create(
+                instructions=instructions,
                 model=self.QUERY_MODEL,
                 previous_response_id=response.id,
                 input=tool_outputs,

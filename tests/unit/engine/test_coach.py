@@ -206,3 +206,22 @@ def test_ask_coach_ignores_a_stray_query_argument(coach: Coach) -> None:
         coach.ask_coach("Should I deload?")
 
     search.assert_called_once_with("Should I deload?", k=5)
+
+
+def test_ask_coach_sends_the_same_instructions_on_every_turn(coach: Coach) -> None:
+    tool_call = _tool_call("query_workouts", '{"metric": "tonnage"}')
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+    ):
+        coach.ask_coach("How much did I squat this week?")
+
+    assert create.call_count == 2
+    first_instructions = create.call_args_list[0].kwargs["instructions"]
+    assert first_instructions
+    assert create.call_args_list[1].kwargs["instructions"] == first_instructions
