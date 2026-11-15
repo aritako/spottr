@@ -1,3 +1,5 @@
+import json
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -6,11 +8,25 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.engine.coach import Coach
+from app.engine.rejections import COULD_NOT_COMPLETE
 
 
 @pytest.fixture
 def coach() -> Coach:
     return Coach(MagicMock())
+
+
+@pytest.fixture
+def engine_logs(caplog: pytest.LogCaptureFixture) -> Iterator[pytest.LogCaptureFixture]:
+    """Capture engine logs even after Alembic's logging setup disables the logger."""
+    engine_logger = logging.getLogger("app.engine.coach")
+    was_disabled = engine_logger.disabled
+    engine_logger.disabled = False
+    caplog.set_level(logging.WARNING, logger="app.engine.coach")
+    try:
+        yield caplog
+    finally:
+        engine_logger.disabled = was_disabled
 
 
 def _tool_call(name: str, arguments: str, call_id: str = "call_123") -> MagicMock:
@@ -226,3 +242,145 @@ def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -
     assert first_instructions
     assert create.call_args_list[1].kwargs["instructions"] == first_instructions
     assert create.call_args_list[1].kwargs["tools"] == coach.TOOLS
+
+
+def test_ask_coach_answers_an_unknown_tool_with_an_error_result(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    tool_call = _tool_call("query_nutrition", "{}", "call_unknown")
+    responses = [
+        _response([tool_call]),
+        _response([], "I can answer from your training data instead.", response_id="resp_2"),
+    ]
+    question = "How is my squat trending?"
+
+    with patch.object(coach.client.responses, "create", side_effect=responses) as create:
+        result = coach.ask_coach(question)
+
+    assert result == {
+        "answer": "I can answer from your training data instead.",
+        "used_tools": [],
+        "citations": [],
+    }
+
+    follow_up = create.call_args_list[1].kwargs["input"]
+    assert len(follow_up) == 1
+    assert follow_up[0]["type"] == "function_call_output"
+    assert follow_up[0]["call_id"] == "call_unknown"
+    error_result = json.loads(follow_up[0]["output"])
+    assert error_result["tool"] == "query_nutrition"
+    assert "Unknown tool" in error_result["error"]
+    assert "query_nutrition" in error_result["error"]
+    assert "query_nutrition" in engine_logs.text
+    assert question not in engine_logs.text
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        "not json",
+        "[]",
+        "null",
+        '{"metric": "pace"}',
+    ],
+)
+def test_ask_coach_answers_unreadable_arguments_with_an_error(coach: Coach, arguments: str) -> None:
+    tool = MagicMock(return_value={"metric": "tonnage", "result": []})
+    tool_call = _tool_call("query_workouts", arguments, "call_bad")
+    responses = [
+        _response([tool_call]),
+        _response([], "I can still answer.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.dict(coach.TOOL_REGISTRY, {"query_workouts": tool}),
+    ):
+        result = coach.ask_coach("How much did I squat this week?")
+
+    assert result["answer"] == "I can still answer."
+    assert result["used_tools"] == []
+    tool.assert_not_called()
+
+    follow_up = create.call_args_list[1].kwargs["input"]
+    assert len(follow_up) == 1
+    assert follow_up[0]["call_id"] == "call_bad"
+    error_result = json.loads(follow_up[0]["output"])
+    assert error_result["tool"] == "query_workouts"
+    assert "Could not read the arguments" in error_result["error"]
+    assert "query_workouts" in error_result["error"]
+
+
+def test_ask_coach_gives_every_tool_call_exactly_one_result(coach: Coach) -> None:
+    tool_calls = [
+        _tool_call("query_workouts", '{"metric": "tonnage"}', "call_ok"),
+        _tool_call("query_nutrition", "{}", "call_unknown"),
+        _tool_call("query_workouts", "not json", "call_broken"),
+    ]
+    responses = [
+        _response(tool_calls),
+        _response([], "Here is the answer.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+    ):
+        result = coach.ask_coach("How much did I squat this week?")
+
+    assert result["answer"] == "Here is the answer."
+    assert result["used_tools"] == ["query_workouts"]
+
+    follow_up = create.call_args_list[1].kwargs["input"]
+    assert [item["call_id"] for item in follow_up] == [
+        "call_ok",
+        "call_unknown",
+        "call_broken",
+    ]
+    assert all(item["type"] == "function_call_output" for item in follow_up)
+    assert len(follow_up) == len(tool_calls)
+
+
+def test_ask_coach_returns_could_not_complete_when_iterations_run_out(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
+    workout_calls = [
+        _tool_call("query_workouts", '{"metric": "tonnage"}', f"call_workouts_{index}")
+        for index in range(4)
+    ]
+    never_run = _tool_call("query_exercises", "{}", "call_never")
+    responses = [
+        _response([search_call], response_id="resp_1"),
+        *[
+            _response([tool_call], response_id=f"resp_{index + 2}")
+            for index, tool_call in enumerate(workout_calls)
+        ],
+        _response([never_run], response_id="resp_6"),
+    ]
+    passage = {
+        "document_id": 1,
+        "document_title": "Deload Guidelines",
+        "chunk_index": 2,
+        "content": "Deload every four to six weeks.",
+    }
+    question = "Should I deload after this block?"
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_search(coach, {"status": "ok", "passages": [passage]}),
+        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+    ):
+        result = coach.ask_coach(question)
+
+    assert create.call_count == 6
+    assert result == {
+        "answer": COULD_NOT_COMPLETE,
+        "used_tools": ["search_coaching_docs", "query_workouts"],
+        "citations": [],
+    }
+    assert "query_exercises" not in result["used_tools"]
+    assert "search_coaching_docs" in engine_logs.text
+    assert "query_workouts" in engine_logs.text
+    assert question not in engine_logs.text
+    assert "You are Spottr" not in engine_logs.text

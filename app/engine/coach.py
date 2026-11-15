@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import date
 from typing import Any
 
@@ -12,9 +13,16 @@ from app.api.repository.workouts import WorkoutsRepository
 from app.core.openai.client import client
 from app.engine.prompts import TOOL_SCHEMAS
 from app.engine.prompts import build_instructions as build_coach_instructions
+from app.engine.rejections import COULD_NOT_COMPLETE
 from app.engine.tools import Tools
 from app.shared.enums.coach import Metric
 from app.shared.schemas.coach import Citation
+
+logger = logging.getLogger(__name__)
+
+
+class _UnreadableArguments(Exception):
+    """Raised when a function call's arguments cannot become tool keyword arguments."""
 
 
 class Coach:
@@ -52,6 +60,7 @@ class Coach:
             **self.TOOL_REGISTRY,
             "search_coaching_docs": search_coaching_docs,
         }
+        available_tools = ", ".join(tool_registry)
 
         instructions = build_coach_instructions(date.today())
         response = self.client.responses.create(
@@ -66,7 +75,7 @@ class Coach:
 
             if not tool_calls:
                 return {
-                    "answer": response.output_text or "I couldn't complete that request.",
+                    "answer": response.output_text or COULD_NOT_COMPLETE,
                     "used_tools": used_tools,
                     "citations": [citation.model_dump() for citation in citations],
                 }
@@ -74,14 +83,33 @@ class Coach:
             tool_outputs: list[ResponseInputItemParam] = []
             for tool_call in tool_calls:
                 fn_name = tool_call.name
-                fn_args: dict[str, Any] = json.loads(tool_call.arguments)
-
-                # The schema sends `metric` as a string; convert to the enum
-                # so Tools.query_workouts' match statement works.
-                if isinstance(fn_args.get("metric"), str):
-                    fn_args["metric"] = Metric(fn_args["metric"])
 
                 if fn_name not in tool_registry:
+                    logger.warning(
+                        "coach called unknown tool %s; returning an error result", fn_name
+                    )
+                    tool_outputs.append(
+                        self._tool_error_output(
+                            tool_call.call_id,
+                            fn_name,
+                            f"Unknown tool '{fn_name}'. Available tools: {available_tools}.",
+                        )
+                    )
+                    continue
+
+                try:
+                    fn_args = self._decode_arguments(tool_call)
+                except _UnreadableArguments as error:
+                    logger.warning(
+                        "coach sent unreadable arguments for tool %s: %s", fn_name, error
+                    )
+                    tool_outputs.append(
+                        self._tool_error_output(
+                            tool_call.call_id,
+                            fn_name,
+                            f"Could not read the arguments for tool '{fn_name}': {error}.",
+                        )
+                    )
                     continue
 
                 if fn_name not in used_tools:
@@ -112,10 +140,46 @@ class Coach:
                 tools=self.TOOLS,
             )
 
+        logger.warning(
+            "coach loop exhausted its %d-iteration budget; tools in flight: %s",
+            max_iterations,
+            ", ".join(used_tools) if used_tools else "none",
+        )
         return {
-            "answer": "I couldn't complete that request.",
+            "answer": COULD_NOT_COMPLETE,
             "used_tools": used_tools,
-            "citations": [citation.model_dump() for citation in citations],
+            "citations": [],
+        }
+
+    @staticmethod
+    def _decode_arguments(tool_call: Any) -> dict[str, Any]:
+        """Turn a function call's raw arguments into keyword arguments for its tool."""
+        try:
+            arguments = json.loads(tool_call.arguments)
+        except (json.JSONDecodeError, TypeError) as error:
+            raise _UnreadableArguments("the arguments are not valid JSON") from error
+        if not isinstance(arguments, dict):
+            raise _UnreadableArguments("the arguments must be a JSON object")
+
+        # The schema sends `metric` as a string; convert to the enum
+        # so Tools.query_workouts' match statement works.
+        metric = arguments.get("metric")
+        if isinstance(metric, str):
+            try:
+                arguments["metric"] = Metric(metric)
+            except ValueError as error:
+                raise _UnreadableArguments(
+                    "metric must be one of: " + ", ".join(enum.value for enum in Metric)
+                ) from error
+        return arguments
+
+    @staticmethod
+    def _tool_error_output(call_id: str, tool_name: str, message: str) -> ResponseInputItemParam:
+        """Build the one function_call_output that answers a failed tool call."""
+        return {
+            "type": "function_call_output",
+            "call_id": call_id,
+            "output": json.dumps({"tool": tool_name, "error": message}),
         }
 
     @staticmethod
