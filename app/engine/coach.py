@@ -1,8 +1,9 @@
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
@@ -19,10 +20,12 @@ from app.engine.guardrails import (
     ScopeVerdict,
     ToolEvidence,
     error_evidence,
+    grounding_violation,
     scope_verdict,
+    scrape_receipts,
     tool_evidence,
 )
-from app.engine.prompts import SCOPE_RETRY, TOOL_SCHEMAS
+from app.engine.prompts import SCOPE_RETRY, TOOL_SCHEMAS, grounding_retry
 from app.engine.prompts import build_instructions as build_coach_instructions
 from app.engine.rejections import (
     COULD_NOT_COMPLETE,
@@ -92,6 +95,9 @@ class Coach:
         used_tools: list[str] = []
         citations: list[Citation] = []
         evidence: list[ToolEvidence] = []
+        # Every numeral any successful tool returned during this request, so a later turn can
+        # quote data that an earlier turn retrieved.
+        receipts: set[Decimal] = set()
         # One correction turn per request, however many Violations it produces: the budget is
         # counted per request, not per Violation kind.
         retry_used = False
@@ -123,6 +129,7 @@ class Coach:
                 decision = self._judge_answer(
                     response.output_text,
                     evidence,
+                    receipts=receipts,
                     retry_used=retry_used,
                     # The correction turn spends this iteration, so its response needs the
                     # next one in which to be judged.
@@ -186,6 +193,7 @@ class Coach:
                 fn = tool_registry[fn_name]
                 result = fn(**fn_args)
                 evidence.append(tool_evidence(fn_name, result))
+                receipts |= scrape_receipts(result)
                 collect_citations = self.CITATION_COLLECTORS.get(fn_name)
                 if collect_citations:
                     collect_citations(citations, result)
@@ -221,6 +229,7 @@ class Coach:
         output_text: str,
         evidence: Sequence[ToolEvidence],
         *,
+        receipts: Collection[Decimal],
         retry_used: bool,
         retry_available: bool,
         used_tools: Sequence[str],
@@ -228,9 +237,10 @@ class Coach:
     ) -> _AnswerDecision:
         """Judge one finished answer and decide its fate: ship, retry, or Rejection.
 
-        This is the loop's single judgement point, so every Guardrail attaches here. A
-        Rejection always goes through the one canned swap, which drops Citations and preserves
-        the tools that actually ran.
+        This is the loop's single judgement point, so every Guardrail attaches here. Scope comes
+        first because it decides whether any evidence exists; only a supported answer reaches
+        the Grounding check. A Rejection always goes through the one canned swap, which drops
+        Citations and preserves the tools that actually ran.
         """
         verdict = scope_verdict(evidence)
         if verdict is ScopeVerdict.ALL_EMPTY:
@@ -251,6 +261,16 @@ class Coach:
             )
         if not output_text:
             return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=COULD_NOT_COMPLETE)
+        violation = grounding_violation(output_text, receipts)
+        if violation is not None:
+            return self._decide_violation(
+                f"grounding: numeral {violation.numeral} has no Receipt in the tool results",
+                grounding_retry(violation.numeral),
+                retry_used=retry_used,
+                retry_available=retry_available,
+                used_tools=used_tools,
+                available_tools=available_tools,
+            )
         return _AnswerDecision(_AnswerOutcome.SHIP)
 
     @staticmethod

@@ -7,7 +7,7 @@ seeing the exchange. The loop chains it from the previous response with the same
 tool menu, matching how the first turn sends the question.
 """
 
-__all__ = ["SCOPE_RETRY"]
+__all__ = ["SCOPE_RETRY", "grounding_retry"]
 
 SCOPE_RETRY = (
     "You answered without calling any tool, so no tool output backs that answer. Answer the "
@@ -15,3 +15,14 @@ SCOPE_RETRY = (
     "for their logged workouts, and search_coaching_docs for training principles. Do not answer "
     "from your own knowledge."
 )
+
+GROUNDING_RETRY = (
+    'Your answer states the number "{numeral}", which is neither present in nor derivable from '
+    "the tool results. Answer the lifter's question again, using only numbers that appear in the "
+    "tool output, or call a tool to retrieve the number you need."
+)
+
+
+def grounding_retry(numeral: str) -> str:
+    """Build the correction turn for one numeral that no tool output backs."""
+    return GROUNDING_RETRY.format(numeral=numeral)

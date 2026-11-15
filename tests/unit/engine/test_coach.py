@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.engine.coach import Coach
-from app.engine.prompts.retry import SCOPE_RETRY
+from app.engine.prompts.retry import SCOPE_RETRY, grounding_retry
 from app.engine.rejections import COULD_NOT_COMPLETE, NOTHING_FOUND, OUT_OF_SCOPE
 
 PASSAGE = {
@@ -276,6 +276,273 @@ def test_ask_coach_accumulates_tools_across_the_correction_turn(coach: Coach) ->
     assert retry["instructions"] == create.call_args_list[0].kwargs["instructions"]
     assert retry["tools"] == coach.TOOLS
     assert retry["input"] == SCOPE_RETRY
+
+
+def test_ask_coach_retries_once_when_an_answer_states_an_unbacked_numeral(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    question = "How much did I lift this week?"
+    workout_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")
+    responses = [
+        _response([workout_call], response_id="resp_1"),
+        _response([], "You lifted 12,400 kg this week.", response_id="resp_2"),
+        _response([], "You lifted 10,000 kg this week.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
+    ):
+        result = coach.ask_coach(question)
+
+    assert result == {
+        "answer": "You lifted 10,000 kg this week.",
+        "used_tools": ["query_workouts"],
+        "citations": [],
+    }
+    assert create.call_count == 3
+
+    retry = create.call_args_list[2].kwargs
+    assert retry["previous_response_id"] == "resp_2"
+    assert retry["instructions"] == create.call_args_list[0].kwargs["instructions"]
+    assert retry["tools"] == coach.TOOLS
+    assert isinstance(retry["input"], str)
+    assert retry["input"] == grounding_retry("12,400")
+    assert "12,400" in retry["input"]
+    assert "neither present in nor derivable" in retry["input"]
+    assert question not in retry["input"]
+
+    assert "retried" in engine_logs.text
+    assert "numeral 12,400" in engine_logs.text
+    assert "no Receipt" in engine_logs.text
+    assert question not in engine_logs.text
+
+
+def test_ask_coach_ships_the_corrected_answer_with_its_citations(coach: Coach) -> None:
+    search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
+    passage = {
+        "document_id": 1,
+        "document_title": "Deload Guidelines",
+        "chunk_index": 2,
+        "content": "Deload every 4 to 6 weeks.",
+    }
+    responses = [
+        _response([search_call], response_id="resp_1"),
+        _response([], "Deload every 5 to 7 weeks.", response_id="resp_2"),
+        _response([], "Deload every 4 to 6 weeks.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_search(coach, {"status": "ok", "passages": [passage]}),
+    ):
+        result = coach.ask_coach("Should I deload?")
+
+    assert result == {
+        "answer": "Deload every 4 to 6 weeks.",
+        "used_tools": ["search_coaching_docs"],
+        "citations": [CITATION],
+    }
+    assert create.call_count == 3
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry("5")
+
+
+def test_ask_coach_returns_the_out_of_scope_rejection_after_a_second_unbacked_numeral(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
+    passage = {
+        "document_id": 1,
+        "document_title": "Deload Guidelines",
+        "chunk_index": 2,
+        "content": "Deload every 4 to 6 weeks.",
+    }
+    responses = [
+        _response([search_call], response_id="resp_1"),
+        _response([], "Deload every 5 to 7 weeks.", response_id="resp_2"),
+        _response([], "Deload every 8 to 9 weeks.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_search(coach, {"status": "ok", "passages": [passage]}),
+    ):
+        result = coach.ask_coach("Should I deload?")
+
+    assert result == {
+        "answer": OUT_OF_SCOPE,
+        "used_tools": ["search_coaching_docs"],
+        "citations": [],
+    }
+    # Initial question, tool follow-up, then the single correction turn. The second offending
+    # answer gets no further request.
+    assert create.call_count == 3
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry("5")
+    assert "blocked" in engine_logs.text
+    assert "numeral 8" in engine_logs.text
+    assert "out-of-scope" in engine_logs.text
+
+
+def test_ask_coach_shares_one_retry_budget_across_violation_kinds(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    question = "How much did I lift this week, and should I deload?"
+    search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
+    passage = {
+        "document_id": 1,
+        "document_title": "Deload Guidelines",
+        "chunk_index": 2,
+        "content": "Deload every 4 to 6 weeks.",
+    }
+    responses = [
+        _response([], "You are getting stronger.", response_id="resp_1"),
+        _response([search_call], response_id="resp_2"),
+        _response([], "Deload every 5 to 7 weeks.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_search(coach, {"status": "ok", "passages": [passage]}),
+    ):
+        result = coach.ask_coach(question)
+
+    assert result == {
+        "answer": OUT_OF_SCOPE,
+        "used_tools": ["search_coaching_docs"],
+        "citations": [],
+    }
+    assert create.call_count == 3
+    assert create.call_args_list[1].kwargs["input"] == SCOPE_RETRY
+    assert "no substantive tool call" in engine_logs.text
+    assert "numeral 5" in engine_logs.text
+    assert "retried" in engine_logs.text
+    assert "out-of-scope" in engine_logs.text
+    assert question not in engine_logs.text
+
+
+def test_ask_coach_ships_a_numeral_that_normalizes_to_a_tool_value(coach: Coach) -> None:
+    workout_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")
+    responses = [
+        _response([workout_call], response_id="resp_1"),
+        _response([], "You lifted 12,400 kg this week.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 12400.0]],
+            },
+        ),
+    ):
+        result = coach.ask_coach("How much did I lift this week?")
+
+    assert result == {
+        "answer": "You lifted 12,400 kg this week.",
+        "used_tools": ["query_workouts"],
+        "citations": [],
+    }
+    assert create.call_count == 2
+
+
+def test_ask_coach_backs_numerals_from_every_tool_result(coach: Coach) -> None:
+    tool_calls = [
+        _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts"),
+        _tool_call("search_coaching_docs", '{"k": null}', "call_search"),
+    ]
+    passage = {
+        "document_id": 1,
+        "document_title": "Deload Guidelines",
+        "chunk_index": 2,
+        "content": "Deload every 4 to 6 weeks.",
+    }
+    responses = [
+        _response(tool_calls, response_id="resp_1"),
+        _response(
+            [],
+            "Deload every 4 to 6 weeks; you lifted 10,000 kg.",
+            response_id="resp_2",
+        ),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
+        _stub_search(coach, {"status": "ok", "passages": [passage]}),
+    ):
+        result = coach.ask_coach("Should I deload, and how much did I lift?")
+
+    assert result == {
+        "answer": "Deload every 4 to 6 weeks; you lifted 10,000 kg.",
+        "used_tools": ["query_workouts", "search_coaching_docs"],
+        "citations": [CITATION],
+    }
+    assert create.call_count == 2
+
+
+def test_ask_coach_ships_after_the_correction_turn_retrieves_the_missing_number(
+    coach: Coach,
+) -> None:
+    first_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_first")
+    second_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_second")
+    responses = [
+        _response([first_call], response_id="resp_1"),
+        _response([], "You lifted 12,400 kg this week.", response_id="resp_2"),
+        _response([second_call], response_id="resp_3"),
+        _response([], "You lifted 12,400 kg this week.", response_id="resp_4"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.dict(
+            coach.TOOL_REGISTRY,
+            {
+                "query_workouts": MagicMock(
+                    side_effect=[
+                        {
+                            "metric": "tonnage",
+                            "group_by": "week",
+                            "result": [["Week of Jun 15, 2026", 10000.0]],
+                        },
+                        {
+                            "metric": "tonnage",
+                            "group_by": "week",
+                            "result": [["Week of Jun 15, 2026", 12400.0]],
+                        },
+                    ]
+                )
+            },
+        ),
+    ):
+        result = coach.ask_coach("How much did I lift this week?")
+
+    assert result == {
+        "answer": "You lifted 12,400 kg this week.",
+        "used_tools": ["query_workouts"],
+        "citations": [],
+    }
+    assert create.call_count == 4
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry("12,400")
 
 
 def test_ask_coach_tracks_used_tools(coach: Coach) -> None:
