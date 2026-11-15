@@ -3,7 +3,7 @@ import random
 
 import pytest
 
-from app.eval.metrics import QuestionResult
+from app.eval.metrics import QuestionResult, wilson_interval
 from app.eval.sweep import (
     _meets_bars,
     lock_cutoff,
@@ -40,6 +40,29 @@ def test_lock_cutoff_centers_a_clean_gap_between_positives_and_negatives() -> No
     assert lock.report.k == 5
     assert lock.report.recall == 1.0
     assert lock.report.no_match_rate == 1.0
+
+
+def test_lock_cutoff_gates_on_point_estimates_not_wilson_bounds() -> None:
+    results = [
+        *[
+            _positive(f"near {index}", f"doc-{index}.md", (f"doc-{index}.md", 0.1))
+            for index in range(67)
+        ],
+        *[
+            _positive(f"late {index}", f"late-{index}.md", (f"late-{index}.md", 0.6))
+            for index in range(3)
+        ],
+        _negative("negative", ("other.md", 0.9)),
+    ]
+
+    # 67/70 = 95.7% meets the point-estimate bar, but its Wilson lower bound is below 95%.
+    lock = lock_cutoff(results)
+
+    assert lock.qualifies is True
+    assert lock.report is not None
+    assert lock.report.recall == pytest.approx(67 / 70)
+    low, _ = wilson_interval(67, 70)
+    assert low < 0.95
 
 
 def test_lock_cutoff_places_the_cutoff_at_the_midpoint_of_the_bounds() -> None:

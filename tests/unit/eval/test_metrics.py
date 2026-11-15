@@ -177,6 +177,18 @@ def test_document_precision_counts_selected_documents_not_passages() -> None:
     assert report.precision == pytest.approx(2 / 3)
 
 
+def test_document_precision_counts_a_leaking_negative_against_it() -> None:
+    results = [
+        _positive("positive", "a.md", ("a.md", 0.1), ("other.md", 0.2)),
+        _negative("negative", ("leak.md", 0.1)),
+    ]
+
+    report = score(results, k=5, cutoff=0.5)
+
+    # Three selected Documents: a.md and other.md from the positive, leak.md from the negative.
+    assert report.document_precision == pytest.approx(1 / 3)
+
+
 def test_scoring_reports_the_counts_behind_the_rates() -> None:
     results = [
         _positive("hit", "a.md", ("a.md", 0.1)),

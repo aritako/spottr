@@ -225,3 +225,4 @@ def test_ask_coach_sends_the_same_instructions_on_every_turn(coach: Coach) -> No
     first_instructions = create.call_args_list[0].kwargs["instructions"]
     assert first_instructions
     assert create.call_args_list[1].kwargs["instructions"] == first_instructions
+    assert create.call_args_list[1].kwargs["tools"] == coach.TOOLS
