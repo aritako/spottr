@@ -184,7 +184,8 @@ Slice rules:
 ## Coach engine (app/engine)
 
 - The engine uses the OpenAI **Responses API**. Follow-up calls chain with `previous_response_id`
-  and **must re-send `tools=self.TOOLS`**, or the model loses its tool menu.
+  and **must re-send both `tools=self.TOOLS` and `instructions`**, or the model can lose its tool
+  menu or the coach's rules.
 - Adding a tool requires three things that must stay in sync:
   1. The implementation in `app/engine/tools.py` (calls handlers, returns JSON-serializable data)
   2. The JSON schema in `app/engine/prompts/tool_schemas.py` (exposed to the model as `Coach.TOOLS`)

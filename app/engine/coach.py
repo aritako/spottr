@@ -26,6 +26,8 @@ class Coach:
         self.TOOL_REGISTRY = {
             "query_exercises": self.tools.query_exercises,
             "query_workouts": self.tools.query_workouts,
+            # search_coaching_docs is rebound in ask_coach with the received question. This base
+            # entry keeps the schema/registry consistency check; the loop does not dispatch it.
             "search_coaching_docs": self.tools.search_coaching_docs,
         }
         self.TOOLS: list[FunctionToolParam] = list(TOOL_SCHEMAS)

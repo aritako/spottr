@@ -6,8 +6,8 @@ search, and still writes the answer from the passages; it no longer writes the s
 ## Evidence
 
 The third calibration experiment (`feat/eval-agent-queries` at `0072489`) captured one first-turn
-`gpt-5.4-nano` sample of the query the coach wrote for every golden question. The fixture is
-`app/eval/golden/agent_queries.yaml`: 98 questions and 77 `search_coaching_docs` calls.
+`gpt-5.4-nano` sample of the query the coach wrote for every golden question. The fixture on that
+branch is `app/eval/golden/agent_queries.yaml`: 98 questions and 77 `search_coaching_docs` calls.
 
 - At k=5, coach-written queries recalled 56 of 70 positives, against 66 of 70 for the raw
   questions.
@@ -16,7 +16,7 @@ The third calibration experiment (`feat/eval-agent-queries` at `0072489`) captur
   questions it was 21 of 22 (95.5%).
 - 26 of the 77 queries contained "autoregulation", 21 contained "deload", and 49 contained
   "guidance", even for questions about triceps or rep ranges. The words come from the tool
-  description's topic list.
+  description and instruction topic lists.
 - Example: "My triceps are lagging. Should I just tack more sets onto the end of my workout?"
   became a query ending in "autoregulation deload guidance for bringing up a lagging muscle
   group", and `deloads.md` filled all five slots.
@@ -30,8 +30,9 @@ in the fixture; it is consistent with the coach copying the tool description's t
 
 The coach's rewrite fixed the two autoregulation misses in the raw sweep: "percentage of my max
 or how the bar feels" moved from true rank 25 to rank 1, and "when to stop back-off sets" from
-17 to 1. Pass-through gives that back. Raw-question recall stays at 66 of 70 (94.3%), below the
-95% bar. The fallback in [ADR 0003](0003-retrieval-fallback-cutoff.md) remains a fallback.
+17 to 1. Pass-through gives that back. Raw-question recall is 66 of 70 (94.3%) with no cutoff and
+65 of 70 (92.9%) at 0.606, below the 95% bar. The fallback in
+[ADR 0003](0003-retrieval-fallback-cutoff.md) remains a fallback.
 
 ## What the retrieval gate measures from now on
 

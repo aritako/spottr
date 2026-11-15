@@ -40,7 +40,7 @@ the retrieval negatives where the coach actually searched. The fallback therefor
 production before ADR 0004.
 
 ADR 0004 makes `search_coaching_docs` embed the user's question verbatim. From that change on,
-the raw-question figures above (65 of 70 recall, 21 of 22 no_match) describe production.
+the raw-question figures above (65 of 70 recall, 21 of 22 no_match) describe production retrieval.
 
 ## Why not k=7
 
