@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.engine.coach import Coach
-from app.engine.rejections import COULD_NOT_COMPLETE, NOTHING_FOUND
+from app.engine.prompts.retry import SCOPE_RETRY
+from app.engine.rejections import COULD_NOT_COMPLETE, NOTHING_FOUND, OUT_OF_SCOPE
 
 PASSAGE = {
     "document_id": 1,
@@ -101,18 +102,180 @@ def test_search_coaching_docs_schema_has_no_query_parameter(coach: Coach) -> Non
     assert tool["parameters"]["required"] == ["k"]
 
 
-def test_ask_coach_ships_a_no_tool_answer_unchanged(coach: Coach) -> None:
-    response = _response([], "Your squat e1RM is trending up.")
+def test_ask_coach_sends_one_chained_correction_turn_for_a_no_tool_answer(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    question = "Hey! Ready to train?"
+    responses = [
+        _response([], "Hey! What are we working on?", response_id="resp_1"),
+        _response(
+            [_tool_call("search_coaching_docs", '{"k": null}', "call_search")],
+            response_id="resp_2",
+        ),
+        _response([], "Deload every four to six weeks.", response_id="resp_3"),
+    ]
 
-    with patch.object(coach.client.responses, "create", return_value=response) as create:
-        result = coach.ask_coach("How is my squat trending?")
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_search(coach, {"status": "ok", "passages": [PASSAGE]}),
+    ):
+        result = coach.ask_coach(question)
 
     assert result == {
-        "answer": "Your squat e1RM is trending up.",
+        "answer": "Deload every four to six weeks.",
+        "used_tools": ["search_coaching_docs"],
+        "citations": [CITATION],
+    }
+    assert create.call_count == 3
+
+    retry = create.call_args_list[1].kwargs
+    assert retry["previous_response_id"] == "resp_1"
+    assert retry["instructions"] == create.call_args_list[0].kwargs["instructions"]
+    assert retry["tools"] == coach.TOOLS
+    assert isinstance(retry["input"], str)
+    assert retry["input"] == SCOPE_RETRY
+    assert "without calling any tool" in retry["input"]
+    assert question not in retry["input"]
+
+    assert "retried" in engine_logs.text
+    assert "no substantive tool call" in engine_logs.text
+    assert "search_coaching_docs" in engine_logs.text
+    assert question not in engine_logs.text
+
+
+def test_ask_coach_returns_the_out_of_scope_rejection_after_a_second_no_tool_answer(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    question = "What is a good banana bread recipe?"
+    responses = [
+        _response([], "Here is a recipe.", response_id="resp_1"),
+        _response([], "Use very ripe bananas.", response_id="resp_2"),
+    ]
+
+    with patch.object(coach.client.responses, "create", side_effect=responses) as create:
+        result = coach.ask_coach(question)
+
+    assert result == {
+        "answer": OUT_OF_SCOPE,
+        "used_tools": [],
+        "citations": [],
+    }
+    assert create.call_count == 2
+    assert "retried" in engine_logs.text
+    assert "blocked" in engine_logs.text
+    assert "out-of-scope" in engine_logs.text
+    assert "query_workouts" in engine_logs.text
+    assert question not in engine_logs.text
+
+
+def test_ask_coach_normalizes_an_all_empty_correction_turn_to_nothing_found(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    responses = [
+        _response([], "You are getting stronger.", response_id="resp_1"),
+        _response(
+            [_tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")],
+            response_id="resp_2",
+        ),
+        _response([], "You lifted 12,400 kg.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(coach, "query_workouts", {"result": "No matching workout data found."}),
+    ):
+        result = coach.ask_coach("How much did I lift?")
+
+    assert result == {
+        "answer": NOTHING_FOUND,
+        "used_tools": ["query_workouts"],
+        "citations": [],
+    }
+    assert create.call_count == 3
+    assert [call.kwargs["input"] for call in create.call_args_list].count(SCOPE_RETRY) == 1
+    assert "nothing-found" in engine_logs.text
+    assert "query_workouts" in engine_logs.text
+    assert "12,400" not in engine_logs.text
+
+
+def test_ask_coach_returns_could_not_complete_when_the_retry_budget_is_spent(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    responses = [_response([], "You are getting stronger.", response_id="resp_1")]
+
+    with patch.object(coach.client.responses, "create", side_effect=responses) as create:
+        result = coach.ask_coach("How much did I lift?", max_iterations=1)
+
+    assert result == {
+        "answer": COULD_NOT_COMPLETE,
         "used_tools": [],
         "citations": [],
     }
     assert create.call_count == 1
+    assert "blocked" in engine_logs.text
+    assert "iteration budget" in engine_logs.text
+    assert "query_workouts" in engine_logs.text
+
+
+def test_ask_coach_returns_could_not_complete_when_the_last_iteration_finds_the_violation(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    unknown_call = _tool_call("query_nutrition", "{}", "call_unknown")
+    responses = [
+        _response([unknown_call], response_id="resp_1"),
+        _response([], "I can answer without tools.", response_id="resp_2"),
+    ]
+
+    with patch.object(coach.client.responses, "create", side_effect=responses) as create:
+        result = coach.ask_coach("How much did I lift?", max_iterations=2)
+
+    assert result == {
+        "answer": COULD_NOT_COMPLETE,
+        "used_tools": [],
+        "citations": [],
+    }
+    assert create.call_count == 2
+    assert "blocked" in engine_logs.text
+    assert "iteration budget" in engine_logs.text
+
+
+def test_ask_coach_accumulates_tools_across_the_correction_turn(coach: Coach) -> None:
+    unknown_call = _tool_call("query_nutrition", "{}", "call_unknown")
+    responses = [
+        _response([unknown_call], response_id="resp_1"),
+        _response([], "I can answer without tools.", response_id="resp_2"),
+        _response(
+            [_tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")],
+            response_id="resp_3",
+        ),
+        _response([], "You lifted 10,000 kg this week.", response_id="resp_4"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
+    ):
+        result = coach.ask_coach("How much did I squat this week?")
+
+    assert result == {
+        "answer": "You lifted 10,000 kg this week.",
+        "used_tools": ["query_workouts"],
+        "citations": [],
+    }
+
+    retry = create.call_args_list[2].kwargs
+    assert retry["previous_response_id"] == "resp_2"
+    assert retry["instructions"] == create.call_args_list[0].kwargs["instructions"]
+    assert retry["tools"] == coach.TOOLS
+    assert retry["input"] == SCOPE_RETRY
 
 
 def test_ask_coach_tracks_used_tools(coach: Coach) -> None:
@@ -457,19 +620,34 @@ def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -
 def test_ask_coach_answers_an_unknown_tool_with_an_error_result(
     coach: Coach, engine_logs: pytest.LogCaptureFixture
 ) -> None:
-    tool_call = _tool_call("query_nutrition", "{}", "call_unknown")
+    unknown_call = _tool_call("query_nutrition", "{}", "call_unknown")
     responses = [
-        _response([tool_call]),
-        _response([], "I can answer from your training data instead.", response_id="resp_2"),
+        _response([unknown_call], response_id="resp_1"),
+        _response(
+            [_tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")],
+            response_id="resp_2",
+        ),
+        _response([], "I can answer from your training data instead.", response_id="resp_3"),
     ]
     question = "How is my squat trending?"
 
-    with patch.object(coach.client.responses, "create", side_effect=responses) as create:
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 10000.0]],
+            },
+        ),
+    ):
         result = coach.ask_coach(question)
 
     assert result == {
         "answer": "I can answer from your training data instead.",
-        "used_tools": [],
+        "used_tools": ["query_workouts"],
         "citations": [],
     }
 
@@ -499,17 +677,25 @@ def test_ask_coach_answers_unreadable_arguments_with_an_error(coach: Coach, argu
     tool_call = _tool_call("query_workouts", arguments, "call_bad")
     responses = [
         _response([tool_call]),
-        _response([], "I can still answer.", response_id="resp_2"),
+        _response(
+            [_tool_call("query_exercises", "{}", "call_exercises")],
+            response_id="resp_2",
+        ),
+        _response([], "I can still answer.", response_id="resp_3"),
     ]
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses) as create,
         patch.dict(coach.TOOL_REGISTRY, {"query_workouts": tool}),
+        _stub_tool(coach, "query_exercises", [[1, "Back Squat"]]),
     ):
         result = coach.ask_coach("How much did I squat this week?")
 
-    assert result["answer"] == "I can still answer."
-    assert result["used_tools"] == []
+    assert result == {
+        "answer": "I can still answer.",
+        "used_tools": ["query_exercises"],
+        "citations": [],
+    }
     tool.assert_not_called()
 
     follow_up = create.call_args_list[1].kwargs["input"]

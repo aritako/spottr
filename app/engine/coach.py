@@ -1,10 +1,14 @@
 import json
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
+from enum import StrEnum
 from typing import Any
 
 from openai.types.responses import (
     FunctionToolParam,
+    Response,
     ResponseInputItemParam,
 )
 from sqlalchemy.orm import Session
@@ -18,9 +22,14 @@ from app.engine.guardrails import (
     scope_verdict,
     tool_evidence,
 )
-from app.engine.prompts import TOOL_SCHEMAS
+from app.engine.prompts import SCOPE_RETRY, TOOL_SCHEMAS
 from app.engine.prompts import build_instructions as build_coach_instructions
-from app.engine.rejections import COULD_NOT_COMPLETE, NOTHING_FOUND, build_rejection
+from app.engine.rejections import (
+    COULD_NOT_COMPLETE,
+    NOTHING_FOUND,
+    OUT_OF_SCOPE,
+    build_rejection,
+)
 from app.engine.tools import Tools
 from app.shared.enums.coach import Metric
 from app.shared.schemas.coach import Citation
@@ -30,6 +39,32 @@ logger = logging.getLogger(__name__)
 
 class _UnreadableArguments(Exception):
     """Raised when a function call's arguments cannot become tool keyword arguments."""
+
+
+class _AnswerOutcome(StrEnum):
+    """What the loop does with a finished answer."""
+
+    SHIP = "ship"
+    RETRY = "retry"
+    REJECTION = "rejection"
+
+
+@dataclass(frozen=True)
+class _AnswerDecision:
+    """The loop's single judgement of a finished answer.
+
+    A ship carries no message; a retry carries the complaint to send the model; a Rejection
+    carries the canned app-written text to ship in the answer's place.
+    """
+
+    outcome: _AnswerOutcome
+    complaint: str | None = None
+    rejection: str | None = None
+
+
+def _tools_in_flight(used_tools: Sequence[str]) -> str:
+    """Name the tools that actually ran, for a log line."""
+    return ", ".join(used_tools) if used_tools else "none"
 
 
 class Coach:
@@ -57,6 +92,9 @@ class Coach:
         used_tools: list[str] = []
         citations: list[Citation] = []
         evidence: list[ToolEvidence] = []
+        # One correction turn per request, however many Violations it produces: the budget is
+        # counted per request, not per Violation kind.
+        retry_used = False
 
         def search_coaching_docs(k: int | None = None, **arguments: Any) -> dict[str, Any]:
             # The model no longer writes the search text. A stray query from an older schema
@@ -78,26 +116,35 @@ class Coach:
             tools=self.TOOLS,
         )
 
-        for _ in range(max_iterations):
+        for iteration in range(max_iterations):
             tool_calls = [item for item in response.output if item.type == "function_call"]
 
             if not tool_calls:
-                if scope_verdict(evidence) is ScopeVerdict.ALL_EMPTY:
-                    logger.warning(
-                        "coach answer normalized to nothing-found: every substantive tool result "
-                        "was empty; tools in flight: %s",
-                        ", ".join(used_tools) if used_tools else "none",
+                decision = self._judge_answer(
+                    response.output_text,
+                    evidence,
+                    retry_used=retry_used,
+                    # The correction turn spends this iteration, so its response needs the
+                    # next one in which to be judged.
+                    retry_available=iteration + 1 < max_iterations,
+                    used_tools=used_tools,
+                    available_tools=available_tools,
+                )
+                if decision.outcome is _AnswerOutcome.SHIP:
+                    return {
+                        "answer": response.output_text,
+                        "used_tools": used_tools,
+                        "citations": [citation.model_dump() for citation in citations],
+                    }
+                if decision.outcome is _AnswerOutcome.RETRY:
+                    assert decision.complaint is not None
+                    response = self._send_correction_turn(
+                        response.id, decision.complaint, instructions
                     )
-                    return build_rejection(NOTHING_FOUND, used_tools)
-                if not response.output_text:
-                    # A turn with no text is a Rejection too; the single swap keeps it free of
-                    # Citations.
-                    return build_rejection(COULD_NOT_COMPLETE, used_tools)
-                return {
-                    "answer": response.output_text,
-                    "used_tools": used_tools,
-                    "citations": [citation.model_dump() for citation in citations],
-                }
+                    retry_used = True
+                    continue
+                assert decision.rejection is not None
+                return build_rejection(decision.rejection, used_tools)
 
             tool_outputs: list[ResponseInputItemParam] = []
             for tool_call in tool_calls:
@@ -165,9 +212,108 @@ class Coach:
         logger.warning(
             "coach loop exhausted its %d-iteration budget; tools in flight: %s",
             max_iterations,
-            ", ".join(used_tools) if used_tools else "none",
+            _tools_in_flight(used_tools),
         )
         return build_rejection(COULD_NOT_COMPLETE, used_tools)
+
+    def _judge_answer(
+        self,
+        output_text: str,
+        evidence: Sequence[ToolEvidence],
+        *,
+        retry_used: bool,
+        retry_available: bool,
+        used_tools: Sequence[str],
+        available_tools: str,
+    ) -> _AnswerDecision:
+        """Judge one finished answer and decide its fate: ship, retry, or Rejection.
+
+        This is the loop's single judgement point, so every Guardrail attaches here. A
+        Rejection always goes through the one canned swap, which drops Citations and preserves
+        the tools that actually ran.
+        """
+        verdict = scope_verdict(evidence)
+        if verdict is ScopeVerdict.ALL_EMPTY:
+            logger.warning(
+                "coach answer normalized to nothing-found: every substantive tool result was "
+                "empty; tools in flight: %s",
+                _tools_in_flight(used_tools),
+            )
+            return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=NOTHING_FOUND)
+        if verdict is ScopeVerdict.NO_SUBSTANTIVE_CALL:
+            return self._decide_violation(
+                "no substantive tool call",
+                SCOPE_RETRY,
+                retry_used=retry_used,
+                retry_available=retry_available,
+                used_tools=used_tools,
+                available_tools=available_tools,
+            )
+        if not output_text:
+            return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=COULD_NOT_COMPLETE)
+        return _AnswerDecision(_AnswerOutcome.SHIP)
+
+    @staticmethod
+    def _decide_violation(
+        reason: str,
+        complaint: str,
+        *,
+        retry_used: bool,
+        retry_available: bool,
+        used_tools: Sequence[str],
+        available_tools: str,
+    ) -> _AnswerDecision:
+        """Apply the one per-request retry budget to a fixable Violation.
+
+        The budget counts retries, not Violation kinds: the first Violation of any kind spends
+        the correction turn, a second one is the two-strike out-of-scope Rejection, and a first
+        Violation with no iteration left to carry its correction turn is the couldn't-complete
+        Rejection.
+        """
+        tools = _tools_in_flight(used_tools)
+        if retry_used:
+            logger.warning(
+                "coach answer blocked: %s again after one correction turn; returning the "
+                "out-of-scope Rejection; tools in flight: %s; available tools: %s",
+                reason,
+                tools,
+                available_tools,
+            )
+            return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=OUT_OF_SCOPE)
+        if not retry_available:
+            logger.warning(
+                "coach answer blocked: %s but the iteration budget is spent; returning the "
+                "couldn't-complete Rejection; tools in flight: %s; available tools: %s",
+                reason,
+                tools,
+                available_tools,
+            )
+            return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=COULD_NOT_COMPLETE)
+        logger.warning(
+            "coach answer retried: %s; sending one correction turn; tools in flight: %s; "
+            "available tools: %s",
+            reason,
+            tools,
+            available_tools,
+        )
+        return _AnswerDecision(_AnswerOutcome.RETRY, complaint=complaint)
+
+    def _send_correction_turn(
+        self, previous_response_id: str, complaint: str, instructions: str
+    ) -> Response:
+        """Send the one silent retry, chained from the answer it corrects.
+
+        The tool menu and the instructions are re-sent so the model keeps its menu and its
+        rules, and the complaint is a plain message input — the same shape the first turn sends
+        the question in — rather than a fabricated assistant turn.
+        """
+        return self.client.responses.create(
+            instructions=instructions,
+            model=self.QUERY_MODEL,
+            previous_response_id=previous_response_id,
+            input=complaint,
+            tools=self.TOOLS,
+        )
 
     @staticmethod
     def _decode_arguments(tool_call: Any) -> dict[str, Any]:
