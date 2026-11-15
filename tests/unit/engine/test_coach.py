@@ -344,6 +344,28 @@ def test_ask_coach_ships_a_mixed_answer_unchanged(coach: Coach) -> None:
     assert create.call_count == 2
 
 
+def test_ask_coach_drops_collected_citations_when_the_model_writes_no_text(
+    coach: Coach,
+) -> None:
+    tool_call = _tool_call("search_coaching_docs", '{"k": null}')
+    responses = [
+        _response([tool_call]),
+        _response([], "", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses),
+        _stub_search(coach, {"status": "ok", "passages": [PASSAGE]}),
+    ):
+        answer = coach.ask_coach("Should I deload?")
+
+    assert answer == {
+        "answer": COULD_NOT_COMPLETE,
+        "used_tools": ["search_coaching_docs"],
+        "citations": [],
+    }
+
+
 def test_ask_coach_collects_evidence_across_every_turn(coach: Coach) -> None:
     workout_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")
     search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")

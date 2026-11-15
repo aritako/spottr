@@ -89,8 +89,12 @@ class Coach:
                         ", ".join(used_tools) if used_tools else "none",
                     )
                     return build_rejection(NOTHING_FOUND, used_tools)
+                if not response.output_text:
+                    # A turn with no text is a Rejection too; the single swap keeps it free of
+                    # Citations.
+                    return build_rejection(COULD_NOT_COMPLETE, used_tools)
                 return {
-                    "answer": response.output_text or COULD_NOT_COMPLETE,
+                    "answer": response.output_text,
                     "used_tools": used_tools,
                     "citations": [citation.model_dump() for citation in citations],
                 }
