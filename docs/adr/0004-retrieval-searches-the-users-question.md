@@ -24,7 +24,8 @@ branch is `app/eval/golden/agent_queries.yaml`: 98 questions and 77 `search_coac
   a shoes query that pulled corpus passages under the cutoff.
 
 The mechanism is a correlation in one sample, not an ablation. The shared vocabulary is visible
-in the fixture; it is consistent with the coach copying the tool description's topic labels.
+in the fixture; it is consistent with the coach copying the tool description and instruction topic
+labels.
 
 ## What it costs
 

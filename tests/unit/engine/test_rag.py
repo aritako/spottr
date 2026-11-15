@@ -113,6 +113,15 @@ def test_chunk_document_rejoins_a_short_tail_onto_the_previous_piece() -> None:
     assert chunks[0].split()[-1] == "w304"
 
 
+def test_chunk_document_rejoins_the_largest_short_tail_to_309_words() -> None:
+    text = " ".join(_words("w", 309))
+
+    chunks = chunk_document(text)
+
+    assert len(chunks) == 1
+    assert len(chunks[0].split()) == 309
+
+
 def test_chunk_document_splits_the_real_corpus_into_paragraph_chunks() -> None:
     corpus = Path(__file__).resolve().parents[3] / "docs" / "corpus"
     documents = sorted(path for path in corpus.glob("*.md") if path.name != "README.md")

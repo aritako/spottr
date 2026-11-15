@@ -208,7 +208,7 @@ def test_ask_coach_ignores_a_stray_query_argument(coach: Coach) -> None:
     search.assert_called_once_with("Should I deload?", k=5)
 
 
-def test_ask_coach_sends_the_same_instructions_on_every_turn(coach: Coach) -> None:
+def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -> None:
     tool_call = _tool_call("query_workouts", '{"metric": "tonnage"}')
     responses = [
         _response([tool_call]),
