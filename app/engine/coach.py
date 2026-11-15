@@ -40,6 +40,17 @@ class Coach:
         used_tools: list[str] = []
         citations: list[Citation] = []
 
+        def search_coaching_docs(k: int | None = None, **arguments: Any) -> dict[str, Any]:
+            # The model no longer writes the search text. A stray query from an older schema
+            # is dropped; the user's question is the only search text.
+            arguments.pop("query", None)
+            return self.tools.search_coaching_docs(question, k=k)
+
+        tool_registry = {
+            **self.TOOL_REGISTRY,
+            "search_coaching_docs": search_coaching_docs,
+        }
+
         response = self.client.responses.create(
             instructions=build_coach_instructions(date.today()),
             model=self.QUERY_MODEL,
@@ -67,13 +78,13 @@ class Coach:
                 if isinstance(fn_args.get("metric"), str):
                     fn_args["metric"] = Metric(fn_args["metric"])
 
-                if fn_name not in self.TOOL_REGISTRY:
+                if fn_name not in tool_registry:
                     continue
 
                 if fn_name not in used_tools:
                     used_tools.append(fn_name)
 
-                fn = self.TOOL_REGISTRY[fn_name]
+                fn = tool_registry[fn_name]
                 result = fn(**fn_args)
                 collect_citations = self.CITATION_COLLECTORS.get(fn_name)
                 if collect_citations:

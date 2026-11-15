@@ -68,15 +68,12 @@ TOOL_SCHEMAS: list[FunctionToolParam] = [
             including ones you answer alongside the user's logged data (e.g.
             "given my volume, should I deload?"). Returns passages with their
             document title and chunk index, plus a status of "ok", "no_match",
-            or "empty_corpus".
+            or "empty_corpus". The tool searches with the user's question as
+            asked, so it takes no query.
         """,
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Natural-language search query.",
-                },
                 "k": {
                     "type": ["integer", "null"],
                     "description": (
@@ -85,7 +82,7 @@ TOOL_SCHEMAS: list[FunctionToolParam] = [
                     ),
                 },
             },
-            "required": ["query", "k"],
+            "required": ["k"],
             "additionalProperties": False,
         },
         "strict": True,
