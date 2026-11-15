@@ -334,9 +334,11 @@ def test_ask_coach_ships_the_corrected_answer_with_its_citations(coach: Coach) -
         "chunk_index": 2,
         "content": "Deload every 4 to 6 weeks.",
     }
+    # The Passage's 4 and 6 derive 5 (their average) and 7 (6 plus the document id), so use a
+    # range that no recipe reaches.
     responses = [
         _response([search_call], response_id="resp_1"),
-        _response([], "Deload every 5 to 7 weeks.", response_id="resp_2"),
+        _response([], "Deload every 14 to 16 weeks.", response_id="resp_2"),
         _response([], "Deload every 4 to 6 weeks.", response_id="resp_3"),
     ]
 
@@ -352,7 +354,7 @@ def test_ask_coach_ships_the_corrected_answer_with_its_citations(coach: Coach) -
         "citations": [CITATION],
     }
     assert create.call_count == 3
-    assert create.call_args_list[2].kwargs["input"] == grounding_retry("5")
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry("14")
 
 
 def test_ask_coach_returns_the_out_of_scope_rejection_after_a_second_unbacked_numeral(
@@ -367,8 +369,8 @@ def test_ask_coach_returns_the_out_of_scope_rejection_after_a_second_unbacked_nu
     }
     responses = [
         _response([search_call], response_id="resp_1"),
-        _response([], "Deload every 5 to 7 weeks.", response_id="resp_2"),
-        _response([], "Deload every 8 to 9 weeks.", response_id="resp_3"),
+        _response([], "Deload every 14 to 16 weeks.", response_id="resp_2"),
+        _response([], "Deload every 18 to 20 weeks.", response_id="resp_3"),
     ]
 
     with (
@@ -385,9 +387,9 @@ def test_ask_coach_returns_the_out_of_scope_rejection_after_a_second_unbacked_nu
     # Initial question, tool follow-up, then the single correction turn. The second offending
     # answer gets no further request.
     assert create.call_count == 3
-    assert create.call_args_list[2].kwargs["input"] == grounding_retry("5")
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry("14")
     assert "blocked" in engine_logs.text
-    assert "numeral 8" in engine_logs.text
+    assert "numeral 18" in engine_logs.text
     assert "out-of-scope" in engine_logs.text
 
 
@@ -405,7 +407,7 @@ def test_ask_coach_shares_one_retry_budget_across_violation_kinds(
     responses = [
         _response([], "You are getting stronger.", response_id="resp_1"),
         _response([search_call], response_id="resp_2"),
-        _response([], "Deload every 5 to 7 weeks.", response_id="resp_3"),
+        _response([], "Deload every 14 to 16 weeks.", response_id="resp_3"),
     ]
 
     with (
@@ -422,7 +424,7 @@ def test_ask_coach_shares_one_retry_budget_across_violation_kinds(
     assert create.call_count == 3
     assert create.call_args_list[1].kwargs["input"] == SCOPE_RETRY
     assert "no substantive tool call" in engine_logs.text
-    assert "numeral 5" in engine_logs.text
+    assert "numeral 14" in engine_logs.text
     assert "retried" in engine_logs.text
     assert "out-of-scope" in engine_logs.text
     assert question not in engine_logs.text
@@ -455,6 +457,88 @@ def test_ask_coach_ships_a_numeral_that_normalizes_to_a_tool_value(coach: Coach)
         "citations": [],
     }
     assert create.call_count == 2
+
+
+def test_ask_coach_ships_a_correctly_derived_percentage_with_its_citations(
+    coach: Coach,
+) -> None:
+    workout_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")
+    search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
+    answer = "Your tonnage rose from 10,000 kg to 12,000 kg, a 20% increase."
+    responses = [
+        _response([workout_call, search_call], response_id="resp_1"),
+        _response([], answer, response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [
+                    ["Week of Jun 15, 2026", 10000.0],
+                    ["Week of Jun 22, 2026", 12000.0],
+                ],
+            },
+        ),
+        _stub_search(coach, {"status": "ok", "passages": [PASSAGE]}),
+    ):
+        result = coach.ask_coach("How is my tonnage trending?")
+
+    assert result == {
+        "answer": answer,
+        "used_tools": ["query_workouts", "search_coaching_docs"],
+        "citations": [CITATION],
+    }
+    assert create.call_count == 2
+
+
+def test_ask_coach_retries_then_rejects_a_wrong_derived_percentage(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    workout_call = _tool_call("query_workouts", '{"metric": "tonnage"}', "call_workouts")
+    responses = [
+        _response([workout_call], response_id="resp_1"),
+        _response(
+            [],
+            "Your tonnage rose from 10,000 kg to 12,000 kg, a 25% increase.",
+            response_id="resp_2",
+        ),
+        _response([], "It was a 30% increase.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [
+                    ["Week of Jun 15, 2026", 10000.0],
+                    ["Week of Jun 22, 2026", 12000.0],
+                ],
+            },
+        ),
+    ):
+        result = coach.ask_coach("How is my tonnage trending?")
+
+    assert result == {
+        "answer": OUT_OF_SCOPE,
+        "used_tools": ["query_workouts"],
+        "citations": [],
+    }
+    assert create.call_count == 3
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry("25")
+    assert "retried" in engine_logs.text
+    assert "numeral 25" in engine_logs.text
+    assert "blocked" in engine_logs.text
+    assert "numeral 30" in engine_logs.text
+    assert "out-of-scope" in engine_logs.text
 
 
 def test_ask_coach_backs_numerals_from_every_tool_result(coach: Coach) -> None:

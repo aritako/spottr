@@ -17,12 +17,28 @@ The Scope rule reads the loop's tool-usage signature and separates three outcome
   calls (an unknown tool or unreadable arguments). A failed call is never an empty result: it is
   a mistake the model can still fix.
 
-The Grounding rule reads the numerals in the answer text. A numeral ships only when its value
-appears literally in tool output — a Receipt — after format normalization: thousands separators
-are stripped, a trailing decimal or zero does not change the value, and an adjacent unit suffix
-or percent sign is not part of the value, so ``12,400``, ``12400.0`` and ``12400`` are one
-Receipt. Matching is exact: there is no tolerance band, and no derivation recipe exists yet, so a
-computed statistic — a difference, percentage, sum, or average — is unbacked until #37 adds one.
+The Grounding rule reads the numerals in the answer text. A numeral ships only when it has a
+Receipt. A Receipt is either the value appearing literally in tool output after format
+normalization — thousands separators stripped, a trailing decimal or zero ignored, an adjacent
+unit suffix or percent sign not part of the value, so ``12,400``, ``12400.0`` and ``12400`` are
+one Receipt — or a value the app re-derives itself from Receipt values. The derivation whitelist
+is closed and small:
+
+- difference: one Receipt minus another, in either direction;
+- percentage change: the signed change from one Receipt to another, in either direction, so a
+  decrease is a negative percentage;
+- sum: the exact total of a set of Receipts;
+- average: the exact mean of a set of Receipts.
+
+Every recipe computes in exact decimal arithmetic: the values are scaled to integers, so a
+floating-point artefact can never manufacture a Receipt. Difference, sum, and average must match
+exactly. A derived percentage must match the recomputation exactly when stated at any fractional
+precision; a percentage stated as a whole percent is also accepted when it equals the exact
+recomputation rounded half-up to a whole percent. That whole-percent rounding is the only
+relaxation. A recipe needs a source pair or set among the Receipts; with too few source numbers
+it produces nothing, and the numeral stays a Violation. Sums and averages search subsets of at
+least two Receipts under a fixed work budget: anything the search finds is exact, and when the
+budget is exhausted it claims nothing, so it can never invent a Receipt.
 
 Every numeral-looking token is checked independently. A range needs Receipts for both ends; a
 fraction is its two numerals rather than an evaluated quotient; a leading sign is part of the
@@ -40,6 +56,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+from itertools import combinations
 
 from app.shared.enums.docs import RetrievalStatus
 
@@ -58,6 +75,20 @@ class ScopeVerdict(StrEnum):
     SUPPORTED = "supported"
     ALL_EMPTY = "all_empty"
     NO_SUBSTANTIVE_CALL = "no_substantive_call"
+
+
+class Derivation(StrEnum):
+    """The closed whitelist of statistics the Grounding rule may re-derive.
+
+    Adding a recipe is a deliberate decision, not an implementation detail: the whitelist stays
+    closed until real dogfooding traffic on the build ticket shows a legitimate answer was
+    blocked.
+    """
+
+    DIFFERENCE = "difference"
+    PERCENTAGE_CHANGE = "percentage_change"
+    SUM = "sum"
+    AVERAGE = "average"
 
 
 @dataclass(frozen=True)
@@ -207,6 +238,12 @@ def scrape_receipts(result: object) -> frozenset[Decimal]:
     return frozenset(numeral.value for numeral in extract_numerals(text))
 
 
+# A sum or average search may visit this many candidate subsets. The budget is a ceiling on work,
+# never a tolerance: a derivation found inside it is exact, and one not found is not claimed. The
+# cap keeps a pathological Receipt pile from turning a near-miss into an unbounded search.
+_MAX_DERIVATION_STEPS = 20_000
+
+
 def grounding_violation(
     output_text: str, receipts: Collection[Decimal]
 ) -> GroundingViolation | None:
@@ -214,9 +251,169 @@ def grounding_violation(
 
     Every numeral is checked independently, so one backed numeral never licenses another: a range
     needs Receipts for both ends, and one unsupported numeral among supported ones is a Violation.
-    Matching is exact after format normalization; a numeral close to a tool value is unbacked.
+    Matching is exact after format normalization; a numeral close to a tool value is unbacked. A
+    numeral that is not literal may still be backed by one of the four derivation recipes.
     """
+    values = tuple(dict.fromkeys(receipts))
+    literals = frozenset(values)
     for numeral in extract_numerals(output_text):
-        if numeral.value not in receipts:
-            return GroundingViolation(numeral=numeral.text, value=numeral.value)
+        if numeral.value in literals:
+            continue
+        if _is_derived(numeral.value, values):
+            continue
+        return GroundingViolation(numeral=numeral.text, value=numeral.value)
     return None
+
+
+def _is_derived(value: Decimal, receipts: tuple[Decimal, ...]) -> bool:
+    """Whether one of the four recipes re-derives this value from the Receipts."""
+    if len(receipts) < 2:
+        # No recipe has a source pair or set to work from.
+        return False
+    scaled, target = _scaled_receipts(receipts, value)
+    return (
+        _is_difference(target, scaled)
+        or _is_sum(target, scaled)
+        or _is_average(target, scaled)
+        or _is_percentage_change(value, scaled)
+    )
+
+
+def _scaled_receipts(receipts: tuple[Decimal, ...], target: Decimal) -> tuple[tuple[int, ...], int]:
+    """Represent every value as an integer at one shared decimal scale.
+
+    Decimal values are finite, so scaling by the largest fractional exponent turns every value
+    into an exact integer. The recipes then use integer arithmetic only: no binary float and no
+    division rounding can turn representation noise into a Receipt.
+    """
+    scale = 0
+    for value in (*receipts, target):
+        scale = max(scale, -value.as_tuple().exponent)
+    return tuple(_scaled_int(value, scale) for value in receipts), _scaled_int(target, scale)
+
+
+def _scaled_int(value: Decimal, scale: int) -> int:
+    """Express one finite Decimal as an integer at the given decimal scale."""
+    sign, digits, exponent = value.as_tuple()
+    coefficient = 0
+    for digit in digits:
+        coefficient = coefficient * 10 + digit
+    if sign:
+        coefficient = -coefficient
+    return coefficient * 10 ** (exponent + scale)
+
+
+def _is_difference(target: int, values: tuple[int, ...]) -> bool:
+    """Whether two distinct Receipts subtract to the target, in either direction."""
+    available = frozenset(values)
+    for value in values:
+        other = value - target
+        if other != value and other in available:
+            return True
+    return False
+
+
+def _is_sum(target: int, values: tuple[int, ...]) -> bool:
+    """Whether a set of at least two Receipts totals the target exactly."""
+    return _is_subset_total(target, values, average=False)
+
+
+def _is_average(target: int, values: tuple[int, ...]) -> bool:
+    """Whether a set of at least two Receipts has the target mean exactly."""
+    return _is_subset_total(target, values, average=True)
+
+
+def _is_subset_total(target: int, values: tuple[int, ...], *, average: bool) -> bool:
+    """Search Receipt subsets for an exact total or exact mean.
+
+    The whole set and every pair are checked directly before the bounded search, which covers the
+    common "sum the rows" and "average the rows" cases without walking subsets. The bounded search
+    then tries increasing subset sizes; if its budget runs out it returns False rather than
+    guessing, so a large pile can delay a claim but never manufacture one.
+    """
+    if len(values) < 2:
+        return False
+    total = sum(values)
+    if average:
+        if total == target * len(values):
+            return True
+    elif total == target:
+        return True
+    if _has_pair_total(target, values, average=average):
+        return True
+
+    ordered = tuple(sorted(values, reverse=True))
+    steps = 0
+    for size in range(3, len(ordered) + 1):
+        wanted = target * size if average else target
+        for subset in combinations(ordered, size):
+            steps += 1
+            if steps > _MAX_DERIVATION_STEPS:
+                return False
+            if sum(subset) == wanted:
+                return True
+    return False
+
+
+def _has_pair_total(target: int, values: tuple[int, ...], *, average: bool) -> bool:
+    """Whether two distinct Receipts total the target, or average to it."""
+    wanted = target * 2 if average else target
+    available = frozenset(values)
+    for value in values:
+        other = wanted - value
+        if other != value and other in available:
+            return True
+    return False
+
+
+def _is_percentage_change(value: Decimal, values: tuple[int, ...]) -> bool:
+    """Whether an ordered pair of Receipts yields this signed percentage change.
+
+    The recomputation is ``100 * (end - start) / start``, so an increase is positive and a
+    decrease is negative; both directions are derived. Whole-percent rounding is the only
+    relaxation: any fractional statement must match the exact recomputation.
+    """
+    numerator, denominator = value.as_integer_ratio()
+    available = frozenset(values)
+
+    # Exact percentages are solved directly for the end value, so the common integer case is
+    # linear in the number of Receipts rather than a pair scan.
+    for start in values:
+        if start == 0:
+            continue
+        scaled_end = start * (100 * denominator + numerator)
+        scaled_denominator = 100 * denominator
+        if scaled_end % scaled_denominator:
+            continue
+        end = scaled_end // scaled_denominator
+        if end != start and end in available:
+            return True
+
+    if not _is_whole(value):
+        return False
+
+    # Whole-percent statements are checked against the exact recomputation rounded half-up.
+    whole = int(value)
+    for end in values:
+        for start in values:
+            if end == start or start == 0:
+                continue
+            if _round_half_up_ratio(100 * (end - start), start) == whole:
+                return True
+    return False
+
+
+def _is_whole(value: Decimal) -> bool:
+    """Whether a Decimal is a whole number, regardless of its written trailing zeros."""
+    return value == value.to_integral_value()
+
+
+def _round_half_up_ratio(numerator: int, denominator: int) -> int:
+    """Round an exact rational to the nearest integer, with halves away from zero."""
+    if denominator < 0:
+        numerator, denominator = -numerator, -denominator
+    sign = -1 if numerator < 0 else 1
+    quotient, remainder = divmod(abs(numerator), denominator)
+    if remainder * 2 >= denominator:
+        quotient += 1
+    return sign * quotient

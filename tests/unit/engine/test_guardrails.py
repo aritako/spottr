@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 
 from app.engine.guardrails import (
+    Derivation,
     ScopeVerdict,
     ToolEvidence,
     ToolOutcome,
@@ -335,3 +336,125 @@ def test_scrape_receipts_reads_every_tool_output_shape(
     result: object, expected: frozenset[Decimal]
 ) -> None:
     assert scrape_receipts(result) == expected
+
+
+def test_derivation_whitelist_stays_closed() -> None:
+    assert set(Derivation) == {
+        Derivation.DIFFERENCE,
+        Derivation.PERCENTAGE_CHANGE,
+        Derivation.SUM,
+        Derivation.AVERAGE,
+    }
+
+
+@pytest.mark.parametrize(
+    ("answer", "receipts", "expected"),
+    [
+        # Difference, both directions, and an exact decimal value.
+        ("Up 2,000 kg.", _receipts("10000", "12000"), None),
+        ("The change was -2,000 kg.", _receipts("10000", "12000"), None),
+        ("Up 2,001 kg.", _receipts("10000", "12000"), "2,001"),
+        ("The change was 0.2 kg.", _receipts("0.1", "0.3"), None),
+        (
+            "The change was 0.20000000000000004 kg.",
+            _receipts("0.1", "0.3"),
+            "0.20000000000000004",
+        ),
+        # Percentage change, both directions; a decrease is signed.
+        ("Tonnage rose 20%.", _receipts("10000", "12000"), None),
+        ("Tonnage fell -17%.", _receipts("10000", "12000"), None),
+        ("Tonnage rose 25%.", _receipts("10000", "12500"), None),
+        ("Tonnage fell -20%.", _receipts("10000", "12500"), None),
+        ("Tonnage fell 17%.", _receipts("10000", "12000"), "17"),
+        # The same pair does not license the wrong direction's figure.
+        ("Tonnage rose 20%.", _receipts("10000", "12500"), "20"),
+        # Whole-percent rounding is the only relaxation.
+        ("Tonnage rose 33%.", _receipts("3000", "4000"), None),
+        ("Tonnage rose 33.3%.", _receipts("3000", "4000"), "33.3"),
+        ("Tonnage rose 34%.", _receipts("3000", "4000"), "34"),
+        ("Tonnage fell 16.7%.", _receipts("10000", "12000"), "16.7"),
+        ("Tonnage rose 16%.", _receipts("10000", "12000"), "16"),
+        ("Tonnage rose 12.5%.", _receipts("10000", "11250"), None),
+        ("Tonnage rose 18%.", _receipts("1.1", "1.3"), None),
+        ("Tonnage rose 18.2%.", _receipts("1.1", "1.3"), "18.2"),
+        # Sum over a pair, a larger set, and exact decimals.
+        ("Total 22,000 kg.", _receipts("10000", "12000"), None),
+        ("Total 6,000 kg.", _receipts("1000", "2000", "3000"), None),
+        ("Total 0.3 kg.", _receipts("0.1", "0.2"), None),
+        ("Total 22,001 kg.", _receipts("10000", "12000"), "22,001"),
+        (
+            "Total 0.30000000000000004 kg.",
+            _receipts("0.1", "0.2"),
+            "0.30000000000000004",
+        ),
+        # Average over a pair, a larger set, and exact decimals.
+        ("Average 11,000 kg.", _receipts("10000", "12000"), None),
+        ("Average 11,000 kg.", _receipts("10000", "11000", "12000"), None),
+        ("Average 0.15 kg.", _receipts("0.1", "0.2"), None),
+        ("Average 11,001 kg.", _receipts("10000", "12000"), "11,001"),
+        (
+            "Average 0.15000000000000002 kg.",
+            _receipts("0.1", "0.2"),
+            "0.15000000000000002",
+        ),
+        # A recipe with no source pair or set produces nothing.
+        ("Up 2,000 kg.", _receipts(), "2,000"),
+        ("Up 2,000 kg.", _receipts("10000"), "2,000"),
+        ("Total 20,000 kg.", _receipts("10000"), "20,000"),
+        ("Average 15,000 kg.", _receipts("10000"), "15,000"),
+        ("Up 20%.", _receipts(), "20"),
+        ("Up 20%.", _receipts("10000"), "20"),
+        # Neither literal nor derivable is still the unchanged Violation.
+        ("You lifted 5,000 kg.", _receipts("10000", "12000"), "5,000"),
+        ("You lifted 10,000 kg.", _receipts("10000"), None),
+    ],
+    ids=[
+        "difference-increase",
+        "difference-decrease-with-sign",
+        "difference-near-miss",
+        "difference-exact-decimal",
+        "difference-representation-noise-is-not-a-receipt",
+        "percentage-increase",
+        "percentage-decrease-whole-rounded",
+        "percentage-exact-increase",
+        "percentage-exact-decrease",
+        "percentage-decrease-without-sign",
+        "percentage-wrong-direction",
+        "percentage-whole-rounded",
+        "percentage-fraction-not-supported",
+        "percentage-near-miss-whole",
+        "percentage-decrease-fraction-not-supported",
+        "percentage-wrong-whole-rounding",
+        "percentage-exact-fraction",
+        "percentage-whole-rounded-decimal-source",
+        "percentage-representation-noise-not-supported",
+        "sum-pair",
+        "sum-three",
+        "sum-exact-decimal",
+        "sum-near-miss",
+        "sum-representation-noise-is-not-a-receipt",
+        "average-pair",
+        "average-three",
+        "average-exact-decimal",
+        "average-near-miss",
+        "average-representation-noise-is-not-a-receipt",
+        "difference-no-receipts",
+        "difference-single-receipt",
+        "sum-single-receipt",
+        "average-single-receipt",
+        "percentage-no-receipts",
+        "percentage-single-receipt",
+        "unrelated-numeral-still-unbacked",
+        "literal-still-backed",
+    ],
+)
+def test_grounding_derivation_recipes(
+    answer: str, receipts: frozenset[Decimal], expected: str | None
+) -> None:
+    violation = grounding_violation(answer, receipts)
+
+    if expected is None:
+        assert violation is None
+    else:
+        assert violation is not None
+        assert violation.numeral == expected
