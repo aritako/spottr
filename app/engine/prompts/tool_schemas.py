@@ -21,17 +21,30 @@ TOOL_SCHEMAS: list[FunctionToolParam] = [
         "description": """
             Query the user's logged workout data. Use for any question
             about their actual numbers, trends, volume, or PRs.
+
+            With an exercise name, returns that exercise's series. Without an
+            exercise, returns one series per exercise that has data. For the
+            additive tonnage metric it also returns a final "total" series;
+            e1rm never totals across exercises, because a cross-exercise max
+            only picks the strongest lift.
         """,
         "parameters": {
             "type": "object",
             "properties": {
                 "exercise": {
                     "type": ["string", "null"],
-                    "description": "Exercise name, e.g. 'Back Squat'.",
+                    "description": (
+                        "Exact exercise name, e.g. 'Back Squat'. Pass null to get one series "
+                        "per exercise, plus a total for tonnage."
+                    ),
                 },
                 "metric": {
                     "type": "string",
                     "enum": ["e1rm", "tonnage"],
+                    "description": (
+                        "e1rm is the highest estimated one-rep max per bucket; tonnage is "
+                        "weight times reps summed per bucket."
+                    ),
                 },
                 "start_date": {
                     "type": ["string", "null"],

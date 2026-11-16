@@ -6,7 +6,7 @@ Estimated one-rep max, e1RM, is computed from every set with the Epley formula: 
 
 Tonnage is volume work: weight times reps, summed across sets. It answers how much total work an exercise received and is best read as a trend line per exercise, rising through a training block, dipping in a deload week, and comparing month over month. Its limits matter. Tonnage conflates load and reps, so ten sets of three at 100 and three sets of ten at 100 are identical tonnage despite being different workouts, and it moves whenever set count, rep scheme, or load changes, which means a tonnage drop can reflect a planned volume cut rather than lost performance. Tonnage is a volume signal, not a growth signal.
 
-Both metrics are organized into weekly buckets with ISO week labels like 2026-W44, where weeks start on Monday. Partial weeks at the start or end of a period, a missed session, or a holiday read as dips that mean nothing. Spottr reports the weekly best e1RM, the highest estimate produced by any single set that week, so one big rep-out lifts the whole week's value; the weekly tonnage is the sum of all sets. A deload week shows up clearly as a tonnage trough, and a slightly lower weekly best e1RM during a deload is expected, not a decline.
+Both metrics are organized into weekly buckets labeled by the Monday that starts the week, for example "Week of Oct 26, 2026"; weeks start on Monday. Partial weeks at the start or end of a period, a missed session, or a holiday read as dips that mean nothing. Spottr reports the weekly best e1RM, the highest estimate produced by any single set that week, so one big rep-out lifts the whole week's value; the weekly tonnage is the sum of all sets. A deload week shows up clearly as a tonnage trough, and a slightly lower weekly best e1RM during a deload is expected, not a decline.
 
 Like-for-like comparison is the rule. Compare an exercise only with itself, because each lift has its own loading scale and skill component, and compare e1RM values from similar rep ranges where possible, since high-rep estimates are inflated noise. Switching exercise variations resets the series: a barbell row and a chest-supported row are different skills with different numbers, and the switch itself explains the first week's difference.
 
@@ -16,6 +16,6 @@ The habit worth building is reading both lines together. Rising tonnage with fla
 
 ## Sources
 
-- Spottr metric definitions, estimated one-rep max (Epley), set and workout tonnage, weekly bucketing: app/engine/helpers.py
+- Spottr metric definitions, estimated one-rep max (Epley), set and workout tonnage, weekly bucketing: app/shared/metrics.py
 - LeSuer, D. A., McCormick, J. H., Mayhew, J. L., Wasserstein, R. L., & Arnold, M. D. (1997). The accuracy of prediction equations for estimating 1-RM performance in the bench press, squat, and deadlift. Journal of Strength and Conditioning Research, 11(4), 211-213.
 - Mayhew, J. L., et al. (2008). Accuracy of prediction equations for determining one-repetition maximum in untrained exercisers. https://pubmed.ncbi.nlm.nih.gov/18714230/

@@ -1,10 +1,15 @@
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.core.models import Exercise, Workout
+from app.core.models import Set as SetModel
 from app.engine.coach import Coach
 
 
@@ -44,6 +49,39 @@ def _stub_search(coach: Coach, result: Any) -> Iterator[MagicMock]:
         patch.dict(coach.TOOL_REGISTRY, {"search_coaching_docs": mock}),
     ):
         yield mock
+
+
+def _exercise(exercise_id: int, name: str) -> Exercise:
+    return Exercise(id=exercise_id, name=name)
+
+
+def _workout(workout_id: int, performed_at: datetime) -> Workout:
+    return Workout(id=workout_id, performed_at=performed_at, unit="kg")
+
+
+def _set(
+    exercise: Exercise, workout: Workout, weight: str, reps: int, set_index: int = 0
+) -> SetModel:
+    return SetModel(
+        exercise=exercise,
+        workout=workout,
+        exercise_id=exercise.id,
+        workout_id=workout.id,
+        weight=Decimal(weight),
+        reps=reps,
+        set_index=set_index,
+    )
+
+
+def _per_exercise_sets() -> list[SetModel]:
+    squat = _exercise(1, "Back Squat")
+    bench = _exercise(2, "Bench Press")
+    return [
+        _set(squat, _workout(10, datetime(2026, 6, 15, 12, tzinfo=UTC)), "100.00", 5),
+        _set(bench, _workout(11, datetime(2026, 6, 16, 12, tzinfo=UTC)), "80.00", 10),
+        _set(squat, _workout(12, datetime(2026, 6, 22, 12, tzinfo=UTC)), "120.00", 5),
+        _set(bench, _workout(13, datetime(2026, 6, 23, 12, tzinfo=UTC)), "90.00", 10),
+    ]
 
 
 def test_every_tool_schema_is_registered_and_strict(coach: Coach) -> None:
@@ -226,3 +264,158 @@ def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -
     assert first_instructions
     assert create.call_args_list[1].kwargs["instructions"] == first_instructions
     assert create.call_args_list[1].kwargs["tools"] == coach.TOOLS
+
+
+def _tool_output(call: Any) -> Any:
+    (item,) = call.kwargs["input"]
+    assert item["type"] == "function_call_output"
+    return json.loads(item["output"])
+
+
+def test_query_workouts_schema_documents_the_per_exercise_default_and_totals(
+    coach: Coach,
+) -> None:
+    tool = next(tool for tool in coach.TOOLS if tool["name"] == "query_workouts")
+    properties = tool["parameters"]["properties"]
+
+    assert properties["metric"]["enum"] == ["e1rm", "tonnage"]
+    assert "one series per exercise" in tool["description"]
+    assert "total" in tool["description"]
+    assert "tonnage" in tool["description"]
+    assert "name" in properties["exercise"]["description"].lower()
+
+
+def test_ask_coach_passes_the_single_exercise_series_shape_to_the_model(coach: Coach) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        (
+            '{"exercise": "Back Squat", "metric": "tonnage", "start_date": null, '
+            '"end_date": null, "group_by": "week"}'
+        ),
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+    squat = _exercise(1, "Back Squat")
+    workout = _workout(10, datetime(2026, 6, 15, 12, tzinfo=UTC))
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(
+            coach.tools.analyticsHandler.exercisesRepository, "get_by_name", return_value=squat
+        ),
+        patch.object(coach.tools.analyticsHandler.exercisesRepository, "get", return_value=squat),
+        patch.object(
+            coach.tools.analyticsHandler.workoutsRepository,
+            "get_sets_for_exercise",
+            return_value=[_set(squat, workout, "100.00", 5)],
+        ),
+    ):
+        coach.ask_coach("How much did I squat last week?")
+
+    assert _tool_output(create.call_args_list[1]) == {
+        "metric": "tonnage",
+        "group_by": "week",
+        "exercise": "Back Squat",
+        "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+    }
+
+
+def test_ask_coach_passes_per_exercise_tonnage_series_with_a_total_to_the_model(
+    coach: Coach,
+) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        '{"exercise": null, "metric": "tonnage", "start_date": null, "end_date": null, '
+        '"group_by": "week"}',
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(
+            coach.tools.analyticsHandler.workoutsRepository,
+            "get_sets_for_all_exercises",
+            return_value=_per_exercise_sets(),
+        ),
+    ):
+        coach.ask_coach("How much did I lift overall last week?")
+
+    assert _tool_output(create.call_args_list[1]) == {
+        "metric": "tonnage",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 500.0},
+                    {"label": "Week of Jun 22, 2026", "value": 600.0},
+                ],
+            },
+            {
+                "exercise": "Bench Press",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 800.0},
+                    {"label": "Week of Jun 22, 2026", "value": 900.0},
+                ],
+            },
+            {
+                "exercise": "total",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 1300.0},
+                    {"label": "Week of Jun 22, 2026", "value": 1500.0},
+                ],
+            },
+        ],
+    }
+
+
+def test_ask_coach_passes_per_exercise_e1rm_series_without_a_total_to_the_model(
+    coach: Coach,
+) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        '{"exercise": null, "metric": "e1rm", "start_date": null, "end_date": null, '
+        '"group_by": "week"}',
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(
+            coach.tools.analyticsHandler.workoutsRepository,
+            "get_sets_for_all_exercises",
+            return_value=_per_exercise_sets(),
+        ),
+    ):
+        coach.ask_coach("How strong am I getting overall?")
+
+    output = _tool_output(create.call_args_list[1])
+    assert output == {
+        "metric": "e1rm",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 116.67},
+                    {"label": "Week of Jun 22, 2026", "value": 140.0},
+                ],
+            },
+            {
+                "exercise": "Bench Press",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 106.67},
+                    {"label": "Week of Jun 22, 2026", "value": 120.0},
+                ],
+            },
+        ],
+    }
+    assert all(series["exercise"] != "total" for series in output["series"])
