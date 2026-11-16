@@ -94,8 +94,8 @@ class Coach:
 
             if not tool_calls:
                 decision = self._judge_answer(
-                    response.output_text,
-                    evidence,
+                    output_text=response.output_text,
+                    evidence=evidence,
                     retry_used=retry_used,
                     # The correction turn spends this iteration, so its response needs the
                     # next one in which to be judged.
