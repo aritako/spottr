@@ -8,6 +8,7 @@ from app.api.repository.exercises import ExercisesRepository
 from app.api.repository.workouts import WorkoutsRepository
 from app.core.models import Exercise, Workout
 from app.core.models import Set as SetModel
+from app.shared.constants import NO_MATCHING_WORKOUT_DATA
 from app.shared.enums.coach import Metric
 from app.shared.enums.workouts import UnitEnum
 from app.shared.errors.exercises import ExerciseNotFoundError
@@ -33,7 +34,7 @@ from app.shared.schemas.analytics import (
     TopSetRead,
 )
 
-NO_DATA_RESULT: dict[str, str] = {"result": "No matching workout data found."}
+NO_DATA_RESULT: dict[str, str] = {"result": NO_MATCHING_WORKOUT_DATA}
 
 
 class AnalyticsHandler:

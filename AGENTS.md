@@ -83,9 +83,12 @@ app/
 │   ├── models.py            # All ORM models
 │   └── openai/client.py     # Shared OpenAI client
 ├── engine/
-│   ├── coach.py             # Coach: tool registry, Responses API loop
+│   ├── coach.py             # Coach: tool registry, Responses API loop, Guardrail orchestration
+│   ├── guardrails.py        # PURE: Scope + Grounding checks over plain tool results
+│   ├── rejections.py        # app-written Rejection copy: one home for boundary strings
 │   ├── prompts/
 │   │   ├── instructions.py  # build_instructions(today): the system prompt
+│   │   ├── retry.py         # the correction-turn complaints
 │   │   └── tool_schemas.py  # TOOL_SCHEMAS: the model-facing tool schemas
 │   └── tools.py             # Tool implementations (call handlers, not repositories)
 ├── eval/
@@ -95,6 +98,7 @@ app/
 │   ├── metrics.py           # PURE retrieval scoring: recall, no_match, margins
 │   └── sweep.py             # PURE cutoff/top-k sweeps and lock rules
 └── shared/
+    ├── constants.py         # string constants crossing module boundaries
     ├── enums/               # StrEnum definitions
     ├── errors/              # Domain exceptions
     ├── metrics.py           # PURE metric and time-bucketing helpers
@@ -191,10 +195,15 @@ Slice rules:
 - The engine uses the OpenAI **Responses API**. Follow-up calls chain with `previous_response_id`
   and **must re-send both `tools=self.TOOLS` and `instructions`**, or the model can lose its tool
   menu or the coach's rules.
-- Adding a tool requires three things that must stay in sync:
+- Adding a tool requires four things that must stay in sync:
   1. The implementation in `app/engine/tools.py` (calls handlers, returns JSON-serializable data)
   2. The JSON schema in `app/engine/prompts/tool_schemas.py` (exposed to the model as `Coach.TOOLS`)
   3. The entry in `Coach.TOOL_REGISTRY`
+  4. Its outcome classification and Receipt scraper in `app/engine/guardrails.py` — a `case` arm
+     in both `tool_evidence` and `scrape_receipts`, and the tool's name in `SCRAPED_TOOLS`.
+     `Coach.__init__` logs an error when a registry tool is not in `SCRAPED_TOOLS`; a member
+     without its `tool_evidence` arm gets the error outcome, and one without its
+     `scrape_receipts` arm backs no Receipts.
 - `query_workouts` delegates name→id resolution, aggregation, and response shaping to
   `AnalyticsHandler`; tools must not query repositories themselves.
 - Prefer `"strict": True` schemas. With strict mode, every property must be listed in `required`,
