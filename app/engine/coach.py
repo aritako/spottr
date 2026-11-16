@@ -233,7 +233,12 @@ class Coach:
                 except (ValueError, TypeError) as error:
                     # Valid JSON can still carry values the tool cannot parse, such as a
                     # model-written "June 2026" date. The call fails like a decode failure.
-                    logger.warning("coach sent unusable arguments for tool %s: %s", fn_name, error)
+                    logger.warning(
+                        "coach sent unusable arguments for tool %s: %s: %s",
+                        fn_name,
+                        type(error).__name__,
+                        error,
+                    )
                     tool_outputs.append(
                         failed_call(
                             tool_call,
@@ -306,7 +311,7 @@ class Coach:
                 SCOPE_RETRY,
                 context=context,
             )
-        if not output_text:
+        if not output_text.strip():
             logger.warning(
                 "coach answer blocked: the model returned no text; returning the "
                 "couldn't-complete Rejection; tools in flight: %s; available tools: %s",

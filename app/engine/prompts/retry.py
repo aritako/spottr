@@ -10,10 +10,9 @@ tool menu, matching how the first turn sends the question.
 __all__ = ["SCOPE_RETRY", "grounding_retry"]
 
 SCOPE_RETRY = (
-    "You answered without calling any tool, so no tool output backs that answer. Answer the "
-    "lifter's question again, and consult your tools first: query_workouts or query_exercises "
-    "for their logged workouts, and search_coaching_docs for training principles. Do not answer "
-    "from your own knowledge."
+    "No tool output backs that answer. Answer the lifter's question again, and consult your "
+    "tools first: query_workouts or query_exercises for their logged workouts, and "
+    "search_coaching_docs for training principles. Do not answer from your own knowledge."
 )
 
 GROUNDING_RETRY = (
