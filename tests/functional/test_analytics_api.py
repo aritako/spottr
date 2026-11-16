@@ -3,7 +3,9 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
+from app.engine.tools import Tools
 from tests.functional.helpers import create_exercise
 
 SetPayload = tuple[float, int, float | None, int | None]
@@ -312,3 +314,49 @@ def test_sessions_returns_an_empty_list_when_the_range_has_no_data(
 
     assert response.status_code == 200, response.text
     assert response.json() == []
+
+
+def test_query_workouts_with_an_exercise_reads_real_sets(
+    client: TestClient, db_session: Session
+) -> None:
+    exercise_id = create_exercise(client)
+    create_workout(client, exercise_id, "2026-06-15T12:00:00Z", [(100.0, 5, None, None)])
+
+    result = Tools(db_session).query_workouts(exercise="Back Squat")
+
+    assert result == {
+        "metric": "tonnage",
+        "group_by": "week",
+        "exercise": "Back Squat",
+        "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+    }
+
+
+def test_query_workouts_without_an_exercise_reads_real_sets_and_totals_tonnage(
+    client: TestClient, db_session: Session
+) -> None:
+    squat_id = create_exercise(client, name="Back Squat")
+    bench_id = create_exercise(client, name="Bench Press")
+    create_workout(client, squat_id, "2026-06-15T12:00:00Z", [(100.0, 5, None, None)])
+    create_workout(client, bench_id, "2026-06-16T12:00:00Z", [(80.0, 10, None, None)])
+
+    result = Tools(db_session).query_workouts()
+
+    assert result == {
+        "metric": "tonnage",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+            },
+            {
+                "exercise": "Bench Press",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 800.0}],
+            },
+            {
+                "exercise": "total",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 1300.0}],
+            },
+        ],
+    }
