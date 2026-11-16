@@ -77,7 +77,7 @@ class Coach:
                 fn_args: dict[str, Any] = json.loads(tool_call.arguments)
 
                 # The schema sends `metric` as a string; convert to the enum
-                # so Tools.query_workouts' match statement works.
+                # so AnalyticsHandler receives the typed metric.
                 if isinstance(fn_args.get("metric"), str):
                     fn_args["metric"] = Metric(fn_args["metric"])
 
