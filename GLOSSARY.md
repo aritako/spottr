@@ -73,3 +73,36 @@ A Metric whose total across exercises is meaningful — tonnage. e1RM is not add
 cross-exercise total is ever computed for it, because a max across lifts only picks the
 strongest lift.
 _Avoid_: sum metric, total metric
+
+**Guardrail**:
+A post-hoc check on the coach's finished answer, run before the user sees it. The two Guardrails
+are the Scope rule and the Grounding rule; both are deterministic code in the engine.
+_Avoid_: safety filter, moderation, classifier
+
+**Scope**:
+What the coach may answer: questions about the user's logged data, answered from data tools, and
+questions about training principles, answered from retrieved Passages. Enforced by the
+tool-usage signature — an answer is in Scope only if substantive tool output backs it. Everything
+else is rejected.
+_Avoid_: scope gate (implies a classification pass before the coach loop, which was rejected)
+
+**Grounding**:
+The rule that every numeral in an answer has a Receipt: it appears in tool output, or the
+Guardrail derives it from output numbers via a closed whitelist of derivations (difference,
+percentage change, sum, average).
+_Avoid_: faithful, factual, hallucination check
+
+**Receipt**:
+A number scraped from tool output that licenses one number in the answer. An answer may state a
+number only if a Receipt exists for it.
+_Avoid_: match, hit
+
+**Rejection**:
+The canned response that replaces an answer no Guardrail passed or no substantive tool output
+backed. Written as static text by the app rather than the model, and carries no Citations.
+_Avoid_: refusal (a model-written decline), error
+
+**Violation**:
+A failed Guardrail check, carrying its evidence (for example, which number lacks a Receipt). A
+fixable Violation earns one retry; a second is rejected.
+_Avoid_: failure, flag
