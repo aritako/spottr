@@ -18,5 +18,5 @@ The final discipline is epistemic honesty about what the data can say. Tonnage a
 
 ## Sources
 
-- Spottr weekly bucketing and metric definitions: app/engine/helpers.py
+- Spottr weekly bucketing and metric definitions: app/shared/metrics.py
 - Spottr coaching instructions on small-sample caution and metric selection: app/engine/prompts/instructions.py

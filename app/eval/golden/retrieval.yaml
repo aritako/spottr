@@ -207,7 +207,7 @@ entries:
 
   - question: What day does a week start on in my weekly charts?
     expected_document: reading-your-spottr-numbers.md
-    # ans: ISO weeks (e.g. 2026-W44), starting Monday.
+    # ans: weeks start on Monday; labels name that Monday (e.g. "Week of Oct 26, 2026").
 
   - question: Does Spottr track my personal records or how many sets I did?
     expected_document: reading-your-spottr-numbers.md
