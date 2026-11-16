@@ -1,9 +1,9 @@
-"""Pure Guardrail checks for the coach's finished answer.
+"""Pure Scope Guardrail for the coach's finished answer.
 
-The Scope rule is the post-hoc check defined by ADR 0005: an answer may ship only when
-substantive tool output backs it. This module consumes plain values scraped from tool results —
-never ORM objects — so unit tests and the offline evaluation tier can import it without a
-database, network, or fixtures. ``app/engine/coach.py`` owns what to do with each verdict.
+An answer may ship only when substantive tool output backs it. This module consumes plain values
+scraped from tool results — never ORM objects — so unit tests and the offline evaluation tier can
+import it without a database, network, or fixtures. ``app/engine/coach.py`` owns what to do with
+each verdict.
 
 The rule separates three outcomes:
 
