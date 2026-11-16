@@ -1,7 +1,7 @@
 import json
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
 from typing import Any
@@ -76,6 +76,20 @@ class _GuardrailContext:
     available_tools: str
 
 
+@dataclass
+class _LoopState:
+    """Everything one request accumulates across turns.
+
+    Evidence and Receipts are appended together as each tool result arrives, so a derivation can
+    never be checked against a number the Scope rule never saw.
+    """
+
+    used_tools: list[str] = field(default_factory=list)
+    citations: list[Citation] = field(default_factory=list)
+    evidence: list[ToolEvidence] = field(default_factory=list)
+    receipts: list[Receipts] = field(default_factory=list)
+
+
 def _tool_calls(response: Response) -> list[Any]:
     """The function calls the model asked for in one response."""
     return [item for item in response.output if item.type == "function_call"]
@@ -118,12 +132,7 @@ class Coach:
         self.workoutsRepository = WorkoutsRepository(db)
 
     def ask_coach(self, question: str, max_iterations: int = 5) -> dict[str, Any]:
-        used_tools: list[str] = []
-        citations: list[Citation] = []
-        evidence: list[ToolEvidence] = []
-        # Every Receipt group any successful tool returned during this request, so a later turn
-        # can quote data that an earlier turn retrieved. A derivation never spans two groups.
-        receipt_groups: list[Receipts] = []
+        state = _LoopState()
         # One correction turn per request, however many Violations it produces: the budget is
         # counted per request, not per Violation kind.
         retry_used = False
@@ -140,18 +149,7 @@ class Coach:
         }
         available_tools = ", ".join(tool_registry)
 
-        def failed_call(tool_call: Any, fn_name: str, reason: str) -> ResponseInputItemParam:
-            """Record a failed call's evidence and build its one error result."""
-            evidence.append(error_evidence(fn_name))
-            return self._tool_error_output(tool_call.call_id, fn_name, reason)
-
-        instructions = build_coach_instructions(date.today())
-        response = self.client.responses.create(
-            instructions=instructions,
-            model=self.QUERY_MODEL,
-            input=question,
-            tools=self.TOOLS,
-        )
+        response = self._send(input=question)
 
         # One round beyond the tool budget: the final dispatch buys a model turn, and that turn
         # may already be the finished answer. It is judged here, never discarded.
@@ -161,8 +159,8 @@ class Coach:
             if not tool_calls:
                 decision = self._judge_answer(
                     response.output_text,
-                    evidence,
-                    receipt_groups=receipt_groups,
+                    state.evidence,
+                    receipt_groups=state.receipts,
                     context=_GuardrailContext(
                         retry_used=retry_used,
                         # The correction turn spends this iteration, so its response needs the
@@ -170,117 +168,163 @@ class Coach:
                         # budget, so a Violation at the last dispatchable iteration still earns
                         # its correction turn.
                         retry_available=iteration + 1 <= max_iterations,
-                        used_tools=used_tools,
+                        used_tools=state.used_tools,
                         available_tools=available_tools,
                     ),
                 )
                 if decision.outcome is _AnswerOutcome.SHIP:
-                    return {
-                        "answer": response.output_text,
-                        "used_tools": used_tools,
-                        "citations": [citation.model_dump() for citation in citations],
-                    }
+                    return self._answer_payload(response.output_text, state)
                 if decision.outcome is _AnswerOutcome.RETRY:
                     assert decision.complaint is not None
-                    response = self._send_correction_turn(
-                        response.id, decision.complaint, instructions
+                    response = self._send(
+                        input=decision.complaint,
+                        previous_response_id=response.id,
                     )
                     retry_used = True
                     continue
                 assert decision.rejection is not None
-                return build_rejection(decision.rejection, used_tools)
+                return build_rejection(decision.rejection, state.used_tools)
 
             if iteration == max_iterations:
                 # The tool budget is spent and the model is still asking for tools; the calls
                 # are not dispatched because no judgement turn would remain to read the answer.
                 break
 
-            tool_outputs: list[ResponseInputItemParam] = []
-            for tool_call in tool_calls:
-                fn_name = tool_call.name
-
-                if fn_name not in tool_registry:
-                    logger.warning(
-                        "coach called unknown tool %s; returning an error result", fn_name
-                    )
-                    tool_outputs.append(
-                        failed_call(
-                            tool_call,
-                            fn_name,
-                            f"Unknown tool '{fn_name}'. Available tools: {available_tools}.",
-                        )
-                    )
-                    continue
-
-                try:
-                    fn_args = self._decode_arguments(tool_call)
-                except _UnreadableArguments as error:
-                    logger.warning(
-                        "coach sent unreadable arguments for tool %s: %s", fn_name, error
-                    )
-                    tool_outputs.append(
-                        failed_call(
-                            tool_call,
-                            fn_name,
-                            f"Could not read the arguments for tool '{fn_name}': {error}.",
-                        )
-                    )
-                    continue
-
-                fn = tool_registry[fn_name]
-                try:
-                    result = fn(**fn_args)
-                except (ValueError, TypeError) as error:
-                    # Valid JSON can still carry values the tool cannot parse, such as a
-                    # model-written "June 2026" date. The call fails like a decode failure.
-                    logger.warning(
-                        "coach sent unusable arguments for tool %s: %s: %s",
-                        fn_name,
-                        type(error).__name__,
-                        error,
-                    )
-                    tool_outputs.append(
-                        failed_call(
-                            tool_call,
-                            fn_name,
-                            f"Could not use the arguments for tool '{fn_name}': {error}.",
-                        )
-                    )
-                    continue
-
-                if fn_name not in used_tools:
-                    used_tools.append(fn_name)
-                evidence.append(tool_evidence(fn_name, result))
-                receipt_groups.append(scrape_receipts(fn_name, result))
-                collect_citations = self.CITATION_COLLECTORS.get(fn_name)
-                if collect_citations:
-                    collect_citations(citations, result)
-                output_str = result if isinstance(result, str) else json.dumps(result)
-
-                tool_outputs.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": tool_call.call_id,
-                        "output": output_str,
-                    }
-                )
-
-            # Feed results back; previous_response_id chains the conversation
-            # server-side so we don't rebuild the full message history.
-            response = self.client.responses.create(
-                instructions=instructions,
-                model=self.QUERY_MODEL,
-                previous_response_id=response.id,
+            tool_outputs = self._dispatch_tool_calls(
+                tool_calls,
+                registry=tool_registry,
+                available_tools=available_tools,
+                state=state,
+            )
+            response = self._send(
                 input=tool_outputs,
-                tools=self.TOOLS,
+                previous_response_id=response.id,
             )
 
         logger.warning(
             "coach loop exhausted its %d-iteration budget; tools in flight: %s",
             max_iterations,
-            _tools_in_flight(used_tools),
+            _tools_in_flight(state.used_tools),
         )
-        return build_rejection(COULD_NOT_COMPLETE, used_tools)
+        return build_rejection(COULD_NOT_COMPLETE, state.used_tools)
+
+    def _send(
+        self,
+        *,
+        input: str | list[ResponseInputItemParam],
+        previous_response_id: str | None = None,
+    ) -> Response:
+        """Send one model turn, always with the current instructions and the tool menu.
+
+        Every turn goes through here so the Responses API chaining contract — re-sending both
+        ``tools`` and ``instructions`` — cannot be half-satisfied at one call site.
+        """
+        return self.client.responses.create(
+            instructions=build_coach_instructions(date.today()),
+            model=self.QUERY_MODEL,
+            input=input,
+            tools=self.TOOLS,
+            previous_response_id=previous_response_id,
+        )
+
+    def _dispatch_tool_calls(
+        self,
+        tool_calls: Sequence[Any],
+        *,
+        registry: dict[str, Any],
+        available_tools: str,
+        state: _LoopState,
+    ) -> list[ResponseInputItemParam]:
+        """Run one turn's tool calls, recording their evidence and Receipts on the state."""
+        outputs: list[ResponseInputItemParam] = []
+        for tool_call in tool_calls:
+            fn_name = tool_call.name
+
+            if fn_name not in registry:
+                logger.warning("coach called unknown tool %s; returning an error result", fn_name)
+                outputs.append(
+                    self._failed_call(
+                        state,
+                        tool_call,
+                        fn_name,
+                        f"Unknown tool '{fn_name}'. Available tools: {available_tools}.",
+                    )
+                )
+                continue
+
+            try:
+                fn_args = self._decode_arguments(tool_call)
+            except _UnreadableArguments as error:
+                logger.warning("coach sent unreadable arguments for tool %s: %s", fn_name, error)
+                outputs.append(
+                    self._failed_call(
+                        state,
+                        tool_call,
+                        fn_name,
+                        f"Could not read the arguments for tool '{fn_name}': {error}.",
+                    )
+                )
+                continue
+
+            fn = registry[fn_name]
+            try:
+                result = fn(**fn_args)
+            except (ValueError, TypeError) as error:
+                # Valid JSON can still carry values the tool cannot parse, such as a
+                # model-written "June 2026" date. The call fails like a decode failure.
+                logger.warning(
+                    "coach sent unusable arguments for tool %s: %s: %s",
+                    fn_name,
+                    type(error).__name__,
+                    error,
+                )
+                outputs.append(
+                    self._failed_call(
+                        state,
+                        tool_call,
+                        fn_name,
+                        f"Could not use the arguments for tool '{fn_name}': {error}.",
+                    )
+                )
+                continue
+
+            if fn_name not in state.used_tools:
+                state.used_tools.append(fn_name)
+            state.evidence.append(tool_evidence(fn_name, result))
+            state.receipts.append(scrape_receipts(fn_name, result))
+            collect_citations = self.CITATION_COLLECTORS.get(fn_name)
+            if collect_citations:
+                collect_citations(state.citations, result)
+            output_str = result if isinstance(result, str) else json.dumps(result)
+
+            outputs.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": tool_call.call_id,
+                    "output": output_str,
+                }
+            )
+        return outputs
+
+    def _failed_call(
+        self,
+        state: _LoopState,
+        tool_call: Any,
+        fn_name: str,
+        reason: str,
+    ) -> ResponseInputItemParam:
+        """Record a failed call's error evidence and build the one result that answers it."""
+        state.evidence.append(error_evidence(fn_name))
+        return self._tool_error_output(tool_call.call_id, fn_name, reason)
+
+    @staticmethod
+    def _answer_payload(text: str, state: _LoopState) -> dict[str, Any]:
+        """The response for a shipped answer, with the tools and Citations it earned."""
+        return {
+            "answer": text,
+            "used_tools": state.used_tools,
+            "citations": [citation.model_dump() for citation in state.citations],
+        }
 
     def _judge_answer(
         self,
@@ -369,23 +413,6 @@ class Coach:
             context.available_tools,
         )
         return _AnswerDecision(_AnswerOutcome.RETRY, complaint=complaint)
-
-    def _send_correction_turn(
-        self, previous_response_id: str, complaint: str, instructions: str
-    ) -> Response:
-        """Send the one silent retry, chained from the answer it corrects.
-
-        The tool menu and the instructions are re-sent so the model keeps its menu and its
-        rules, and the complaint is a plain message input — the same shape the first turn sends
-        the question in — rather than a fabricated assistant turn.
-        """
-        return self.client.responses.create(
-            instructions=instructions,
-            model=self.QUERY_MODEL,
-            previous_response_id=previous_response_id,
-            input=complaint,
-            tools=self.TOOLS,
-        )
 
     @staticmethod
     def _decode_arguments(tool_call: Any) -> dict[str, Any]:
