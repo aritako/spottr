@@ -117,10 +117,8 @@ Layer rules:
 - **Analytics is shared through `AnalyticsHandler` (`app/api/handlers/analytics.py`):** the
   `/analytics` controller and the engine's `query_workouts` tool both call it. Name→id
   resolution, Decimal conversion, entry construction, and response shaping live there, not in
-  controllers or tools. `engine → api` is the only cross-layer direction for new code. The two
-  pre-existing `api → engine` imports (`app/api/handlers/coach.py` and
-  `app/api/handlers/docs.py`) are known exceptions outside the analytics scope; new analytics code
-  must not add any.
+  controllers or tools. `engine → api` is the only cross-layer direction; no `api → engine`
+  imports.
 - **`app/eval` must stay pure and offline:** no ORM, database, network, or OpenAI imports outside
   `app/eval/golden_set.py`'s filesystem loader. Scoring, coverage, and lock rules take plain
   dataclasses so the eval tier stays cheap and deterministic.
