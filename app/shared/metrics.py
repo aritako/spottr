@@ -12,7 +12,15 @@ from typing import Literal, TypedDict
 
 GroupBy = Literal["day", "week", "month", "year"]
 
+# A chronological bucket key from sort_key(), e.g. (2026, 24) for ISO week 24.
+BucketKey = tuple[int, int]
+# (exercise name, bucket key), e.g. ("Back Squat", (2026, 24)).
+ExerciseBucketKey = tuple[str, BucketKey]
+# A display label and its aggregated value, e.g. ("Week of Jun 15, 2026", 1300.0).
+Bucket = tuple[str, float]
 
+
+# A plain weight/reps payload, named SetValues so it does not shadow the ORM Set model.
 class SetValues(TypedDict):
     weight: float
     reps: int
@@ -81,8 +89,7 @@ def workout_tonnage(sets: list[SetValues]) -> float:
     """
     Calculates the total tonnage for a workout.
     Args:
-        sets (list[SetValues]): A list of sets, where each set
-        is a dictionary with 'weight' and 'reps' keys.
+        sets: A list of SetValues dictionaries, each with 'weight' and 'reps' keys.
 
     Returns:
         float: The total tonnage.
@@ -95,7 +102,7 @@ def workout_tonnage(sets: list[SetValues]) -> float:
 def tonnage_by_exercise(
     entries: list[DatedTonnageByExercise],
     group_by: GroupBy | None = None,
-) -> dict[str, list[tuple[str, float]]]:
+) -> dict[str, list[Bucket]]:
     """
     Group tonnage entries by exercise and time bucket, returning total tonnage per bucket.
 
@@ -107,15 +114,16 @@ def tonnage_by_exercise(
         A dictionary mapping exercise name to a chronologically sorted list of
         (bucket_label, total_tonnage) tuples.
     """
-    buckets: dict[tuple[str, tuple[int, int]], float] = defaultdict(float)
-    label_for: dict[tuple[str, tuple[int, int]], str] = {}
+    # Key: (exercise, sort_key(date, group_by)); one key shape serves every grain.
+    buckets: dict[ExerciseBucketKey, float] = defaultdict(float)
+    label_for: dict[ExerciseBucketKey, str] = {}
 
     for entry in entries:
         key = (entry.exercise, sort_key(entry.date, group_by))
         buckets[key] += entry.tonnage
         label_for[key] = get_time_bucket_key(entry.date, group_by)
 
-    grouped: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    grouped: dict[str, list[Bucket]] = defaultdict(list)
     for key, tonnage in sorted(buckets.items()):
         grouped[key[0]].append((label_for[key], tonnage))
 
@@ -125,7 +133,7 @@ def tonnage_by_exercise(
 def e1rm_by_exercise(
     entries: list[DatedE1RMByExercise],
     group_by: GroupBy | None = None,
-) -> dict[str, list[tuple[str, float]]]:
+) -> dict[str, list[Bucket]]:
     """
     Group e1RM entries by exercise and time bucket, keeping the max per bucket.
 
@@ -137,22 +145,23 @@ def e1rm_by_exercise(
         A dictionary mapping exercise name to a chronologically sorted list of
         (bucket_label, maximum_e1rm) tuples.
     """
-    buckets: dict[tuple[str, tuple[int, int]], float] = defaultdict(float)
-    label_for: dict[tuple[str, tuple[int, int]], str] = {}
+    # Same (exercise, bucket key) shape as tonnage_by_exercise.
+    buckets: dict[ExerciseBucketKey, float] = defaultdict(float)
+    label_for: dict[ExerciseBucketKey, str] = {}
 
     for entry in entries:
         key = (entry.exercise, sort_key(entry.date, group_by))
         buckets[key] = max(buckets[key], entry.e1rm)
         label_for[key] = get_time_bucket_key(entry.date, group_by)
 
-    grouped: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    grouped: dict[str, list[Bucket]] = defaultdict(list)
     for key, e1rm in sorted(buckets.items()):
         grouped[key[0]].append((label_for[key], e1rm))
 
     return dict(grouped)
 
 
-def sort_key(d: date, group_by: GroupBy | None = None) -> tuple[int, int]:
+def sort_key(d: date, group_by: GroupBy | None = None) -> BucketKey:
     match group_by:
         case "day":
             return (d.year, d.toordinal())
@@ -200,9 +209,9 @@ def get_time_bucket_key(d: date, group_by: GroupBy | None = None) -> str:
 def tonnage_over_time(
     entries: list[DatedTonnage],
     group_by: GroupBy | None = None,
-) -> list[tuple[str, float]]:
-    buckets: dict[tuple[int, int], float] = defaultdict(float)
-    label_for: dict[tuple[int, int], str] = {}
+) -> list[Bucket]:
+    buckets: dict[BucketKey, float] = defaultdict(float)
+    label_for: dict[BucketKey, str] = {}
 
     for entry in entries:
         key = sort_key(entry.date, group_by)
@@ -215,9 +224,9 @@ def tonnage_over_time(
 def e1rm_over_time(
     entries: list[DatedE1RM],
     group_by: GroupBy | None = None,
-) -> list[tuple[str, float]]:
-    buckets: dict[tuple[int, int], float] = defaultdict(float)
-    label_for: dict[tuple[int, int], str] = {}
+) -> list[Bucket]:
+    buckets: dict[BucketKey, float] = defaultdict(float)
+    label_for: dict[BucketKey, str] = {}
 
     for entry in entries:
         key = sort_key(entry.date, group_by)
