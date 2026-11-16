@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.session import Session
 
-from app.core.models import Exercise, Set, Workout
+from app.core.models import Set, Workout
 
 
 class WorkoutsRepository:
@@ -99,20 +99,16 @@ class WorkoutsRepository:
 
     # Analytics across all exercises
 
-    def get_sets_for_metrics(
+    def get_sets_for_all_exercises(
         self,
-        exercise: str | None = None,
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> list[Set]:  # ORM Set objects, with workout + exercise reachable
         query = (
             select(Set)
             .join(Workout, Set.workout_id == Workout.id)
-            .join(Exercise, Set.exercise_id == Exercise.id)
             .options(selectinload(Set.workout), selectinload(Set.exercise))
         )
-        if exercise:
-            query = query.where(Exercise.name == exercise)
         if start_date:
             query = query.where(Workout.performed_at >= start_date)
         if end_date:

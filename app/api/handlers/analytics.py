@@ -51,8 +51,8 @@ class AnalyticsHandler:
         end_date: date | None = None,
         group_by: GroupBy = "week",
     ) -> ExerciseSeriesRead:
-        exercise = self._exercise_or_404(exercise_id)
-        buckets = self._buckets_for_exercise(exercise.id, metric, start_date, end_date, group_by)
+        exercise = self._require_exercise(exercise_id)
+        buckets = self._buckets_for_exercise_id(exercise.id, metric, start_date, end_date, group_by)
         return ExerciseSeriesRead(
             exercise_id=exercise.id,
             metric=metric,
@@ -68,7 +68,7 @@ class AnalyticsHandler:
         page: int = 0,
         page_size: int = 10,
     ) -> list[ExerciseSessionRead]:
-        exercise = self._exercise_or_404(exercise_id)
+        exercise = self._require_exercise(exercise_id)
         workouts = self.workoutsRepository.list_workouts_for_exercise(
             exercise.id, start_date, end_date, page, page_size
         )
@@ -81,11 +81,7 @@ class AnalyticsHandler:
         ):
             sets_by_workout[set_.workout_id].append(set_)
 
-        return [
-            self._session_row(workout, sets_by_workout[workout.id])
-            for workout in workouts
-            if sets_by_workout[workout.id]
-        ]
+        return [self._session_row(workout, sets_by_workout[workout.id]) for workout in workouts]
 
     def query_workouts(
         self,
@@ -100,23 +96,21 @@ class AnalyticsHandler:
             resolved = self.exercisesRepository.get_by_name(exercise)
             if resolved is None:
                 return dict(NO_DATA_RESULT)
-            buckets = self._buckets_for_exercise(
-                resolved.id, metric, start_date, end_date, group_by
-            )
-            if not buckets:
+            series = self.read_series(resolved.id, metric, start_date, end_date, group_by)
+            if not series.buckets:
                 return dict(NO_DATA_RESULT)
             return {
                 "metric": metric.value,
                 "group_by": group_by,
                 "exercise": resolved.name,
-                "buckets": [bucket.model_dump() for bucket in buckets],
+                "buckets": [bucket.model_dump() for bucket in series.buckets],
             }
 
-        sets = self.workoutsRepository.get_sets_for_metrics(None, start_date, end_date)
+        sets = self.workoutsRepository.get_sets_for_all_exercises(start_date, end_date)
         if not sets:
             return dict(NO_DATA_RESULT)
 
-        grouped = self._buckets_by_exercise(metric, sets, group_by)
+        grouped = self._buckets_grouped_by_exercise(metric, sets, group_by)
         series = [
             {
                 "exercise": name,
@@ -136,7 +130,7 @@ class AnalyticsHandler:
             )
         return {"metric": metric.value, "group_by": group_by, "series": series}
 
-    def _buckets_by_exercise(
+    def _buckets_grouped_by_exercise(
         self, metric: Metric, sets: list[SetModel], group_by: GroupBy
     ) -> dict[str, list[AnalyticsBucket]]:
         if metric is Metric.TONNAGE:
@@ -194,13 +188,13 @@ class AnalyticsHandler:
             ),
         )
 
-    def _exercise_or_404(self, exercise_id: int) -> Exercise:
+    def _require_exercise(self, exercise_id: int) -> Exercise:
         exercise = self.exercisesRepository.get(exercise_id)
         if exercise is None:
             raise ExerciseNotFoundError()
         return exercise
 
-    def _buckets_for_exercise(
+    def _buckets_for_exercise_id(
         self,
         exercise_id: int,
         metric: Metric,
@@ -214,6 +208,7 @@ class AnalyticsHandler:
     def _buckets_for_sets(
         self, metric: Metric, sets: list[SetModel], group_by: GroupBy
     ) -> list[AnalyticsBucket]:
+        """The one aggregation pipeline shared by the REST series and the coach tool."""
         if metric is Metric.TONNAGE:
             entries = [
                 DatedTonnage(

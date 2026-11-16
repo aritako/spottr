@@ -13,7 +13,7 @@ from typing import Literal, TypedDict
 GroupBy = Literal["day", "week", "month", "year"]
 
 
-class Set(TypedDict):
+class SetValues(TypedDict):
     weight: float
     reps: int
 
@@ -77,11 +77,11 @@ def set_tonnage(weight: float, reps: int) -> float:
     return round(weight * reps, 2)
 
 
-def workout_tonnage(sets: list[Set]) -> float:
+def workout_tonnage(sets: list[SetValues]) -> float:
     """
     Calculates the total tonnage for a workout.
     Args:
-        sets (list[dict[Set]]): A list of sets, where each set
+        sets (list[SetValues]): A list of sets, where each set
         is a dictionary with 'weight' and 'reps' keys.
 
     Returns:

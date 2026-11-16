@@ -85,7 +85,7 @@ def test_query_workouts_without_an_exercise_returns_per_exercise_series_and_tonn
     handler = _handler()
 
     with patch.object(
-        handler.workoutsRepository, "get_sets_for_metrics", return_value=_per_exercise_sets()
+        handler.workoutsRepository, "get_sets_for_all_exercises", return_value=_per_exercise_sets()
     ):
         result = handler.query_workouts(Metric.TONNAGE, None, None, None, "week")
 
@@ -122,7 +122,7 @@ def test_query_workouts_without_an_exercise_never_totals_e1rm_across_exercises()
     handler = _handler()
 
     with patch.object(
-        handler.workoutsRepository, "get_sets_for_metrics", return_value=_per_exercise_sets()
+        handler.workoutsRepository, "get_sets_for_all_exercises", return_value=_per_exercise_sets()
     ):
         result = handler.query_workouts(Metric.E1RM, None, None, None, "week")
 
@@ -174,7 +174,7 @@ def test_query_workouts_returns_no_data_when_the_exercise_has_no_sets() -> None:
 def test_query_workouts_returns_no_data_when_the_range_has_no_sets() -> None:
     handler = _handler()
 
-    with patch.object(handler.workoutsRepository, "get_sets_for_metrics", return_value=[]):
+    with patch.object(handler.workoutsRepository, "get_sets_for_all_exercises", return_value=[]):
         result = handler.query_workouts(Metric.TONNAGE, None, None, None, "week")
 
     assert result == NO_DATA
