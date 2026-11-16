@@ -70,6 +70,47 @@ def test_query_workouts_with_an_exercise_returns_one_series() -> None:
     }
 
 
+def test_read_series_coerces_a_raw_metric_string() -> None:
+    handler = _handler()
+    squat = _exercise(1, "Back Squat")
+    workout = _workout(10, datetime(2026, 6, 15, 12, tzinfo=UTC))
+    sets = [_set(squat, workout, "100.00", 5)]
+
+    with (
+        patch.object(handler.exercisesRepository, "get", return_value=squat),
+        patch.object(handler.workoutsRepository, "get_sets_for_exercise", return_value=sets),
+    ):
+        result = handler.read_series(1, "tonnage")  # type: ignore[arg-type]
+
+    assert result.model_dump(mode="json") == {
+        "exercise_id": 1,
+        "metric": "tonnage",
+        "group_by": "week",
+        "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+    }
+
+
+def test_query_workouts_coerces_a_raw_metric_string() -> None:
+    handler = _handler()
+    squat = _exercise(1, "Back Squat")
+    workout = _workout(10, datetime(2026, 6, 15, 12, tzinfo=UTC))
+    sets = [_set(squat, workout, "100.00", 5)]
+
+    with (
+        patch.object(handler.exercisesRepository, "get_by_name", return_value=squat),
+        patch.object(handler.exercisesRepository, "get", return_value=squat),
+        patch.object(handler.workoutsRepository, "get_sets_for_exercise", return_value=sets),
+    ):
+        result = handler.query_workouts("tonnage", "Back Squat")  # type: ignore[arg-type]
+
+    assert result == {
+        "metric": "tonnage",
+        "group_by": "week",
+        "exercise": "Back Squat",
+        "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+    }
+
+
 def _per_exercise_sets() -> list[SetModel]:
     squat = _exercise(1, "Back Squat")
     bench = _exercise(2, "Bench Press")

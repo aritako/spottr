@@ -51,6 +51,7 @@ class AnalyticsHandler:
         end_date: date | None = None,
         group_by: GroupBy = "week",
     ) -> ExerciseSeriesRead:
+        metric = Metric(metric)
         exercise = self._require_exercise(exercise_id)
         buckets = self._buckets_for_exercise_id(exercise.id, metric, start_date, end_date, group_by)
         return ExerciseSeriesRead(
@@ -92,6 +93,7 @@ class AnalyticsHandler:
         group_by: GroupBy = "week",
     ) -> dict[str, Any]:
         """Shape workout analytics for the coach's query_workouts tool."""
+        metric = Metric(metric)
         if exercise is not None:
             resolved = self.exercisesRepository.get_by_name(exercise)
             if resolved is None:
@@ -118,7 +120,7 @@ class AnalyticsHandler:
             }
             for name, buckets in sorted(grouped.items())
         ]
-        if metric is Metric.TONNAGE:
+        if metric == Metric.TONNAGE:
             series.append(
                 {
                     "exercise": "total",
@@ -133,7 +135,7 @@ class AnalyticsHandler:
     def _buckets_grouped_by_exercise(
         self, metric: Metric, sets: list[SetModel], group_by: GroupBy
     ) -> dict[str, list[AnalyticsBucket]]:
-        if metric is Metric.TONNAGE:
+        if metric == Metric.TONNAGE:
             tonnage_entries = [
                 DatedTonnageByExercise(
                     exercise=set_.exercise.name,
@@ -209,7 +211,7 @@ class AnalyticsHandler:
         self, metric: Metric, sets: list[SetModel], group_by: GroupBy
     ) -> list[AnalyticsBucket]:
         """The one aggregation pipeline shared by the REST series and the coach tool."""
-        if metric is Metric.TONNAGE:
+        if metric == Metric.TONNAGE:
             entries = [
                 DatedTonnage(
                     date=set_.workout.performed_at.date(),
