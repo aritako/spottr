@@ -24,9 +24,8 @@ Keep all business logic in this backend so every client (web, Expo) reuses it.
 
 - You may create branches, stage changes, commit, and push without asking. Use Conventional
   Commits for messages (`feat(scope): ...`, `fix(scope): ...`), matching the existing history.
-- **Always open a pull request for pushed work.** Push the branch and open a PR against `main`
-  (ready for review, not draft unless asked), then link it in the summary. Do not merge or close a
-  pull request without explicit instruction.
+- **Stop before the PR.** Do not open, merge, or close a pull request. Finish with a summary and
+  a proposed PR title/body, and leave the PR for the human to create.
 - Destructive history operations still need explicit instruction: no `--force`/`--force-with-lease`
   pushes, no rewriting published history, and no `git reset --hard` or `git checkout`/`git restore`
   that would discard work you did not create. Ask before stashing or discarding uncommitted work.
