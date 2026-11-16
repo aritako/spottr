@@ -196,7 +196,8 @@ Slice rules:
   4. Its outcome classification and Receipt scraper in `app/engine/guardrails.py` — a `case` arm
      in both `tool_evidence` and `scrape_receipts`, and the tool's name in `SCRAPED_TOOLS`.
      `Coach.__init__` logs an error when a registry tool is not in `SCRAPED_TOOLS`; a member
-     without its `case` arms gets the error outcome and backs no Receipts.
+     without its `tool_evidence` arm gets the error outcome, and one without its
+     `scrape_receipts` arm backs no Receipts.
 - Prefer `"strict": True` schemas. With strict mode, every property must be listed in `required`,
   optional values use `["type", "null"]`, and `additionalProperties` must be `False`.
 - Never interpolate model-provided strings into SQL. Tool arguments map to fixed query options or

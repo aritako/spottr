@@ -163,6 +163,9 @@ def _numerals(*pairs: tuple[str, str]) -> list[tuple[str, Decimal]]:
         ("-5 kg", _numerals(("-5", "-5"))),
         ("\u22125 kg", _numerals(("\u22125", "-5"))),
         ("+5 kg", _numerals(("+5", "5"))),
+        # A sign detached by a space is not part of the value; only orthographically attached
+        # signs count, so "4 - 6" stays a range.
+        ("- 5 kg", _numerals(("5", "5"))),
         # Ranges, fractions, and dates are checked one numeral at a time.
         ("4-6 weeks", _numerals(("4", "4"), ("6", "6"))),
         ("4\u20136 weeks", _numerals(("4", "4"), ("6", "6"))),
@@ -197,6 +200,7 @@ def _numerals(*pairs: tuple[str, str]) -> list[tuple[str, Decimal]]:
         "leading-minus-sign",
         "unicode-minus-sign",
         "explicit-plus-sign",
+        "detached-sign-is-not-part-of-value",
         "hyphenated-range",
         "en-dash-range",
         "worded-range",
@@ -362,9 +366,19 @@ def test_scrape_receipts_reads_every_tool_output_shape(
 def test_every_scraped_tool_has_a_real_scraper() -> None:
     samples = {
         "search_coaching_docs": (
-            {"status": "ok", "passages": [PASSAGE]},
+            {
+                "status": "ok",
+                "passages": [
+                    {
+                        "document_id": 1,
+                        "document_title": "Deload Guidelines",
+                        "chunk_index": 2,
+                        "content": "Deload every 4 to 6 weeks for 20% less volume.",
+                    }
+                ],
+            },
             ToolOutcome.SUBSTANTIVE,
-            _group(),
+            _group("4", "6", "20"),
         ),
         "query_workouts": (
             {"metric": "tonnage", "result": [["2026-W01", 1000.0]]},
@@ -372,9 +386,9 @@ def test_every_scraped_tool_has_a_real_scraper() -> None:
             _group("1", "2026", "1000", series=("1000",)),
         ),
         "query_exercises": (
-            [[1, "Back Squat"]],
+            [[1, "2-Board Press"]],
             ToolOutcome.SUBSTANTIVE,
-            _group(),
+            _group("2"),
         ),
     }
 

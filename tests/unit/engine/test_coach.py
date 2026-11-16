@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.engine.coach import Coach
+from app.engine.guardrails import SCRAPED_TOOLS
 from app.engine.prompts.retry import SCOPE_RETRY, grounding_retry
 from app.engine.rejections import COULD_NOT_COMPLETE, NOTHING_FOUND, OUT_OF_SCOPE
 
@@ -134,7 +135,7 @@ def test_ask_coach_sends_one_chained_correction_turn_for_a_no_tool_answer(
     assert retry["tools"] == coach.TOOLS
     assert isinstance(retry["input"], str)
     assert retry["input"] == SCOPE_RETRY
-    assert "without calling any tool" in retry["input"]
+    assert "No tool output backs" in retry["input"]
     assert question not in retry["input"]
 
     assert "retried" in engine_logs.text
@@ -1230,7 +1231,7 @@ def test_ask_coach_retries_a_violation_at_the_last_dispatchable_iteration(
 
 
 def test_ask_coach_answers_unusable_arguments_with_an_error_result(
-    coach: Coach,
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
 ) -> None:
     bad_call = _tool_call(
         "query_workouts",
@@ -1246,10 +1247,9 @@ def test_ask_coach_answers_unusable_arguments_with_an_error_result(
 
     with (
         patch.object(coach.client.responses, "create", side_effect=responses) as create,
-        patch.object(
-            coach.tools,
-            "query_workouts",
-            side_effect=ValueError("Invalid isoformat string: 'June 2026'"),
+        patch.dict(
+            coach.TOOL_REGISTRY,
+            {"query_workouts": MagicMock(side_effect=ValueError("invalid start_date"))},
         ),
     ):
         result = coach.ask_coach("How much did I lift?")
@@ -1262,6 +1262,35 @@ def test_ask_coach_answers_unusable_arguments_with_an_error_result(
         "used_tools": [],
         "citations": [],
     }
+    assert "unusable arguments" in engine_logs.text
+    assert "ValueError" in engine_logs.text
+
+
+def test_the_registry_is_fully_scraped(coach: Coach) -> None:
+    assert set(coach.TOOL_REGISTRY) <= SCRAPED_TOOLS
+
+
+def test_ask_coach_blocks_a_whitespace_only_answer(
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
+) -> None:
+    tool_call = _tool_call("search_coaching_docs", '{"k": null}')
+    responses = [
+        _response([tool_call]),
+        _response([], "   ", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses),
+        _stub_search(coach, {"status": "ok", "passages": [PASSAGE]}),
+    ):
+        answer = coach.ask_coach("Should I deload?")
+
+    assert answer == {
+        "answer": COULD_NOT_COMPLETE,
+        "used_tools": ["search_coaching_docs"],
+        "citations": [],
+    }
+    assert "no text" in engine_logs.text
 
 
 def test_coach_logs_registry_tools_without_a_scraper(
