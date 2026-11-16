@@ -42,7 +42,9 @@ exactly. A derived percentage must match the recomputation exactly when stated a
 precision; a percentage stated as a whole percent is also accepted when it equals the exact
 recomputation rounded half-up to a whole percent. That whole-percent rounding is the only
 relaxation. A recipe needs a source pair or set among one result's measurements; with too few
-source numbers it produces nothing, and the numeral stays a Violation.
+source numbers it produces nothing, and the numeral stays a Violation. A numeral whose written
+exponent exceeds 12 in magnitude is never derivable: it cannot be a legitimate statistic, and
+scaling it would allocate an enormous integer, so it can only be backed literally.
 
 Every numeral-looking token is checked independently. A range needs Receipts for both ends; a
 fraction is its two numerals rather than an evaluated quotient; a leading sign is part of the
@@ -62,15 +64,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
 
+from app.shared.constants import NO_MATCHING_WORKOUT_DATA
 from app.shared.enums.docs import RetrievalStatus
 
 # Tools whose results this module can classify and scrape. A registry tool without an entry here
 # gets no evidence and no Receipts, so ``Coach`` logs an error at construction rather than letting
 # a new tool silently produce false rejections.
 SCRAPED_TOOLS = frozenset({"search_coaching_docs", "query_workouts", "query_exercises"})
-
-# ``app/engine/tools.py`` reports a workout range with no rows using exactly this status string.
-_NO_MATCHING_WORKOUT_DATA = "No matching workout data found."
 
 
 class ToolOutcome(StrEnum):
@@ -174,7 +174,7 @@ def _workout_outcome(result: object) -> ToolOutcome:
         return ToolOutcome.ERROR
     rows = result["result"]
     if isinstance(rows, str):
-        return ToolOutcome.EMPTY if rows == _NO_MATCHING_WORKOUT_DATA else ToolOutcome.ERROR
+        return ToolOutcome.EMPTY if rows == NO_MATCHING_WORKOUT_DATA else ToolOutcome.ERROR
     if isinstance(rows, (list, tuple, dict)):
         return ToolOutcome.SUBSTANTIVE if rows else ToolOutcome.EMPTY
     return ToolOutcome.ERROR
@@ -345,7 +345,7 @@ def grounding_violation(
             continue
         if abs(numeral.value.as_tuple().exponent) > _MAX_DERIVATION_EXPONENT:
             return GroundingViolation(numeral=numeral.text, value=numeral.value)
-        written_whole = _written_whole(numeral.text)
+        written_whole = _written_whole(numeral.text, numeral.value)
         if any(
             _is_derived(numeral.value, group.series, written_whole=written_whole)
             for group in receipts
@@ -355,10 +355,15 @@ def grounding_violation(
     return None
 
 
-def _written_whole(text: str) -> bool:
-    """Whether a numeral was written without a fractional part, whatever its value normalizes to."""
+def _written_whole(text: str, value: Decimal) -> bool:
+    """Whether a numeral is written as a whole percent.
+
+    The mantissa must carry no decimal point (``3.3e1`` is fractional however it normalizes) and
+    the value must have no fractional part (``33e-1`` is 3.3). A whole percent is a statement
+    written whole, not one whose value happens to be integral.
+    """
     mantissa = text.split("e")[0].split("E")[0]
-    return "." not in mantissa
+    return "." not in mantissa and value.as_tuple().exponent >= 0
 
 
 def _is_derived(value: Decimal, series: Sequence[Decimal], *, written_whole: bool) -> bool:

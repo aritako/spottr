@@ -492,6 +492,8 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         ("Tonnage rose 33.00%.", _receipts("3000", "4000"), "33.00"),
         # A fractional mantissa is fractional however the exponent normalizes it.
         ("Tonnage rose 3.3e1%.", _receipts("3000", "4000"), "3.3e1"),
+        # A whole mantissa with a negative exponent is still fractional: 33e-1 is 3.3.
+        ("Tonnage rose 33e-1%.", _receipts("3000", "4000"), "33e-1"),
         ("Tonnage rose 34%.", _receipts("3000", "4000"), "34"),
         ("Tonnage fell 16.7%.", _receipts("10000", "12000"), "16.7"),
         ("Tonnage rose 16%.", _receipts("10000", "12000"), "16"),
@@ -549,6 +551,7 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         "percentage-written-tenths-is-not-whole",
         "percentage-written-hundredths-is-not-whole",
         "percentage-scientific-fraction-is-not-whole",
+        "percentage-negative-exponent-is-not-whole",
         "percentage-near-miss-whole",
         "percentage-decrease-fraction-not-supported",
         "percentage-wrong-whole-rounding",

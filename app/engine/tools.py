@@ -15,6 +15,7 @@ from app.engine.helpers import (
     set_tonnage,
     tonnage_over_time,
 )
+from app.shared.constants import NO_MATCHING_WORKOUT_DATA
 from app.shared.enums.coach import Metric
 
 
@@ -43,7 +44,7 @@ class Tools:
         sets: list[Set] = self.workoutsHandler.get_sets_for_metrics(exercise, start, end)
 
         if not sets:
-            return {"result": "No matching workout data found."}
+            return {"result": NO_MATCHING_WORKOUT_DATA}
         match metric:
             case Metric.TONNAGE:
                 entries = [
