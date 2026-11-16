@@ -6,6 +6,10 @@ the coach cannot talk its way around the boundary in its own words. Every Reject
 coach can answer — questions about the lifter's logged workouts, and training principles from the
 coaching corpus — so a refusal teaches the boundary rather than merely declining. A Rejection
 never carries Citations.
+
+This module is deliberately separate from the model-facing system prompt in
+`app/engine/prompts/instructions.py`: a Rejection is returned to the lifter and is never sent to
+the model, so it does not belong with the prompt copy.
 """
 
 __all__ = ["COULD_NOT_COMPLETE", "NOTHING_FOUND", "OUT_OF_SCOPE"]
