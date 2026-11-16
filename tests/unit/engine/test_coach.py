@@ -2,11 +2,15 @@ import json
 import logging
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
+from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.core.models import Exercise, Workout
+from app.core.models import Set as SetModel
 from app.engine.coach import Coach
 from app.engine.guardrails import SCRAPED_TOOLS
 from app.engine.prompts.retry import SCOPE_RETRY, grounding_retry
@@ -82,6 +86,39 @@ def _stub_result(coach: Coach, tool: str, result: Any) -> AbstractContextManager
     if tool == "search_coaching_docs":
         return _stub_search(coach, result)
     return _stub_tool(coach, tool, result)
+
+
+def _exercise(exercise_id: int, name: str) -> Exercise:
+    return Exercise(id=exercise_id, name=name)
+
+
+def _workout(workout_id: int, performed_at: datetime) -> Workout:
+    return Workout(id=workout_id, performed_at=performed_at, unit="kg")
+
+
+def _set(
+    exercise: Exercise, workout: Workout, weight: str, reps: int, set_index: int = 0
+) -> SetModel:
+    return SetModel(
+        exercise=exercise,
+        workout=workout,
+        exercise_id=exercise.id,
+        workout_id=workout.id,
+        weight=Decimal(weight),
+        reps=reps,
+        set_index=set_index,
+    )
+
+
+def _per_exercise_sets() -> list[SetModel]:
+    squat = _exercise(1, "Back Squat")
+    bench = _exercise(2, "Bench Press")
+    return [
+        _set(squat, _workout(10, datetime(2026, 6, 15, 12, tzinfo=UTC)), "100.00", 5),
+        _set(bench, _workout(11, datetime(2026, 6, 16, 12, tzinfo=UTC)), "80.00", 10),
+        _set(squat, _workout(12, datetime(2026, 6, 22, 12, tzinfo=UTC)), "120.00", 5),
+        _set(bench, _workout(13, datetime(2026, 6, 23, 12, tzinfo=UTC)), "90.00", 10),
+    ]
 
 
 def test_every_tool_schema_is_registered_and_strict(coach: Coach) -> None:
@@ -266,7 +303,7 @@ def test_ask_coach_accumulates_tools_across_the_correction_turn(coach: Coach) ->
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
     ):
@@ -304,7 +341,7 @@ def test_ask_coach_retries_once_when_an_answer_states_an_unbacked_numeral(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
     ):
@@ -452,7 +489,7 @@ def test_ask_coach_ships_a_numeral_that_normalizes_to_a_tool_value(coach: Coach)
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 12400.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 12400.0}],
             },
         ),
     ):
@@ -485,9 +522,9 @@ def test_ask_coach_ships_a_correctly_derived_percentage_with_its_citations(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [
-                    ["Week of Jun 15, 2026", 10000.0],
-                    ["Week of Jun 22, 2026", 12000.0],
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 10000.0},
+                    {"label": "Week of Jun 22, 2026", "value": 12000.0},
                 ],
             },
         ),
@@ -525,9 +562,9 @@ def test_ask_coach_retries_then_rejects_a_wrong_derived_percentage(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [
-                    ["Week of Jun 15, 2026", 10000.0],
-                    ["Week of Jun 22, 2026", 12000.0],
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 10000.0},
+                    {"label": "Week of Jun 22, 2026", "value": 12000.0},
                 ],
             },
         ),
@@ -576,7 +613,7 @@ def test_ask_coach_backs_numerals_from_every_tool_result(coach: Coach) -> None:
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
         _stub_search(coach, {"status": "ok", "passages": [passage]}),
@@ -613,12 +650,12 @@ def test_ask_coach_ships_after_the_correction_turn_retrieves_the_missing_number(
                         {
                             "metric": "tonnage",
                             "group_by": "week",
-                            "result": [["Week of Jun 15, 2026", 10000.0]],
+                            "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
                         },
                         {
                             "metric": "tonnage",
                             "group_by": "week",
-                            "result": [["Week of Jun 15, 2026", 12400.0]],
+                            "buckets": [{"label": "Week of Jun 15, 2026", "value": 12400.0}],
                         },
                     ]
                 )
@@ -651,7 +688,7 @@ def test_ask_coach_tracks_used_tools(coach: Coach) -> None:
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
     ):
@@ -797,7 +834,7 @@ def test_ask_coach_normalizes_an_all_empty_outcome_to_nothing_found(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
             [],
         ),
@@ -907,7 +944,7 @@ def test_ask_coach_collects_evidence_across_every_turn(coach: Coach) -> None:
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
         _stub_search(coach, {"status": "no_match", "passages": []}),
@@ -965,7 +1002,7 @@ def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
     ):
@@ -1000,7 +1037,7 @@ def test_ask_coach_answers_an_unknown_tool_with_an_error_result(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
     ):
@@ -1034,7 +1071,7 @@ def test_ask_coach_answers_an_unknown_tool_with_an_error_result(
     ],
 )
 def test_ask_coach_answers_unreadable_arguments_with_an_error(coach: Coach, arguments: str) -> None:
-    tool = MagicMock(return_value={"metric": "tonnage", "result": []})
+    tool = MagicMock(return_value={"metric": "tonnage", "buckets": []})
     tool_call = _tool_call("query_workouts", arguments, "call_bad")
     responses = [
         _response([tool_call]),
@@ -1087,7 +1124,7 @@ def test_ask_coach_gives_every_tool_call_exactly_one_result(coach: Coach) -> Non
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 10000.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 10000.0}],
             },
         ),
     ):
@@ -1134,7 +1171,7 @@ def test_ask_coach_returns_could_not_complete_when_iterations_run_out(
     with (
         patch.object(coach.client.responses, "create", side_effect=responses) as create,
         _stub_search(coach, {"status": "ok", "passages": [passage]}),
-        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "result": []}),
+        _stub_tool(coach, "query_workouts", {"metric": "tonnage", "buckets": []}),
     ):
         result = coach.ask_coach(question)
 
@@ -1177,7 +1214,7 @@ def test_ask_coach_ships_the_answer_from_the_final_model_turn(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 12400.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 12400.0}],
             },
         ),
     ):
@@ -1215,7 +1252,7 @@ def test_ask_coach_retries_a_violation_at_the_last_dispatchable_iteration(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 12400.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 12400.0}],
             },
         ),
     ):
@@ -1304,3 +1341,158 @@ def test_coach_logs_registry_tools_without_a_scraper(
     assert "Guardrail classification" in engine_logs.text
     assert "query_exercises" in engine_logs.text
     assert "search_coaching_docs" in engine_logs.text
+
+
+def _tool_output(call: Any) -> Any:
+    (item,) = call.kwargs["input"]
+    assert item["type"] == "function_call_output"
+    return json.loads(item["output"])
+
+
+def test_query_workouts_schema_documents_the_per_exercise_default_and_totals(
+    coach: Coach,
+) -> None:
+    tool = next(tool for tool in coach.TOOLS if tool["name"] == "query_workouts")
+    properties = tool["parameters"]["properties"]
+
+    assert properties["metric"]["enum"] == ["e1rm", "tonnage"]
+    assert "one series per exercise" in tool["description"]
+    assert "total" in tool["description"]
+    assert "tonnage" in tool["description"]
+    assert "name" in properties["exercise"]["description"].lower()
+
+
+def test_ask_coach_passes_the_single_exercise_series_shape_to_the_model(coach: Coach) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        (
+            '{"exercise": "Back Squat", "metric": "tonnage", "start_date": null, '
+            '"end_date": null, "group_by": "week"}'
+        ),
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+    squat = _exercise(1, "Back Squat")
+    workout = _workout(10, datetime(2026, 6, 15, 12, tzinfo=UTC))
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(
+            coach.tools.analyticsHandler.exercisesRepository, "get_by_name", return_value=squat
+        ),
+        patch.object(coach.tools.analyticsHandler.exercisesRepository, "get", return_value=squat),
+        patch.object(
+            coach.tools.analyticsHandler.workoutsRepository,
+            "get_sets_for_exercise",
+            return_value=[_set(squat, workout, "100.00", 5)],
+        ),
+    ):
+        coach.ask_coach("How much did I squat last week?")
+
+    assert _tool_output(create.call_args_list[1]) == {
+        "metric": "tonnage",
+        "group_by": "week",
+        "exercise": "Back Squat",
+        "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+    }
+
+
+def test_ask_coach_passes_per_exercise_tonnage_series_with_a_total_to_the_model(
+    coach: Coach,
+) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        '{"exercise": null, "metric": "tonnage", "start_date": null, "end_date": null, '
+        '"group_by": "week"}',
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(
+            coach.tools.analyticsHandler.workoutsRepository,
+            "get_sets_for_all_exercises",
+            return_value=_per_exercise_sets(),
+        ),
+    ):
+        coach.ask_coach("How much did I lift overall last week?")
+
+    assert _tool_output(create.call_args_list[1]) == {
+        "metric": "tonnage",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 500.0},
+                    {"label": "Week of Jun 22, 2026", "value": 600.0},
+                ],
+            },
+            {
+                "exercise": "Bench Press",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 800.0},
+                    {"label": "Week of Jun 22, 2026", "value": 900.0},
+                ],
+            },
+            {
+                "exercise": "total",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 1300.0},
+                    {"label": "Week of Jun 22, 2026", "value": 1500.0},
+                ],
+            },
+        ],
+    }
+
+
+def test_ask_coach_passes_per_exercise_e1rm_series_without_a_total_to_the_model(
+    coach: Coach,
+) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        '{"exercise": null, "metric": "e1rm", "start_date": null, "end_date": null, '
+        '"group_by": "week"}',
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(
+            coach.tools.analyticsHandler.workoutsRepository,
+            "get_sets_for_all_exercises",
+            return_value=_per_exercise_sets(),
+        ),
+    ):
+        coach.ask_coach("How strong am I getting overall?")
+
+    output = _tool_output(create.call_args_list[1])
+    assert output == {
+        "metric": "e1rm",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 116.67},
+                    {"label": "Week of Jun 22, 2026", "value": 140.0},
+                ],
+            },
+            {
+                "exercise": "Bench Press",
+                "buckets": [
+                    {"label": "Week of Jun 15, 2026", "value": 106.67},
+                    {"label": "Week of Jun 22, 2026", "value": 120.0},
+                ],
+            },
+        ],
+    }
+    assert all(series["exercise"] != "total" for series in output["series"])

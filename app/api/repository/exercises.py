@@ -15,6 +15,10 @@ class ExercisesRepository:
     def get(self, id: int) -> Exercise | None:
         return self.db.get(Exercise, id)
 
+    def get_by_name(self, name: str) -> Exercise | None:
+        query = select(Exercise).where(Exercise.name == name)
+        return self.db.scalar(query)
+
     def list_(self, page: int, page_size: int) -> list[Exercise]:
         query = select(Exercise).offset(page * page_size).limit(page_size)
         return list(self.db.scalars(query))

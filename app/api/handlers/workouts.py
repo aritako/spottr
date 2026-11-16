@@ -1,5 +1,3 @@
-from datetime import date
-
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -59,8 +57,3 @@ class WorkoutsHandler:
         if workout is None:
             raise WorkoutNotFoundError()
         self.workoutsRepository.delete(workout)
-
-    def get_sets_for_metrics(
-        self, exercise: str | None, start: date | None, end: date | None
-    ) -> list[Set]:
-        return self.workoutsRepository.get_sets_for_metrics(exercise, start, end)

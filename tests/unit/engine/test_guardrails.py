@@ -35,10 +35,14 @@ PASSAGE = {
             {"status": "ok", "passages": [PASSAGE]},
             ToolOutcome.SUBSTANTIVE,
         ),
-        # Workout data arrives as rows; the no-matching-data result is a status string.
+        # Workout analytics arrives as bucket series; the no-data result is a status string.
         (
             "query_workouts",
-            {"metric": "tonnage", "group_by": "week", "result": [["2026-W01", 1000.0]]},
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "buckets": [{"label": "2026-W01", "value": 1000.0}],
+            },
             ToolOutcome.SUBSTANTIVE,
         ),
         (
@@ -130,7 +134,7 @@ def test_error_evidence_is_never_an_empty_result() -> None:
 def _group(*literal: str, series: tuple[str, ...] = ()) -> Receipts:
     return Receipts(
         literal=frozenset(Decimal(value) for value in literal),
-        series=tuple(Decimal(value) for value in series),
+        series=(tuple(Decimal(value) for value in series),) if series else (),
     )
 
 
@@ -319,9 +323,34 @@ def test_grounding_violation_requires_an_exact_receipt(
             {
                 "metric": "tonnage",
                 "group_by": "week",
-                "result": [["Week of Jun 15, 2026", 12400.0]],
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 12400.0}],
             },
             _group("15", "2026", "12400", series=("12400",)),
+        ),
+        # One result can carry several series; each is its own derivation source.
+        (
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "series": [
+                    {
+                        "exercise": "Back Squat",
+                        "buckets": [{"label": "Week of Jun 15, 2026", "value": 1000.0}],
+                    },
+                    {
+                        "exercise": "total",
+                        "buckets": [{"label": "Week of Jun 15, 2026", "value": 2500.0}],
+                    },
+                ],
+            },
+            Receipts(
+                literal=frozenset(Decimal(value) for value in ("15", "2026", "1000", "2500")),
+                series=(
+                    (Decimal("1000"),),
+                    (Decimal("2500"),),
+                ),
+            ),
         ),
         # Exercise ids are identifiers, not measurements; their names carry no numerals here.
         ("query_exercises", [[1, "Back Squat"], [2, "Bench Press"]], _group()),
@@ -342,7 +371,10 @@ def test_grounding_violation_requires_an_exact_receipt(
         ),
         (
             "query_workouts",
-            {"metric": "e1rm", "result": [["Week of Jun 15, 2026", 125.0]]},
+            {
+                "metric": "e1rm",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 125.0}],
+            },
             _group("15", "2026", "125", series=("125",)),
         ),
         ("query_workouts", {"result": "No matching workout data found."}, _group()),
@@ -352,6 +384,7 @@ def test_grounding_violation_requires_an_exact_receipt(
     ],
     ids=[
         "workout-rows-and-bucket-label",
+        "multi-series-result",
         "exercise-list",
         "retrieved-passage-text-and-metadata",
         "e1rm-rows",
@@ -385,7 +418,10 @@ def test_every_scraped_tool_has_a_real_scraper() -> None:
             _group("4", "6", "20"),
         ),
         "query_workouts": (
-            {"metric": "tonnage", "result": [["2026-W01", 1000.0]]},
+            {
+                "metric": "tonnage",
+                "buckets": [{"label": "2026-W01", "value": 1000.0}],
+            },
             ToolOutcome.SUBSTANTIVE,
             _group("1", "2026", "1000", series=("1000",)),
         ),
@@ -411,6 +447,34 @@ def test_derivations_use_only_one_results_measurements() -> None:
     results = [_group("100", series=("100",)), _group("200", series=("200",))]
 
     assert grounding_violation("Total 300 kg.", results) is not None
+
+
+def test_derivations_never_span_two_series_in_one_result() -> None:
+    result = {
+        "metric": "tonnage",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [
+                    {"label": "W1", "value": 1000.0},
+                    {"label": "W2", "value": 2000.0},
+                ],
+            },
+            {
+                "exercise": "Bench Press",
+                "buckets": [
+                    {"label": "W1", "value": 2500.0},
+                    {"label": "W2", "value": 3000.0},
+                ],
+            },
+        ],
+    }
+    receipts = [scrape_receipts("query_workouts", result)]
+
+    assert grounding_violation("Total 3,000 kg.", receipts) is None
+    assert grounding_violation("Total 5,500 kg.", receipts) is None
+    assert grounding_violation("Total 3,500 kg.", receipts) is not None
 
 
 def test_labels_are_literal_receipts_but_never_derivation_sources() -> None:

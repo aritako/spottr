@@ -31,9 +31,10 @@ result. The derivation whitelist is closed and small:
 - sum: the exact total of all the result's measurement values;
 - average: the exact mean of all the result's measurement values.
 
-Derivations never span tool results and never use identifiers or labels as source numbers: a sum
-of a year and a document id is not a statistic. Labels (bucket names, dates) and Passage prose
-are literal Receipts only, so they back a quoted numeral but never feed arithmetic. Repeated
+Derivations never span tool results or two series inside one result, and never use identifiers
+or labels as source numbers: a sum of a year and a document id is not a statistic. Labels (bucket
+names, dates) and Passage prose are literal Receipts only, so they back a quoted numeral but never
+feed arithmetic. Repeated
 measurements are kept as a multiset, because summing repeated rows is legitimate.
 
 Every recipe computes in exact decimal arithmetic: the values are scaled to integers, so a
@@ -58,7 +59,6 @@ exponent is part of the numeral itself, so ``1e5`` is ``100000``. Spelled-out an
 are not numerals and never violate.
 """
 
-import json
 import re
 from collections import Counter
 from collections.abc import Sequence
@@ -104,12 +104,13 @@ class Receipts:
     """The numbers one successful tool result can back.
 
     ``literal`` holds every numeral the model could quote verbatim, including bucket labels and
-    Passage prose. ``series`` holds only the result's measurement values, in order, which are the
-    only numbers a derivation recipe may use.
+    Passage prose. ``series`` holds one tuple of measurement values per series the result carries
+    (analytics returns one per exercise plus a total); those are the only numbers a derivation
+    recipe may use, and only within their own series.
     """
 
     literal: frozenset[Decimal]
-    series: tuple[Decimal, ...]
+    series: tuple[tuple[Decimal, ...], ...]
 
 
 def error_evidence(tool: str) -> ToolEvidence:
@@ -166,20 +167,25 @@ def _retrieval_outcome(result: object) -> ToolOutcome:
 
 
 def _workout_outcome(result: object) -> ToolOutcome:
-    """Workout data arrives as ``{"result": rows}``; no data arrives as a status string.
+    """Workout analytics arrives as bucket series; no data arrives as a status string.
 
-    Only the exact no-data string means emptiness. Any other string result is a capability
-    outcome the model can fix (for example ``"Metric not yet implemented."``), so it is an error,
-    never an empty result.
+    Only the exact no-data string means emptiness. Any other status string is a capability
+    outcome the model can fix, so it is an error, never an empty result. A bucket series is
+    substantive when it holds at least one bucket.
     """
-    if not isinstance(result, dict) or "result" not in result:
+    if not isinstance(result, dict):
         return ToolOutcome.ERROR
-    rows = result["result"]
-    if isinstance(rows, str):
-        return ToolOutcome.EMPTY if rows == NO_MATCHING_WORKOUT_DATA else ToolOutcome.ERROR
-    if isinstance(rows, (list, tuple, dict)):
-        return ToolOutcome.SUBSTANTIVE if rows else ToolOutcome.EMPTY
-    return ToolOutcome.ERROR
+    if "result" in result:
+        rows = result["result"]
+        if isinstance(rows, str):
+            return ToolOutcome.EMPTY if rows == NO_MATCHING_WORKOUT_DATA else ToolOutcome.ERROR
+        if isinstance(rows, (list, tuple, dict)):
+            return ToolOutcome.SUBSTANTIVE if rows else ToolOutcome.EMPTY
+        return ToolOutcome.ERROR
+    bucket_lists = _workout_bucket_lists(result)
+    if not bucket_lists:
+        return ToolOutcome.ERROR
+    return ToolOutcome.SUBSTANTIVE if any(bucket_lists) else ToolOutcome.EMPTY
 
 
 def _exercise_outcome(result: object) -> ToolOutcome:
@@ -281,10 +287,15 @@ def scrape_receipts(tool: str, result: object) -> Receipts:
             literal = _numerals_in(_passage_texts(result))
             return Receipts(literal=frozenset(literal), series=())
         case "query_workouts":
-            if not isinstance(result, dict) or "result" not in result:
-                return Receipts(literal=frozenset(), series=())
-            literal = _numerals_in([_json_text(result["result"])])
-            return Receipts(literal=frozenset(literal), series=_workout_series(result))
+            texts: list[str] = []
+            for buckets in _workout_bucket_lists(result):
+                for bucket in buckets:
+                    texts.extend(_bucket_texts(bucket))
+            texts.extend(_workout_names(result))
+            return Receipts(
+                literal=frozenset(_numerals_in(texts)),
+                series=_workout_series(result),
+            )
         case "query_exercises":
             literal = _numerals_in(_exercise_names(result))
             return Receipts(literal=frozenset(literal), series=())
@@ -292,11 +303,6 @@ def scrape_receipts(tool: str, result: object) -> Receipts:
             # A tool without its own scraper backs nothing: scraping the envelope would let
             # identifiers and names manufacture Receipts.
             return Receipts(literal=frozenset(), series=())
-
-
-def _json_text(value: object) -> str:
-    """The text the model saw for a tool result."""
-    return value if isinstance(value, str) else json.dumps(value)
 
 
 def _numerals_in(texts: Sequence[str]) -> list[Decimal]:
@@ -327,20 +333,63 @@ def _exercise_names(result: object) -> list[str]:
     return names
 
 
-def _workout_series(result: object) -> tuple[Decimal, ...]:
-    """The measurement values of a workout result, in the order the tool returned them."""
+def _workout_bucket_lists(result: object) -> list[list[object]]:
+    """Every bucket list in an analytics workout result, one per series."""
     if not isinstance(result, dict):
-        return ()
-    rows = result.get("result")
-    if not isinstance(rows, (list, tuple)):
-        return ()
-    values: list[Decimal] = []
-    for row in rows:
-        if isinstance(row, (list, tuple)) and len(row) >= 2:
-            value = row[1]
-            if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
-                values.append(Decimal(str(value)))
-    return tuple(values)
+        return []
+    lists: list[list[object]] = []
+    buckets = result.get("buckets")
+    if isinstance(buckets, list):
+        lists.append(buckets)
+    for item in result.get("series") or []:
+        if isinstance(item, dict) and isinstance(item.get("buckets"), list):
+            lists.append(item["buckets"])
+    return lists
+
+
+def _bucket_texts(bucket: object) -> list[str]:
+    """The label and value of one bucket as text, for literal Receipts."""
+    if isinstance(bucket, dict):
+        return [str(bucket.get("label") or ""), str(bucket.get("value"))]
+    if isinstance(bucket, (list, tuple)) and len(bucket) >= 2:
+        return [str(bucket[0]), str(bucket[1])]
+    return []
+
+
+def _bucket_value(bucket: object) -> Decimal | None:
+    """The measurement value of one bucket, whatever shape the tool used."""
+    if isinstance(bucket, dict):
+        value = bucket.get("value")
+    elif isinstance(bucket, (list, tuple)) and len(bucket) >= 2:
+        value = bucket[1]
+    else:
+        return None
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        return Decimal(str(value))
+    return None
+
+
+def _workout_names(result: object) -> list[str]:
+    """Exercise names in an analytics workout result; names are literal content."""
+    if not isinstance(result, dict):
+        return []
+    names: list[str] = []
+    if isinstance(result.get("exercise"), str):
+        names.append(result["exercise"])
+    for item in result.get("series") or []:
+        if isinstance(item, dict) and isinstance(item.get("exercise"), str):
+            names.append(item["exercise"])
+    return names
+
+
+def _workout_series(result: object) -> tuple[tuple[Decimal, ...], ...]:
+    """The measurement values of each series in a workout result, in order."""
+    series: list[tuple[Decimal, ...]] = []
+    for buckets in _workout_bucket_lists(result):
+        values = tuple(value for bucket in buckets if (value := _bucket_value(bucket)) is not None)
+        if values:
+            series.append(values)
+    return tuple(series)
 
 
 # A numeral whose decimal exponent is beyond this magnitude cannot be a legitimate derived
@@ -368,8 +417,9 @@ def grounding_violation(
             return GroundingViolation(numeral=numeral.text, value=numeral.value)
         written_whole = _written_whole(numeral.text, numeral.value, numeral.percent)
         if any(
-            _is_derived(numeral.value, group.series, written_whole=written_whole)
+            _is_derived(numeral.value, series, written_whole=written_whole)
             for group in receipts
+            for series in group.series
         ):
             continue
         return GroundingViolation(numeral=numeral.text, value=numeral.value)

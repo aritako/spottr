@@ -72,7 +72,7 @@ Requests flow one way: **controller → handler → repository → ORM model**.
 
 ```
 app/
-├── main.py                  # FastAPI app, router registration, /health
+├── main.py                  # FastAPI app, router registration (incl. /analytics), /health
 ├── api/
 │   ├── controllers/         # FastAPI routers: HTTP concerns only
 │   ├── handlers/            # Business logic, class-based (e.g. WorkoutsHandler(db))
@@ -90,8 +90,7 @@ app/
 │   │   ├── instructions.py  # build_instructions(today): the system prompt
 │   │   ├── retry.py         # the correction-turn complaints
 │   │   └── tool_schemas.py  # TOOL_SCHEMAS: the model-facing tool schemas
-│   ├── tools.py             # Tool implementations (call handlers, not repositories)
-│   └── helpers.py           # PURE functions only: metrics and time bucketing
+│   └── tools.py             # Tool implementations (call handlers, not repositories)
 ├── eval/
 │   ├── golden/              # authored retrieval golden set (YAML)
 │   ├── coverage.py          # PURE golden-set coverage: gaps per corpus Document
@@ -102,6 +101,7 @@ app/
     ├── constants.py         # string constants crossing module boundaries
     ├── enums/               # StrEnum definitions
     ├── errors/              # Domain exceptions
+    ├── metrics.py           # PURE metric and time-bucketing helpers
     └── schemas/             # Pydantic request/response models
 ```
 
@@ -116,8 +116,13 @@ Layer rules:
   status codes in controllers (see `create_workout` in `controllers/workouts.py`). Some existing
   handlers raise `HTTPException` directly; follow the domain-error pattern in new code, but don't
   refactor existing handlers unless the task asks for it.
-- **`engine/helpers.py` must stay pure:** no ORM imports, no DB, no I/O. Pass plain values or
+- **`shared/metrics.py` must stay pure:** no ORM imports, no DB, no I/O. Pass plain values or
   dataclasses in, get plain values out. This keeps metrics trivially unit-testable.
+- **Analytics is shared through `AnalyticsHandler` (`app/api/handlers/analytics.py`):** the
+  `/analytics` controller and the engine's `query_workouts` tool both call it. Name→id
+  resolution, Decimal conversion, entry construction, and response shaping live there, not in
+  controllers or tools. `engine → api` is the only cross-layer direction; no `api → engine`
+  imports.
 - **`app/eval` must stay pure and offline:** no ORM, database, network, or OpenAI imports outside
   `app/eval/golden_set.py`'s filesystem loader. Scoring, coverage, and lock rules take plain
   dataclasses so the eval tier stays cheap and deterministic.
@@ -166,7 +171,7 @@ Slice rules:
   enum as a `StrEnum` in `app/shared/enums/`, use it in Pydantic schemas, and store `.value` in the
   model. Do not introduce `sqlalchemy.Enum` columns.
 - **Numeric columns** (`weight`, `bodyweight`) come back from the ORM as `Decimal`. Convert with
-  `float(...)` at the boundary before passing values into `helpers.py`.
+  `float(...)` at the boundary before passing values into `app/shared/metrics.py`.
 - **Timestamps** are timezone-aware (`TIMESTAMP(timezone=True)`). Use `TimestampMixin` for
   `created_at`/`updated_at` on new tables where it makes sense.
 - **Date-range filters are inclusive of the end date:** filter with
@@ -199,6 +204,8 @@ Slice rules:
      `Coach.__init__` logs an error when a registry tool is not in `SCRAPED_TOOLS`; a member
      without its `tool_evidence` arm gets the error outcome, and one without its
      `scrape_receipts` arm backs no Receipts.
+- `query_workouts` delegates name→id resolution, aggregation, and response shaping to
+  `AnalyticsHandler`; tools must not query repositories themselves.
 - Prefer `"strict": True` schemas. With strict mode, every property must be listed in `required`,
   optional values use `["type", "null"]`, and `additionalProperties` must be `False`.
 - Never interpolate model-provided strings into SQL. Tool arguments map to fixed query options or
