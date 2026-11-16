@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -6,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.engine.coach import Coach
+from app.shared.enums.coach import Metric
 
 
 @pytest.fixture
@@ -226,3 +228,144 @@ def test_ask_coach_re_sends_instructions_and_tools_on_every_turn(coach: Coach) -
     assert first_instructions
     assert create.call_args_list[1].kwargs["instructions"] == first_instructions
     assert create.call_args_list[1].kwargs["tools"] == coach.TOOLS
+
+
+def _tool_output(call: Any) -> Any:
+    (item,) = call.kwargs["input"]
+    assert item["type"] == "function_call_output"
+    return json.loads(item["output"])
+
+
+def test_query_workouts_schema_documents_the_per_exercise_default_and_totals(
+    coach: Coach,
+) -> None:
+    tool = next(tool for tool in coach.TOOLS if tool["name"] == "query_workouts")
+    properties = tool["parameters"]["properties"]
+
+    assert properties["metric"]["enum"] == ["e1rm", "tonnage"]
+    assert "one series per exercise" in tool["description"]
+    assert "total" in tool["description"]
+    assert "tonnage" in tool["description"]
+    assert "name" in properties["exercise"]["description"].lower()
+
+
+def test_ask_coach_passes_the_single_exercise_series_shape_to_the_model(coach: Coach) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        (
+            '{"exercise": "Back Squat", "metric": "tonnage", "start_date": null, '
+            '"end_date": null, "group_by": "week"}'
+        ),
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+    shape = {
+        "metric": "tonnage",
+        "group_by": "week",
+        "exercise": "Back Squat",
+        "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+    }
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(coach.tools.analyticsHandler, "query_workouts", return_value=shape) as query,
+    ):
+        coach.ask_coach("How much did I squat last week?")
+
+    query.assert_called_once_with(
+        metric=Metric.TONNAGE,
+        exercise="Back Squat",
+        start_date=None,
+        end_date=None,
+        group_by="week",
+    )
+    assert _tool_output(create.call_args_list[1]) == shape
+
+
+def test_ask_coach_passes_per_exercise_tonnage_series_with_a_total_to_the_model(
+    coach: Coach,
+) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        '{"exercise": null, "metric": "tonnage", "start_date": null, "end_date": null, '
+        '"group_by": "week"}',
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+    shape = {
+        "metric": "tonnage",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+            },
+            {
+                "exercise": "total",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 500.0}],
+            },
+        ],
+    }
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(coach.tools.analyticsHandler, "query_workouts", return_value=shape) as query,
+    ):
+        coach.ask_coach("How much did I lift overall last week?")
+
+    query.assert_called_once_with(
+        metric=Metric.TONNAGE,
+        exercise=None,
+        start_date=None,
+        end_date=None,
+        group_by="week",
+    )
+    assert _tool_output(create.call_args_list[1]) == shape
+
+
+def test_ask_coach_passes_per_exercise_e1rm_series_without_a_total_to_the_model(
+    coach: Coach,
+) -> None:
+    tool_call = _tool_call(
+        "query_workouts",
+        '{"exercise": null, "metric": "e1rm", "start_date": null, "end_date": null, '
+        '"group_by": "week"}',
+    )
+    responses = [
+        _response([tool_call]),
+        _response([], "Done.", response_id="resp_2"),
+    ]
+    shape = {
+        "metric": "e1rm",
+        "group_by": "week",
+        "series": [
+            {
+                "exercise": "Back Squat",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 116.67}],
+            },
+            {
+                "exercise": "Bench Press",
+                "buckets": [{"label": "Week of Jun 15, 2026", "value": 106.67}],
+            },
+        ],
+    }
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(coach.tools.analyticsHandler, "query_workouts", return_value=shape) as query,
+    ):
+        coach.ask_coach("How strong am I getting overall?")
+
+    query.assert_called_once_with(
+        metric=Metric.E1RM,
+        exercise=None,
+        start_date=None,
+        end_date=None,
+        group_by="week",
+    )
+    assert _tool_output(create.call_args_list[1]) == shape
+    assert all(series["exercise"] != "total" for series in shape["series"])

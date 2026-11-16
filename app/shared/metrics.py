@@ -1,12 +1,16 @@
 """
-This file should only contain pure functions and
-helper classes that will be used by the engine.tools.
+Pure metric and time-bucketing helpers shared by the REST analytics layer and the coach engine.
+
+Nothing here may import the ORM, a database session, or perform I/O. Callers pass plain values or
+dataclasses in and get plain values out, which keeps the metrics trivially unit-testable.
 """
 
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal, TypedDict
+
+GroupBy = Literal["day", "week", "month", "year"]
 
 
 class Set(TypedDict):
@@ -88,35 +92,67 @@ def workout_tonnage(sets: list[Set]) -> float:
     return sum(set_tonnage(set_["weight"], set_["reps"]) for set_ in sets)
 
 
-def weekly_tonnage_by_exercise(
+def tonnage_by_exercise(
     entries: list[DatedTonnageByExercise],
+    group_by: GroupBy | None = None,
 ) -> dict[str, list[tuple[str, float]]]:
     """
-    Group tonnage entries by exercise and ISO week, returning total tonnage per week.
+    Group tonnage entries by exercise and time bucket, returning total tonnage per bucket.
 
     Args:
         entries: A list of dated tonnage entries tagged with an exercise name.
+        group_by: The bucket grain. Defaults to weeks.
 
     Returns:
         A dictionary mapping exercise name to a chronologically sorted list of
-        (week_label, total_tonnage) tuples. Week labels use ISO-8601 format
-        (e.g. "2026-W01").
+        (bucket_label, total_tonnage) tuples.
     """
-    buckets: dict[tuple[str, int, int], float] = defaultdict(float)
+    buckets: dict[tuple[str, tuple[int, int]], float] = defaultdict(float)
+    label_for: dict[tuple[str, tuple[int, int]], str] = {}
+
     for entry in entries:
-        iso_year, iso_week, _ = entry.date.isocalendar()
-        buckets[(entry.exercise, iso_year, iso_week)] += entry.tonnage
+        key = (entry.exercise, sort_key(entry.date, group_by))
+        buckets[key] += entry.tonnage
+        label_for[key] = get_time_bucket_key(entry.date, group_by)
 
     grouped: dict[str, list[tuple[str, float]]] = defaultdict(list)
-    for (exercise, iso_year, iso_week), tonnage in sorted(buckets.items()):
-        grouped[exercise].append((f"{iso_year}-W{iso_week:02d}", tonnage))
+    for key, tonnage in sorted(buckets.items()):
+        grouped[key[0]].append((label_for[key], tonnage))
 
     return dict(grouped)
 
 
-def sort_key(
-    d: date, group_by: Literal["day", "week", "month", "year"] | None = None
-) -> tuple[int, int]:
+def e1rm_by_exercise(
+    entries: list[DatedE1RMByExercise],
+    group_by: GroupBy | None = None,
+) -> dict[str, list[tuple[str, float]]]:
+    """
+    Group e1RM entries by exercise and time bucket, keeping the max per bucket.
+
+    Args:
+        entries: A list of dated e1RM entries tagged with an exercise name.
+        group_by: The bucket grain. Defaults to weeks.
+
+    Returns:
+        A dictionary mapping exercise name to a chronologically sorted list of
+        (bucket_label, maximum_e1rm) tuples.
+    """
+    buckets: dict[tuple[str, tuple[int, int]], float] = defaultdict(float)
+    label_for: dict[tuple[str, tuple[int, int]], str] = {}
+
+    for entry in entries:
+        key = (entry.exercise, sort_key(entry.date, group_by))
+        buckets[key] = max(buckets[key], entry.e1rm)
+        label_for[key] = get_time_bucket_key(entry.date, group_by)
+
+    grouped: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    for key, e1rm in sorted(buckets.items()):
+        grouped[key[0]].append((label_for[key], e1rm))
+
+    return dict(grouped)
+
+
+def sort_key(d: date, group_by: GroupBy | None = None) -> tuple[int, int]:
     match group_by:
         case "day":
             return (d.year, d.toordinal())
@@ -132,16 +168,13 @@ def sort_key(
             return (iso_year, iso_week)
 
 
-def get_time_bucket_key(
-    d: date, group_by: Literal["day", "week", "month", "year"] | None = None
-) -> str:
+def get_time_bucket_key(d: date, group_by: GroupBy | None = None) -> str:
     """
-    Returns a human-readable, chronologically-sortable-enough label for the
-    time bucket `d` falls into, at the given grain.
+    Returns a human-readable label for the time bucket `d` falls into, at the given grain.
 
-    Note: these labels are for DISPLAY. Internally, sorting is still done
-    on the (year, week)/(year, month)/etc. tuples before formatting — see
-    tonnage_over_time, which sorts by the underlying key, not the string.
+    Note: these labels are for DISPLAY. Internally, sorting is still done on the
+    (year, week)/(year, month)/etc. tuples before formatting — see tonnage_over_time, which sorts
+    by the underlying key, not the string.
     """
     match group_by:
         case None:
@@ -166,7 +199,7 @@ def get_time_bucket_key(
 
 def tonnage_over_time(
     entries: list[DatedTonnage],
-    group_by: Literal["day", "week", "month", "year"] | None = None,
+    group_by: GroupBy | None = None,
 ) -> list[tuple[str, float]]:
     buckets: dict[tuple[int, int], float] = defaultdict(float)
     label_for: dict[tuple[int, int], str] = {}
@@ -181,7 +214,7 @@ def tonnage_over_time(
 
 def e1rm_over_time(
     entries: list[DatedE1RM],
-    group_by: Literal["day", "week", "month", "year"] | None = None,
+    group_by: GroupBy | None = None,
 ) -> list[tuple[str, float]]:
     buckets: dict[tuple[int, int], float] = defaultdict(float)
     label_for: dict[tuple[int, int], str] = {}

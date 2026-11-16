@@ -62,11 +62,11 @@ app/
 │   └── openai/client.py  # shared OpenAI client
 ├── engine/
 │   ├── coach.py          # tool schemas + Responses API loop
-│   ├── tools.py          # tool implementations
-│   └── helpers.py        # pure functions (metrics, time bucketing)
+│   └── tools.py          # tool implementations
 └── shared/
     ├── enums/            # StrEnum definitions
     ├── errors/           # domain exceptions
+    ├── metrics.py        # pure functions (metrics, time bucketing)
     └── schemas/          # Pydantic request/response models
 ```
 

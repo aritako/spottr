@@ -2,32 +2,55 @@ import json
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-from app.engine.helpers import DatedTonnageByExercise, weekly_tonnage_by_exercise
 from app.engine.tools import Tools
+from app.shared.enums.coach import Metric
 from app.shared.enums.docs import RetrievalStatus
 from app.shared.schemas.docs import PassageRead, PassageRetrieval
 
 
-def test_weekly_tonnage_by_exercise() -> None:
-    entries = [
-        DatedTonnageByExercise(exercise="bench", date=date(2025, 12, 30), tonnage=100.0),
-        DatedTonnageByExercise(exercise="bench", date=date(2026, 1, 1), tonnage=100.0),
-        DatedTonnageByExercise(exercise="bench", date=date(2026, 1, 2), tonnage=120.0),
-        DatedTonnageByExercise(exercise="bench", date=date(2026, 1, 8), tonnage=120.0),
-        DatedTonnageByExercise(exercise="squat", date=date(2026, 1, 1), tonnage=80.0),
-        DatedTonnageByExercise(exercise="squat", date=date(2026, 1, 8), tonnage=90.0),
-        DatedTonnageByExercise(exercise="deadlift", date=date(2026, 1, 1), tonnage=150.0),
-        DatedTonnageByExercise(exercise="deadlift", date=date(2026, 1, 8), tonnage=160.0),
-        DatedTonnageByExercise(exercise="overhead press", date=date(2026, 1, 1), tonnage=100.0),
-        DatedTonnageByExercise(exercise="overhead press", date=date(2026, 1, 8), tonnage=120.0),
-    ]
-    result = weekly_tonnage_by_exercise(entries)
-    assert result == {
-        "bench": [("2026-W01", 320.0), ("2026-W02", 120.0)],
-        "squat": [("2026-W01", 80.0), ("2026-W02", 90.0)],
-        "deadlift": [("2026-W01", 150.0), ("2026-W02", 160.0)],
-        "overhead press": [("2026-W01", 100.0), ("2026-W02", 120.0)],
+def test_query_workouts_delegates_to_the_analytics_handler() -> None:
+    tools = Tools(MagicMock())
+    expected = {
+        "metric": "tonnage",
+        "group_by": "day",
+        "exercise": "Back Squat",
+        "buckets": [{"label": "Jun 15, 2026", "value": 500.0}],
     }
+
+    with patch.object(tools.analyticsHandler, "query_workouts", return_value=expected) as query:
+        result = tools.query_workouts(
+            metric=Metric.TONNAGE,
+            exercise="Back Squat",
+            start_date="2026-06-01",
+            end_date="2026-06-30",
+            group_by="day",
+        )
+
+    query.assert_called_once_with(
+        metric=Metric.TONNAGE,
+        exercise="Back Squat",
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 30),
+        group_by="day",
+    )
+    assert result == expected
+
+
+def test_query_workouts_defaults_to_all_time_weekly_tonnage() -> None:
+    tools = Tools(MagicMock())
+
+    with patch.object(
+        tools.analyticsHandler, "query_workouts", return_value={"result": "no data"}
+    ) as query:
+        tools.query_workouts()
+
+    query.assert_called_once_with(
+        metric=Metric.TONNAGE,
+        exercise=None,
+        start_date=None,
+        end_date=None,
+        group_by="week",
+    )
 
 
 def test_search_coaching_docs_returns_the_handler_result() -> None:

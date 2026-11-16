@@ -42,7 +42,62 @@ class WorkoutsRepository:
             self.db.rollback()
             raise e
 
-    # Engine Tools
+    # Analytics
+
+    def get_sets_for_exercise(
+        self,
+        exercise_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[Set]:
+        query = (
+            select(Set)
+            .join(Workout, Set.workout_id == Workout.id)
+            .where(Set.exercise_id == exercise_id)
+            .options(selectinload(Set.workout))
+            .order_by(Workout.performed_at, Set.set_index, Set.id)
+        )
+        if start_date:
+            query = query.where(Workout.performed_at >= start_date)
+        if end_date:
+            query = query.where(Workout.performed_at < end_date + timedelta(days=1))
+        return list(self.db.scalars(query))
+
+    def list_workouts_for_exercise(
+        self,
+        exercise_id: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        page: int = 0,
+        page_size: int = 10,
+    ) -> list[Workout]:
+        query = (
+            select(Workout)
+            .join(Set, Set.workout_id == Workout.id)
+            .where(Set.exercise_id == exercise_id)
+            .distinct()
+            .order_by(Workout.performed_at.desc(), Workout.id.desc())
+            .offset(page * page_size)
+            .limit(page_size)
+        )
+        if start_date:
+            query = query.where(Workout.performed_at >= start_date)
+        if end_date:
+            query = query.where(Workout.performed_at < end_date + timedelta(days=1))
+        return list(self.db.scalars(query))
+
+    def get_sets_for_workouts(self, workout_ids: list[int], exercise_id: int) -> list[Set]:
+        if not workout_ids:
+            return []
+        query = (
+            select(Set)
+            .where(Set.exercise_id == exercise_id, Set.workout_id.in_(workout_ids))
+            .options(selectinload(Set.workout))
+            .order_by(Set.set_index, Set.id)
+        )
+        return list(self.db.scalars(query))
+
+    # Analytics across all exercises
 
     def get_sets_for_metrics(
         self,
