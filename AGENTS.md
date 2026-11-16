@@ -83,9 +83,12 @@ app/
 │   ├── models.py            # All ORM models
 │   └── openai/client.py     # Shared OpenAI client
 ├── engine/
-│   ├── coach.py             # Coach: tool registry, Responses API loop
+│   ├── coach.py             # Coach: tool registry, Responses API loop, Guardrail orchestration
+│   ├── guardrails.py        # PURE: Scope + Grounding checks over plain tool results
+│   ├── rejections.py        # app-written Rejection copy: one home for boundary strings
 │   ├── prompts/
 │   │   ├── instructions.py  # build_instructions(today): the system prompt
+│   │   ├── retry.py         # the correction-turn complaints
 │   │   └── tool_schemas.py  # TOOL_SCHEMAS: the model-facing tool schemas
 │   ├── tools.py             # Tool implementations (call handlers, not repositories)
 │   └── helpers.py           # PURE functions only: metrics and time bucketing
@@ -186,10 +189,13 @@ Slice rules:
 - The engine uses the OpenAI **Responses API**. Follow-up calls chain with `previous_response_id`
   and **must re-send both `tools=self.TOOLS` and `instructions`**, or the model can lose its tool
   menu or the coach's rules.
-- Adding a tool requires three things that must stay in sync:
+- Adding a tool requires four things that must stay in sync:
   1. The implementation in `app/engine/tools.py` (calls handlers, returns JSON-serializable data)
   2. The JSON schema in `app/engine/prompts/tool_schemas.py` (exposed to the model as `Coach.TOOLS`)
   3. The entry in `Coach.TOOL_REGISTRY`
+  4. Its outcome classification and Receipt scraper in `app/engine/guardrails.py` (added to
+     `SCRAPED_TOOLS`), or its answers are rejected. `Coach.__init__` logs an error when a registry
+     tool has no scraper.
 - Prefer `"strict": True` schemas. With strict mode, every property must be listed in `required`,
   optional values use `["type", "null"]`, and `additionalProperties` must be `False`.
 - Never interpolate model-provided strings into SQL. Tool arguments map to fixed query options or
