@@ -10,35 +10,39 @@ The Scope rule reads the loop's tool-usage signature and separates three outcome
 
 - ``SUPPORTED``: at least one tool returned substantive output (data rows, an exercise list, or
   retrieved Passages), so the answer may ship with its Citations.
-- ``ALL_EMPTY``: tools ran and every substantive result was legitimately empty — retrieval
-  ``no_match`` or ``empty_corpus``, the no-matching-workout-data result, or an empty exercise
-  list. The model cannot fix reality, so this normalizes immediately without a retry.
+- ``ALL_EMPTY``: tools ran and every result was legitimately empty — retrieval ``no_match`` or
+  ``empty_corpus``, the no-matching-workout-data result, or an empty exercise list. The model
+  cannot fix reality, so this normalizes immediately without a retry.
 - ``NO_SUBSTANTIVE_CALL``: no substantive call was made at all — no tool calls, or only failed
   calls (an unknown tool or unreadable arguments). A failed call is never an empty result: it is
-  a mistake the model can still fix.
+  a mistake the model can still fix. An error also outranks emptiness, so a request that both
+  failed and came back empty is fixable rather than a dead end.
 
 The Grounding rule reads the numerals in the answer text. A numeral ships only when it has a
 Receipt. A Receipt is either the value appearing literally in tool output after format
 normalization — thousands separators stripped, a trailing decimal or zero ignored, an adjacent
 unit suffix or percent sign not part of the value, so ``12,400``, ``12400.0`` and ``12400`` are
-one Receipt — or a value the app re-derives itself from Receipt values. The derivation whitelist
-is closed and small:
+one Receipt — or a value the app re-derives itself from the measurement values of ONE tool
+result. The derivation whitelist is closed and small:
 
-- difference: one Receipt minus another, in either direction;
-- percentage change: the signed change from one Receipt to another, in either direction, so a
-  decrease is a negative percentage;
-- sum: the exact total of a set of Receipts;
-- average: the exact mean of a set of Receipts.
+- difference: one measurement minus another from the same result, in either direction;
+- percentage change: the signed change between two measurements from the same result, in either
+  direction, so a decrease is a negative percentage;
+- sum: the exact total of all the result's measurement values;
+- average: the exact mean of all the result's measurement values.
+
+Derivations never span tool results and never use identifiers or labels as source numbers: a sum
+of a year and a document id is not a statistic. Labels (bucket names, dates) and Passage prose
+are literal Receipts only, so they back a quoted numeral but never feed arithmetic. Repeated
+measurements are kept as a multiset, because summing repeated rows is legitimate.
 
 Every recipe computes in exact decimal arithmetic: the values are scaled to integers, so a
 floating-point artefact can never manufacture a Receipt. Difference, sum, and average must match
 exactly. A derived percentage must match the recomputation exactly when stated at any fractional
 precision; a percentage stated as a whole percent is also accepted when it equals the exact
 recomputation rounded half-up to a whole percent. That whole-percent rounding is the only
-relaxation. A recipe needs a source pair or set among the Receipts; with too few source numbers
-it produces nothing, and the numeral stays a Violation. Sums and averages search subsets of at
-least two Receipts under a fixed work budget: anything the search finds is exact, and when the
-budget is exhausted it claims nothing, so it can never invent a Receipt.
+relaxation. A recipe needs a source pair or set among one result's measurements; with too few
+source numbers it produces nothing, and the numeral stays a Violation.
 
 Every numeral-looking token is checked independently. A range needs Receipts for both ends; a
 fraction is its two numerals rather than an evaluated quotient; a leading sign is part of the
@@ -52,13 +56,21 @@ are not numerals and never violate.
 
 import json
 import re
-from collections.abc import Collection, Sequence
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
-from itertools import combinations
 
 from app.shared.enums.docs import RetrievalStatus
+
+# Tools whose results this module can classify and scrape. A registry tool without an entry here
+# gets no evidence and no Receipts, so ``Coach`` logs an error at construction rather than letting
+# a new tool silently produce false rejections.
+SCRAPED_TOOLS = frozenset({"search_coaching_docs", "query_workouts", "query_exercises"})
+
+# ``app/engine/tools.py`` reports a workout range with no rows using exactly this status string.
+_NO_MATCHING_WORKOUT_DATA = "No matching workout data found."
 
 
 class ToolOutcome(StrEnum):
@@ -77,26 +89,25 @@ class ScopeVerdict(StrEnum):
     NO_SUBSTANTIVE_CALL = "no_substantive_call"
 
 
-class Derivation(StrEnum):
-    """The closed whitelist of statistics the Grounding rule may re-derive.
-
-    Adding a recipe is a deliberate decision, not an implementation detail: the whitelist stays
-    closed until real dogfooding traffic on the build ticket shows a legitimate answer was
-    blocked.
-    """
-
-    DIFFERENCE = "difference"
-    PERCENTAGE_CHANGE = "percentage_change"
-    SUM = "sum"
-    AVERAGE = "average"
-
-
 @dataclass(frozen=True)
 class ToolEvidence:
     """One tool call's contribution, in plain values the Scope rule can judge."""
 
     tool: str
     outcome: ToolOutcome
+
+
+@dataclass(frozen=True)
+class Receipts:
+    """The numbers one successful tool result can back.
+
+    ``literal`` holds every numeral the model could quote verbatim, including bucket labels and
+    Passage prose. ``series`` holds only the result's measurement values, in order, which are the
+    only numbers a derivation recipe may use.
+    """
+
+    literal: frozenset[Decimal]
+    series: tuple[Decimal, ...]
 
 
 def error_evidence(tool: str) -> ToolEvidence:
@@ -109,7 +120,7 @@ def tool_evidence(tool: str, result: object) -> ToolEvidence:
 
     Emptiness is a property of each tool's real result shape, so the scraper reads the shapes the
     tools in ``app/engine/tools.py`` actually return rather than assuming one common envelope.
-    A result the scraper cannot read contributes no evidence, never a false positive.
+    A result the scraper cannot read contributes an error, never a false positive.
     """
     match tool:
         case "search_coaching_docs":
@@ -124,10 +135,16 @@ def tool_evidence(tool: str, result: object) -> ToolEvidence:
 
 
 def scope_verdict(evidence: Sequence[ToolEvidence]) -> ScopeVerdict:
-    """Judge whether substantive tool output backs the finished answer."""
+    """Judge whether substantive tool output backs the finished answer.
+
+    An error outranks emptiness: a failed call is a mistake the model can still fix, so a request
+    that both failed and came back empty earns the correction turn instead of being called empty.
+    """
     outcomes = {item.outcome for item in evidence}
     if ToolOutcome.SUBSTANTIVE in outcomes:
         return ScopeVerdict.SUPPORTED
+    if ToolOutcome.ERROR in outcomes:
+        return ScopeVerdict.NO_SUBSTANTIVE_CALL
     if ToolOutcome.EMPTY in outcomes:
         return ScopeVerdict.ALL_EMPTY
     return ScopeVerdict.NO_SUBSTANTIVE_CALL
@@ -147,13 +164,17 @@ def _retrieval_outcome(result: object) -> ToolOutcome:
 
 
 def _workout_outcome(result: object) -> ToolOutcome:
-    """Workout data arrives as ``{"result": rows}``; no data arrives as a status string."""
+    """Workout data arrives as ``{"result": rows}``; no data arrives as a status string.
+
+    Only the exact no-data string means emptiness. Any other string result is a capability
+    outcome the model can fix (for example ``"Metric not yet implemented."``), so it is an error,
+    never an empty result.
+    """
     if not isinstance(result, dict) or "result" not in result:
         return ToolOutcome.ERROR
     rows = result["result"]
     if isinstance(rows, str):
-        # "No matching workout data found." and other no-data statuses are strings, not rows.
-        return ToolOutcome.EMPTY
+        return ToolOutcome.EMPTY if rows == _NO_MATCHING_WORKOUT_DATA else ToolOutcome.ERROR
     if isinstance(rows, (list, tuple, dict)):
         return ToolOutcome.SUBSTANTIVE if rows else ToolOutcome.EMPTY
     return ToolOutcome.ERROR
@@ -226,57 +247,111 @@ def _numeral_value(token: str) -> Decimal:
     return Decimal(sign + unsigned)
 
 
-def scrape_receipts(result: object) -> frozenset[Decimal]:
-    """Scrape every Receipt numeral from one successful tool result.
+def scrape_receipts(tool: str, result: object) -> Receipts:
+    """Scrape one successful tool result into the numbers it can back.
 
-    The scrape reads the same text the model read: a string result as-is, any other result through
-    the JSON serialization the loop sends in the function call output. Numbers in data rows,
-    bucket labels ("Week of Jun 15, 2026"), exercise ids and names, Passage metadata, and Passage
-    text all count as Receipts, because quoting any of them is legitimate.
+    Literal Receipts are everything the model could quote verbatim: data rows, bucket labels,
+    exercise names, and Passage titles and text. The derivation series is the result's measurement
+    values only. Identifiers — exercise ids, document ids, chunk indexes — are not content and
+    back nothing. Duplicate measurements are kept, so repeated rows still sum correctly.
     """
-    text = result if isinstance(result, str) else json.dumps(result)
-    return frozenset(numeral.value for numeral in extract_numerals(text))
+    match tool:
+        case "search_coaching_docs":
+            literal = _numerals_in(_passage_texts(result))
+            return Receipts(literal=frozenset(literal), series=())
+        case "query_workouts":
+            literal = _numerals_in([_json_text(result)])
+            return Receipts(literal=frozenset(literal), series=_workout_series(result))
+        case "query_exercises":
+            literal = _numerals_in(_exercise_names(result))
+            return Receipts(literal=frozenset(literal), series=())
+        case _:
+            return Receipts(literal=frozenset(_numerals_in([_json_text(result)])), series=())
 
 
-# A sum or average search may visit this many candidate subsets. The budget is a ceiling on work,
-# never a tolerance: a derivation found inside it is exact, and one not found is not claimed. The
-# cap keeps a pathological Receipt pile from turning a near-miss into an unbounded search.
-_MAX_DERIVATION_STEPS = 20_000
+def _json_text(value: object) -> str:
+    """The text the model saw for a tool result."""
+    return value if isinstance(value, str) else json.dumps(value)
+
+
+def _numerals_in(texts: Sequence[str]) -> list[Decimal]:
+    """Every numeral in the given texts, in order."""
+    return [numeral.value for text in texts for numeral in extract_numerals(text)]
+
+
+def _passage_texts(result: object) -> list[str]:
+    """Passage titles and content, without their identifiers."""
+    if not isinstance(result, dict):
+        return []
+    texts: list[str] = []
+    for passage in result.get("passages") or []:
+        if isinstance(passage, dict):
+            texts.append(str(passage.get("document_title") or ""))
+            texts.append(str(passage.get("content") or ""))
+    return texts
+
+
+def _exercise_names(result: object) -> list[str]:
+    """Exercise names only, without their ids."""
+    if not isinstance(result, (list, tuple)):
+        return []
+    names: list[str] = []
+    for entry in result:
+        if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+            names.append(str(entry[1]))
+    return names
+
+
+def _workout_series(result: object) -> tuple[Decimal, ...]:
+    """The measurement values of a workout result, in the order the tool returned them."""
+    if not isinstance(result, dict):
+        return ()
+    rows = result.get("result")
+    if not isinstance(rows, (list, tuple)):
+        return ()
+    values: list[Decimal] = []
+    for row in rows:
+        if isinstance(row, (list, tuple)) and len(row) >= 2:
+            value = row[1]
+            if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+                values.append(Decimal(str(value)))
+    return tuple(values)
 
 
 def grounding_violation(
-    output_text: str, receipts: Collection[Decimal]
+    output_text: str, receipts: Sequence[Receipts]
 ) -> GroundingViolation | None:
     """Return the first numeral in the answer that has no Receipt, if any.
 
     Every numeral is checked independently, so one backed numeral never licenses another: a range
     needs Receipts for both ends, and one unsupported numeral among supported ones is a Violation.
     Matching is exact after format normalization; a numeral close to a tool value is unbacked. A
-    numeral that is not literal may still be backed by one of the four derivation recipes.
+    numeral that is not literal may still be backed by one of the four derivation recipes, using
+    the measurements of a single tool result.
     """
-    values = tuple(dict.fromkeys(receipts))
-    literals = frozenset(values)
+    literals = {value for group in receipts for value in group.literal}
     for numeral in extract_numerals(output_text):
         if numeral.value in literals:
             continue
-        if _is_derived(numeral.value, values):
+        if any(_is_derived(numeral.value, group.series) for group in receipts):
             continue
         return GroundingViolation(numeral=numeral.text, value=numeral.value)
     return None
 
 
-def _is_derived(value: Decimal, receipts: tuple[Decimal, ...]) -> bool:
-    """Whether one of the four recipes re-derives this value from the Receipts."""
-    if len(receipts) < 2:
+def _is_derived(value: Decimal, series: Sequence[Decimal]) -> bool:
+    """Whether one of the four recipes re-derives this value from one result's measurements."""
+    if len(series) < 2:
         # No recipe has a source pair or set to work from.
         return False
-    scaled, target = _scaled_receipts(receipts, value)
-    return (
-        _is_difference(target, scaled)
-        or _is_sum(target, scaled)
-        or _is_average(target, scaled)
-        or _is_percentage_change(value, scaled)
-    )
+    scaled, target = _scaled_receipts(tuple(series), value)
+    if _is_difference(target, scaled):
+        return True
+    if sum(scaled) == target:
+        return True
+    if sum(scaled) == target * len(scaled):
+        return True
+    return _is_percentage_change(value, scaled)
 
 
 def _scaled_receipts(receipts: tuple[Decimal, ...], target: Decimal) -> tuple[tuple[int, ...], int]:
@@ -303,82 +378,36 @@ def _scaled_int(value: Decimal, scale: int) -> int:
     return coefficient * 10 ** (exponent + scale)
 
 
-def _is_difference(target: int, values: tuple[int, ...]) -> bool:
-    """Whether two distinct Receipts subtract to the target, in either direction."""
-    available = frozenset(values)
-    for value in values:
+def _is_difference(target: int, values: Sequence[int]) -> bool:
+    """Whether two measurements from the series subtract to the target, in either direction."""
+    counts = Counter(values)
+    for value in counts:
         other = value - target
-        if other != value and other in available:
+        if _has_second(counts, other, value):
             return True
     return False
 
 
-def _is_sum(target: int, values: tuple[int, ...]) -> bool:
-    """Whether a set of at least two Receipts totals the target exactly."""
-    return _is_subset_total(target, values, average=False)
-
-
-def _is_average(target: int, values: tuple[int, ...]) -> bool:
-    """Whether a set of at least two Receipts has the target mean exactly."""
-    return _is_subset_total(target, values, average=True)
-
-
-def _is_subset_total(target: int, values: tuple[int, ...], *, average: bool) -> bool:
-    """Search Receipt subsets for an exact total or exact mean.
-
-    The whole set and every pair are checked directly before the bounded search, which covers the
-    common "sum the rows" and "average the rows" cases without walking subsets. The bounded search
-    then tries increasing subset sizes; if its budget runs out it returns False rather than
-    guessing, so a large pile can delay a claim but never manufacture one.
-    """
-    if len(values) < 2:
+def _has_second(counts: Counter[int], candidate: int, present: int) -> bool:
+    """Whether the multiset holds ``candidate`` besides one instance of ``present``."""
+    if candidate not in counts:
         return False
-    total = sum(values)
-    if average:
-        if total == target * len(values):
-            return True
-    elif total == target:
-        return True
-    if _has_pair_total(target, values, average=average):
-        return True
-
-    ordered = tuple(sorted(values, reverse=True))
-    steps = 0
-    for size in range(3, len(ordered) + 1):
-        wanted = target * size if average else target
-        for subset in combinations(ordered, size):
-            steps += 1
-            if steps > _MAX_DERIVATION_STEPS:
-                return False
-            if sum(subset) == wanted:
-                return True
-    return False
+    return candidate != present or counts[present] >= 2
 
 
-def _has_pair_total(target: int, values: tuple[int, ...], *, average: bool) -> bool:
-    """Whether two distinct Receipts total the target, or average to it."""
-    wanted = target * 2 if average else target
-    available = frozenset(values)
-    for value in values:
-        other = wanted - value
-        if other != value and other in available:
-            return True
-    return False
-
-
-def _is_percentage_change(value: Decimal, values: tuple[int, ...]) -> bool:
-    """Whether an ordered pair of Receipts yields this signed percentage change.
+def _is_percentage_change(value: Decimal, values: Sequence[int]) -> bool:
+    """Whether an ordered pair of measurements yields this signed percentage change.
 
     The recomputation is ``100 * (end - start) / start``, so an increase is positive and a
     decrease is negative; both directions are derived. Whole-percent rounding is the only
     relaxation: any fractional statement must match the exact recomputation.
     """
     numerator, denominator = value.as_integer_ratio()
-    available = frozenset(values)
+    counts = Counter(values)
 
     # Exact percentages are solved directly for the end value, so the common integer case is
-    # linear in the number of Receipts rather than a pair scan.
-    for start in values:
+    # linear in the number of measurements rather than a pair scan.
+    for start in counts:
         if start == 0:
             continue
         scaled_end = start * (100 * denominator + numerator)
@@ -386,7 +415,7 @@ def _is_percentage_change(value: Decimal, values: tuple[int, ...]) -> bool:
         if scaled_end % scaled_denominator:
             continue
         end = scaled_end // scaled_denominator
-        if end != start and end in available:
+        if _has_second(counts, end, start):
             return True
 
     if not _is_whole(value):
@@ -394,9 +423,9 @@ def _is_percentage_change(value: Decimal, values: tuple[int, ...]) -> bool:
 
     # Whole-percent statements are checked against the exact recomputation rounded half-up.
     whole = int(value)
-    for end in values:
-        for start in values:
-            if end == start or start == 0:
+    for end in counts:
+        for start in counts:
+            if start == 0 or not _has_second(counts, end, start):
                 continue
             if _round_half_up_ratio(100 * (end - start), start) == whole:
                 return True

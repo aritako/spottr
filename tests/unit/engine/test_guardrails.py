@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 
 from app.engine.guardrails import (
-    Derivation,
+    Receipts,
     ScopeVerdict,
     ToolEvidence,
     ToolOutcome,
@@ -45,6 +45,12 @@ PASSAGE = {
             {"result": "No matching workout data found."},
             ToolOutcome.EMPTY,
         ),
+        # Any other status string is a capability outcome the model can fix, not emptiness.
+        (
+            "query_workouts",
+            {"result": "Metric not yet implemented."},
+            ToolOutcome.ERROR,
+        ),
         # Exercise data is a list of (id, name) pairs.
         ("query_exercises", [[1, "Back Squat"]], ToolOutcome.SUBSTANTIVE),
         ("query_exercises", [], ToolOutcome.EMPTY),
@@ -58,6 +64,7 @@ PASSAGE = {
         "retrieval-passages",
         "workout-rows",
         "workout-no-data",
+        "workout-unimplemented-metric",
         "exercise-list",
         "exercise-empty-list",
         "unknown-tool",
@@ -85,7 +92,8 @@ def _evidence(*outcomes: ToolOutcome) -> list[ToolEvidence]:
         (_evidence(ToolOutcome.ERROR, ToolOutcome.ERROR), ScopeVerdict.NO_SUBSTANTIVE_CALL),
         (_evidence(ToolOutcome.EMPTY), ScopeVerdict.ALL_EMPTY),
         (_evidence(ToolOutcome.EMPTY, ToolOutcome.EMPTY), ScopeVerdict.ALL_EMPTY),
-        (_evidence(ToolOutcome.ERROR, ToolOutcome.EMPTY), ScopeVerdict.ALL_EMPTY),
+        # An error outranks emptiness: a failed call is fixable, so it earns the retry.
+        (_evidence(ToolOutcome.ERROR, ToolOutcome.EMPTY), ScopeVerdict.NO_SUBSTANTIVE_CALL),
         (_evidence(ToolOutcome.SUBSTANTIVE), ScopeVerdict.SUPPORTED),
         (_evidence(ToolOutcome.EMPTY, ToolOutcome.SUBSTANTIVE), ScopeVerdict.SUPPORTED),
         (
@@ -118,8 +126,16 @@ def test_error_evidence_is_never_an_empty_result() -> None:
     assert scope_verdict(evidence) is ScopeVerdict.NO_SUBSTANTIVE_CALL
 
 
-def _receipts(*values: str) -> frozenset[Decimal]:
-    return frozenset(Decimal(value) for value in values)
+def _group(*literal: str, series: tuple[str, ...] = ()) -> Receipts:
+    return Receipts(
+        literal=frozenset(Decimal(value) for value in literal),
+        series=tuple(Decimal(value) for value in series),
+    )
+
+
+def _receipts(*values: str) -> list[Receipts]:
+    """One tool result whose measurements are also literal Receipts."""
+    return [_group(*values, series=values)]
 
 
 def _numerals(*pairs: tuple[str, str]) -> list[tuple[str, Decimal]]:
@@ -275,7 +291,7 @@ def test_extract_numerals_checks_every_form_independently(
     ],
 )
 def test_grounding_violation_requires_an_exact_receipt(
-    answer: str, receipts: frozenset[Decimal], expected: str | None
+    answer: str, receipts: list[Receipts], expected: str | None
 ) -> None:
     violation = grounding_violation(answer, receipts)
 
@@ -287,18 +303,21 @@ def test_grounding_violation_requires_an_exact_receipt(
 
 
 @pytest.mark.parametrize(
-    ("result", "expected"),
+    ("tool", "result", "expected"),
     [
         (
+            "query_workouts",
             {
                 "metric": "tonnage",
                 "group_by": "week",
                 "result": [["Week of Jun 15, 2026", 12400.0]],
             },
-            _receipts("15", "2026", "12400"),
+            _group("15", "2026", "12400", series=("12400",)),
         ),
-        ([[1, "Back Squat"], [2, "Bench Press"]], _receipts("1", "2")),
+        # Exercise ids are identifiers, not measurements; their names carry no numerals here.
+        ("query_exercises", [[1, "Back Squat"], [2, "Bench Press"]], _group()),
         (
+            "search_coaching_docs",
             {
                 "status": "ok",
                 "passages": [
@@ -310,16 +329,17 @@ def test_grounding_violation_requires_an_exact_receipt(
                     }
                 ],
             },
-            _receipts("1", "2", "4", "6", "20"),
+            _group("4", "6", "20"),
         ),
         (
+            "query_workouts",
             {"metric": "e1rm", "result": [["Week of Jun 15, 2026", 125.0]]},
-            _receipts("1", "15", "2026", "125"),
+            _group("1", "15", "2026", "125", series=("125",)),
         ),
-        ({"result": "No matching workout data found."}, frozenset()),
-        ({"status": "no_match", "passages": []}, frozenset()),
-        ([], frozenset()),
-        ("No matching workout data found.", frozenset()),
+        ("query_workouts", {"result": "No matching workout data found."}, _group()),
+        ("search_coaching_docs", {"status": "no_match", "passages": []}, _group()),
+        ("query_exercises", [], _group()),
+        ("query_workouts", "No matching workout data found.", _group()),
     ],
     ids=[
         "workout-rows-and-bucket-label",
@@ -333,18 +353,64 @@ def test_grounding_violation_requires_an_exact_receipt(
     ],
 )
 def test_scrape_receipts_reads_every_tool_output_shape(
-    result: object, expected: frozenset[Decimal]
+    tool: str, result: object, expected: Receipts
 ) -> None:
-    assert scrape_receipts(result) == expected
+    assert scrape_receipts(tool, result) == expected
 
 
-def test_derivation_whitelist_stays_closed() -> None:
-    assert set(Derivation) == {
-        Derivation.DIFFERENCE,
-        Derivation.PERCENTAGE_CHANGE,
-        Derivation.SUM,
-        Derivation.AVERAGE,
-    }
+def test_derivations_use_only_one_results_measurements() -> None:
+    results = [_group("100", series=("100",)), _group("200", series=("200",))]
+
+    assert grounding_violation("Total 300 kg.", results) is not None
+
+
+def test_labels_are_literal_receipts_but_never_derivation_sources() -> None:
+    workout = _group("15", "2026", "12400", "13400", series=("12400", "13400"))
+
+    assert grounding_violation("You lifted 15,000 kg.", [workout]) is not None
+    assert grounding_violation("You lifted 12,400 kg.", [workout]) is None
+
+
+def test_repeated_measurements_sum_correctly() -> None:
+    workout = _group(series=("10000", "20000", "20000"))
+
+    assert grounding_violation("Total 50,000 kg.", [workout]) is None
+    assert grounding_violation("Total 30,000 kg.", [workout]) is not None
+
+
+def test_a_sum_uses_every_measurement_not_any_subset() -> None:
+    workout = _group(series=("10000", "20000", "30000"))
+
+    assert grounding_violation("Total 60,000 kg.", [workout]) is None
+    assert grounding_violation("Total 30,000 kg.", [workout]) is not None
+
+
+def test_identifiers_are_not_receipts() -> None:
+    exercises = scrape_receipts("query_exercises", [[12, "Back Squat"]])
+    passage = scrape_receipts(
+        "search_coaching_docs",
+        {
+            "status": "ok",
+            "passages": [
+                {
+                    "document_id": 15,
+                    "document_title": "Deload Guidelines",
+                    "chunk_index": 1,
+                    "content": "2026 deload schedule.",
+                }
+            ],
+        },
+    )
+
+    assert grounding_violation("You logged 12 exercises.", [exercises]) is not None
+    assert grounding_violation("That is from 2,041.", [passage]) is not None
+    assert grounding_violation("That is from 2026.", [passage]) is None
+
+
+def test_equal_measurements_derive_a_zero_difference() -> None:
+    workout = _group(series=("10000", "10000"))
+
+    assert grounding_violation("No change: 0 kg.", [workout]) is None
 
 
 @pytest.mark.parametrize(
@@ -449,7 +515,7 @@ def test_derivation_whitelist_stays_closed() -> None:
     ],
 )
 def test_grounding_derivation_recipes(
-    answer: str, receipts: frozenset[Decimal], expected: str | None
+    answer: str, receipts: list[Receipts], expected: str | None
 ) -> None:
     violation = grounding_violation(answer, receipts)
 

@@ -1,9 +1,8 @@
 import json
 import logging
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
@@ -17,6 +16,8 @@ from sqlalchemy.orm import Session
 from app.api.repository.workouts import WorkoutsRepository
 from app.core.openai.client import client
 from app.engine.guardrails import (
+    SCRAPED_TOOLS,
+    Receipts,
     ScopeVerdict,
     ToolEvidence,
     error_evidence,
@@ -65,6 +66,21 @@ class _AnswerDecision:
     rejection: str | None = None
 
 
+@dataclass(frozen=True)
+class _GuardrailContext:
+    """The per-request facts every Guardrail decision needs."""
+
+    retry_used: bool
+    retry_available: bool
+    used_tools: Sequence[str]
+    available_tools: str
+
+
+def _tool_calls(response: Response) -> list[Any]:
+    """The function calls the model asked for in one response."""
+    return [item for item in response.output if item.type == "function_call"]
+
+
 def _tools_in_flight(used_tools: Sequence[str]) -> str:
     """Name the tools that actually ran, for a log line."""
     return ", ".join(used_tools) if used_tools else "none"
@@ -88,6 +104,16 @@ class Coach:
         self.CITATION_COLLECTORS = {
             "search_coaching_docs": self._collect_citations,
         }
+        # Every registry tool needs a Guardrail classification and its Receipts scraper. A tool
+        # added to the registry without one would get no evidence and no numbers, turning every
+        # answer from it into a false rejection; fail loudly at construction instead.
+        unscraped = set(self.TOOL_REGISTRY) - SCRAPED_TOOLS
+        if unscraped:
+            logger.error(
+                "tools without a Guardrail classification: %s; add them to the outcome and "
+                "Receipt scrapers in app/engine/guardrails.py",
+                ", ".join(sorted(unscraped)),
+            )
 
         self.workoutsRepository = WorkoutsRepository(db)
 
@@ -95,9 +121,9 @@ class Coach:
         used_tools: list[str] = []
         citations: list[Citation] = []
         evidence: list[ToolEvidence] = []
-        # Every numeral any successful tool returned during this request, so a later turn can
-        # quote data that an earlier turn retrieved.
-        receipts: set[Decimal] = set()
+        # Every Receipt group any successful tool returned during this request, so a later turn
+        # can quote data that an earlier turn retrieved. A derivation never spans two groups.
+        receipt_groups: list[Receipts] = []
         # One correction turn per request, however many Violations it produces: the budget is
         # counted per request, not per Violation kind.
         retry_used = False
@@ -114,6 +140,11 @@ class Coach:
         }
         available_tools = ", ".join(tool_registry)
 
+        def failed_call(tool_call: Any, fn_name: str, reason: str) -> ResponseInputItemParam:
+            """Record a failed call's evidence and build its one error result."""
+            evidence.append(error_evidence(fn_name))
+            return self._tool_error_output(tool_call.call_id, fn_name, reason)
+
         instructions = build_coach_instructions(date.today())
         response = self.client.responses.create(
             instructions=instructions,
@@ -122,20 +153,24 @@ class Coach:
             tools=self.TOOLS,
         )
 
-        for iteration in range(max_iterations):
-            tool_calls = [item for item in response.output if item.type == "function_call"]
+        # One round beyond the tool budget: the final dispatch buys a model turn, and that turn
+        # may already be the finished answer. It is judged here, never discarded.
+        for iteration in range(max_iterations + 1):
+            tool_calls = _tool_calls(response)
 
             if not tool_calls:
                 decision = self._judge_answer(
                     response.output_text,
                     evidence,
-                    receipts=receipts,
-                    retry_used=retry_used,
-                    # The correction turn spends this iteration, so its response needs the
-                    # next one in which to be judged.
-                    retry_available=iteration + 1 < max_iterations,
-                    used_tools=used_tools,
-                    available_tools=available_tools,
+                    receipt_groups=receipt_groups,
+                    context=_GuardrailContext(
+                        retry_used=retry_used,
+                        # The correction turn spends this iteration, so its response needs the
+                        # next one in which to be judged.
+                        retry_available=iteration + 1 < max_iterations,
+                        used_tools=used_tools,
+                        available_tools=available_tools,
+                    ),
                 )
                 if decision.outcome is _AnswerOutcome.SHIP:
                     return {
@@ -153,6 +188,11 @@ class Coach:
                 assert decision.rejection is not None
                 return build_rejection(decision.rejection, used_tools)
 
+            if iteration == max_iterations:
+                # The tool budget is spent and the model is still asking for tools; the calls
+                # are not dispatched because no judgement turn would remain to read the answer.
+                break
+
             tool_outputs: list[ResponseInputItemParam] = []
             for tool_call in tool_calls:
                 fn_name = tool_call.name
@@ -161,10 +201,9 @@ class Coach:
                     logger.warning(
                         "coach called unknown tool %s; returning an error result", fn_name
                     )
-                    evidence.append(error_evidence(fn_name))
                     tool_outputs.append(
-                        self._tool_error_output(
-                            tool_call.call_id,
+                        failed_call(
+                            tool_call,
                             fn_name,
                             f"Unknown tool '{fn_name}'. Available tools: {available_tools}.",
                         )
@@ -177,10 +216,9 @@ class Coach:
                     logger.warning(
                         "coach sent unreadable arguments for tool %s: %s", fn_name, error
                     )
-                    evidence.append(error_evidence(fn_name))
                     tool_outputs.append(
-                        self._tool_error_output(
-                            tool_call.call_id,
+                        failed_call(
+                            tool_call,
                             fn_name,
                             f"Could not read the arguments for tool '{fn_name}': {error}.",
                         )
@@ -193,7 +231,7 @@ class Coach:
                 fn = tool_registry[fn_name]
                 result = fn(**fn_args)
                 evidence.append(tool_evidence(fn_name, result))
-                receipts |= scrape_receipts(result)
+                receipt_groups.append(scrape_receipts(fn_name, result))
                 collect_citations = self.CITATION_COLLECTORS.get(fn_name)
                 if collect_citations:
                     collect_citations(citations, result)
@@ -229,11 +267,8 @@ class Coach:
         output_text: str,
         evidence: Sequence[ToolEvidence],
         *,
-        receipts: Collection[Decimal],
-        retry_used: bool,
-        retry_available: bool,
-        used_tools: Sequence[str],
-        available_tools: str,
+        receipt_groups: Sequence[Receipts],
+        context: _GuardrailContext,
     ) -> _AnswerDecision:
         """Judge one finished answer and decide its fate: ship, retry, or Rejection.
 
@@ -247,29 +282,23 @@ class Coach:
             logger.warning(
                 "coach answer normalized to nothing-found: every substantive tool result was "
                 "empty; tools in flight: %s",
-                _tools_in_flight(used_tools),
+                _tools_in_flight(context.used_tools),
             )
             return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=NOTHING_FOUND)
         if verdict is ScopeVerdict.NO_SUBSTANTIVE_CALL:
             return self._decide_violation(
                 "no substantive tool call",
                 SCOPE_RETRY,
-                retry_used=retry_used,
-                retry_available=retry_available,
-                used_tools=used_tools,
-                available_tools=available_tools,
+                context=context,
             )
         if not output_text:
             return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=COULD_NOT_COMPLETE)
-        violation = grounding_violation(output_text, receipts)
+        violation = grounding_violation(output_text, receipt_groups)
         if violation is not None:
             return self._decide_violation(
                 f"grounding: numeral {violation.numeral} has no Receipt in the tool results",
                 grounding_retry(violation.numeral),
-                retry_used=retry_used,
-                retry_available=retry_available,
-                used_tools=used_tools,
-                available_tools=available_tools,
+                context=context,
             )
         return _AnswerDecision(_AnswerOutcome.SHIP)
 
@@ -278,10 +307,7 @@ class Coach:
         reason: str,
         complaint: str,
         *,
-        retry_used: bool,
-        retry_available: bool,
-        used_tools: Sequence[str],
-        available_tools: str,
+        context: _GuardrailContext,
     ) -> _AnswerDecision:
         """Apply the one per-request retry budget to a fixable Violation.
 
@@ -290,23 +316,23 @@ class Coach:
         Violation with no iteration left to carry its correction turn is the couldn't-complete
         Rejection.
         """
-        tools = _tools_in_flight(used_tools)
-        if retry_used:
+        tools = _tools_in_flight(context.used_tools)
+        if context.retry_used:
             logger.warning(
                 "coach answer blocked: %s again after one correction turn; returning the "
                 "out-of-scope Rejection; tools in flight: %s; available tools: %s",
                 reason,
                 tools,
-                available_tools,
+                context.available_tools,
             )
             return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=OUT_OF_SCOPE)
-        if not retry_available:
+        if not context.retry_available:
             logger.warning(
                 "coach answer blocked: %s but the iteration budget is spent; returning the "
                 "couldn't-complete Rejection; tools in flight: %s; available tools: %s",
                 reason,
                 tools,
-                available_tools,
+                context.available_tools,
             )
             return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=COULD_NOT_COMPLETE)
         logger.warning(
@@ -314,7 +340,7 @@ class Coach:
             "available tools: %s",
             reason,
             tools,
-            available_tools,
+            context.available_tools,
         )
         return _AnswerDecision(_AnswerOutcome.RETRY, complaint=complaint)
 

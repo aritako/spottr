@@ -1140,3 +1140,43 @@ def test_ask_coach_returns_could_not_complete_when_iterations_run_out(
     assert "query_workouts" in engine_logs.text
     assert question not in engine_logs.text
     assert "You are Spottr" not in engine_logs.text
+
+
+def test_ask_coach_ships_the_answer_from_the_final_model_turn(
+    coach: Coach,
+) -> None:
+    search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
+    workout_calls = [
+        _tool_call("query_workouts", '{"metric": "tonnage"}', f"call_workouts_{index}")
+        for index in range(4)
+    ]
+    responses = [
+        _response([search_call], response_id="resp_1"),
+        *[
+            _response([tool_call], response_id=f"resp_{index + 2}")
+            for index, tool_call in enumerate(workout_calls)
+        ],
+        _response([], "You lifted 12,400 kg.", response_id="resp_6"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_search(coach, {"status": "no_match", "passages": []}),
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 12400.0]],
+            },
+        ),
+    ):
+        result = coach.ask_coach("How much did I lift?")
+
+    assert result == {
+        "answer": "You lifted 12,400 kg.",
+        "used_tools": ["search_coaching_docs", "query_workouts"],
+        "citations": [],
+    }
+    assert create.call_count == 6
