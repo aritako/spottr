@@ -150,6 +150,9 @@ def _numerals(*pairs: tuple[str, str]) -> list[tuple[str, Decimal]]:
         ("3 sets", _numerals(("3", "3"))),
         ("12,400 kg", _numerals(("12,400", "12400"))),
         ("12,400.50 kg", _numerals(("12,400.50", "12400.5"))),
+        # A malformed grouping is not a thousands separator: each run of digits is its own
+        # numeral and is checked independently.
+        ("1,24,00 kg", _numerals(("1", "1"), ("24", "24"), ("00", "0"))),
         ("12400.0", _numerals(("12400.0", "12400"))),
         ("12400.00", _numerals(("12400.00", "12400"))),
         ("72.5 kg", _numerals(("72.5", "72.5"))),
@@ -187,6 +190,7 @@ def _numerals(*pairs: tuple[str, str]) -> list[tuple[str, Decimal]]:
         "plain-integer",
         "thousands-separator",
         "thousands-and-fraction",
+        "malformed-grouping-is-not-a-separator",
         "trailing-decimal",
         "trailing-zeros",
         "decimal",
@@ -482,6 +486,10 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         # Whole-percent rounding is the only relaxation.
         ("Tonnage rose 33%.", _receipts("3000", "4000"), None),
         ("Tonnage rose 33.3%.", _receipts("3000", "4000"), "33.3"),
+        # A written fractional statement is not "stated as a whole percent" even when its value
+        # is integral: tenths precision supports 33.3, not 33.0.
+        ("Tonnage rose 33.0%.", _receipts("3000", "4000"), "33.0"),
+        ("Tonnage rose 33.00%.", _receipts("3000", "4000"), "33.00"),
         ("Tonnage rose 34%.", _receipts("3000", "4000"), "34"),
         ("Tonnage fell 16.7%.", _receipts("10000", "12000"), "16.7"),
         ("Tonnage rose 16%.", _receipts("10000", "12000"), "16"),
@@ -533,6 +541,8 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         "percentage-wrong-direction",
         "percentage-whole-rounded",
         "percentage-fraction-not-supported",
+        "percentage-written-tenths-is-not-whole",
+        "percentage-written-hundredths-is-not-whole",
         "percentage-near-miss-whole",
         "percentage-decrease-fraction-not-supported",
         "percentage-wrong-whole-rounding",

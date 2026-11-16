@@ -422,7 +422,9 @@ def _is_percentage_change(value: Decimal, values: Sequence[int]) -> bool:
         if _has_second(counts, end, start):
             return True
 
-    if not _is_whole(value):
+    if value.as_tuple().exponent < 0:
+        # A statement written with fractional digits is not "stated as a whole percent", even
+        # when its value happens to be integral (33.0% against a recomputation of 33.333).
         return False
 
     # Whole-percent statements are checked against the exact recomputation rounded half-up.
@@ -434,11 +436,6 @@ def _is_percentage_change(value: Decimal, values: Sequence[int]) -> bool:
             if _round_half_up_ratio(100 * (end - start), start) == whole:
                 return True
     return False
-
-
-def _is_whole(value: Decimal) -> bool:
-    """Whether a Decimal is a whole number, regardless of its written trailing zeros."""
-    return value == value.to_integral_value()
 
 
 def _round_half_up_ratio(numerator: int, denominator: int) -> int:

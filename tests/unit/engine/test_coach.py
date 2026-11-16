@@ -195,7 +195,7 @@ def test_ask_coach_normalizes_an_all_empty_correction_turn_to_nothing_found(
     assert create.call_count == 3
     assert [call.kwargs["input"] for call in create.call_args_list].count(SCOPE_RETRY) == 1
     assert "nothing-found" in engine_logs.text
-    assert "query_workouts" in engine_logs.text
+    assert "tools in flight: query_workouts" in engine_logs.text
     assert "12,400" not in engine_logs.text
 
 
