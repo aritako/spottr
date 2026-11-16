@@ -498,6 +498,13 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         ("Tonnage fell 16.7%.", _receipts("10000", "12000"), "16.7"),
         ("Tonnage rose 16%.", _receipts("10000", "12000"), "16"),
         ("Tonnage rose 12.5%.", _receipts("10000", "11250"), None),
+        # The whole-percent relaxation applies only to a numeral written as a percentage, so a
+        # wrong difference, sum, or average that coincides with a rounded pair percentage stays a
+        # Violation.
+        ("The difference was 33 kg.", _receipts("3000", "4000"), "33"),
+        ("The total is 33 kg.", _receipts("3000", "4000"), "33"),
+        ("The average is 33 kg.", _receipts("3000", "4000"), "33"),
+        ("Tonnage rose 33 percent.", _receipts("3000", "4000"), None),
         ("Tonnage rose 18%.", _receipts("1.1", "1.3"), None),
         ("Tonnage rose 18.2%.", _receipts("1.1", "1.3"), "18.2"),
         # Sum over a pair, a larger set, and exact decimals.
@@ -556,6 +563,10 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         "percentage-decrease-fraction-not-supported",
         "percentage-wrong-whole-rounding",
         "percentage-exact-fraction",
+        "whole-number-difference-is-not-a-percentage",
+        "whole-number-total-is-not-a-percentage",
+        "whole-number-average-is-not-a-percentage",
+        "percent-word-is-a-percentage",
         "percentage-whole-rounded-decimal-source",
         "percentage-representation-noise-not-supported",
         "sum-pair",

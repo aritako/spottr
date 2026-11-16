@@ -39,12 +39,14 @@ measurements are kept as a multiset, because summing repeated rows is legitimate
 Every recipe computes in exact decimal arithmetic: the values are scaled to integers, so a
 floating-point artefact can never manufacture a Receipt. Difference, sum, and average must match
 exactly. A derived percentage must match the recomputation exactly when stated at any fractional
-precision; a percentage stated as a whole percent is also accepted when it equals the exact
-recomputation rounded half-up to a whole percent. That whole-percent rounding is the only
-relaxation. A recipe needs a source pair or set among one result's measurements; with too few
-source numbers it produces nothing, and the numeral stays a Violation. A numeral whose written
-exponent exceeds 12 in magnitude is never derivable: it cannot be a legitimate statistic, and
-scaling it would allocate an enormous integer, so it can only be backed literally.
+precision; a percentage written as a whole percent is also accepted when it equals the exact
+recomputation rounded to the nearest whole percent, with halves away from zero. That whole-percent
+rounding is the only relaxation, and it applies only to a numeral written as a percentage, so it
+can never excuse a wrong difference, sum, or average. A recipe needs a source pair or set among
+one result's measurements; with too few source numbers it produces nothing, and the numeral stays
+a Violation. A numeral whose decimal exponent exceeds 12 in magnitude is never derivable: it
+cannot be a legitimate statistic, and scaling it would allocate an enormous integer, so it can
+only be backed literally.
 
 Every numeral-looking token is checked independently. A range needs Receipts for both ends; a
 fraction is its two numerals rather than an evaluated quotient; a leading sign is part of the
@@ -204,6 +206,7 @@ class Numeral:
 
     text: str
     value: Decimal
+    percent: bool = False
 
 
 @dataclass(frozen=True)
@@ -228,8 +231,22 @@ def extract_numerals(text: str) -> tuple[Numeral, ...]:
         if match.group("sign") and _follows_digit(text, match.start()):
             # "4-6" is a range, not 4 and negative 6.
             token = token[1:]
-        numerals.append(Numeral(text=token, value=_numeral_value(token)))
+        numerals.append(
+            Numeral(
+                text=token,
+                value=_numeral_value(token),
+                percent=_is_percent(text, match.end()),
+            )
+        )
     return tuple(numerals)
+
+
+_PERCENT_AFTER = re.compile(r"\s*(?:%|percent\b)", re.IGNORECASE)
+
+
+def _is_percent(text: str, end: int) -> bool:
+    """Whether a numeral is a percentage: followed by ``%`` or the word ``percent``."""
+    return _PERCENT_AFTER.match(text, end) is not None
 
 
 def _follows_digit(text: str, start: int) -> bool:
@@ -322,7 +339,7 @@ def _workout_series(result: object) -> tuple[Decimal, ...]:
     return tuple(values)
 
 
-# A numeral whose written exponent is beyond this magnitude cannot be a legitimate derived
+# A numeral whose decimal exponent is beyond this magnitude cannot be a legitimate derived
 # statistic, and scaling it to integers would allocate an enormous coefficient. Such a numeral
 # is treated as unbacked when it is not literal.
 _MAX_DERIVATION_EXPONENT = 12
@@ -345,7 +362,7 @@ def grounding_violation(
             continue
         if abs(numeral.value.as_tuple().exponent) > _MAX_DERIVATION_EXPONENT:
             return GroundingViolation(numeral=numeral.text, value=numeral.value)
-        written_whole = _written_whole(numeral.text, numeral.value)
+        written_whole = _written_whole(numeral.text, numeral.value, numeral.percent)
         if any(
             _is_derived(numeral.value, group.series, written_whole=written_whole)
             for group in receipts
@@ -355,13 +372,16 @@ def grounding_violation(
     return None
 
 
-def _written_whole(text: str, value: Decimal) -> bool:
+def _written_whole(text: str, value: Decimal, percent: bool) -> bool:
     """Whether a numeral is written as a whole percent.
 
-    The mantissa must carry no decimal point (``3.3e1`` is fractional however it normalizes) and
-    the value must have no fractional part (``33e-1`` is 3.3). A whole percent is a statement
-    written whole, not one whose value happens to be integral.
+    Only a percentage can use the whole-percent relaxation, so a wrong difference, sum, or
+    average that happens to equal a rounded pair percentage stays a Violation. The mantissa must
+    carry no decimal point (``3.3e1`` is fractional however it normalizes) and the value must
+    have no fractional part (``33e-1`` is 3.3).
     """
+    if not percent:
+        return False
     mantissa = text.split("e")[0].split("E")[0]
     return "." not in mantissa and value.as_tuple().exponent >= 0
 
@@ -449,7 +469,8 @@ def _is_percentage_change(value: Decimal, values: Sequence[int], *, written_whol
     if not written_whole:
         return False
 
-    # Whole-percent statements are checked against the exact recomputation rounded half-up.
+    # Whole-percent statements are checked against the exact recomputation rounded to the nearest
+    # whole percent, with halves away from zero.
     whole = int(value)
     for end in counts:
         for start in counts:
