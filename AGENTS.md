@@ -193,9 +193,10 @@ Slice rules:
   1. The implementation in `app/engine/tools.py` (calls handlers, returns JSON-serializable data)
   2. The JSON schema in `app/engine/prompts/tool_schemas.py` (exposed to the model as `Coach.TOOLS`)
   3. The entry in `Coach.TOOL_REGISTRY`
-  4. Its outcome classification and Receipt scraper in `app/engine/guardrails.py` (added to
-     `SCRAPED_TOOLS`), or its answers are rejected. `Coach.__init__` logs an error when a registry
-     tool has no scraper.
+  4. Its outcome classification and Receipt scraper in `app/engine/guardrails.py` — a `case` arm
+     in both `tool_evidence` and `scrape_receipts`, and the tool's name in `SCRAPED_TOOLS`.
+     `Coach.__init__` logs an error when a registry tool is not in `SCRAPED_TOOLS`; a member
+     without its `case` arms still falls through to the error outcome.
 - Prefer `"strict": True` schemas. With strict mode, every property must be listed in `required`,
   optional values use `["type", "null"]`, and `additionalProperties` must be `False`.
 - Never interpolate model-provided strings into SQL. Tool arguments map to fixed query options or
