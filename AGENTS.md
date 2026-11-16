@@ -72,7 +72,7 @@ Requests flow one way: **controller → handler → repository → ORM model**.
 
 ```
 app/
-├── main.py                  # FastAPI app, router registration, /health
+├── main.py                  # FastAPI app, router registration (incl. /analytics), /health
 ├── api/
 │   ├── controllers/         # FastAPI routers: HTTP concerns only
 │   ├── handlers/            # Business logic, class-based (e.g. WorkoutsHandler(db))
@@ -83,12 +83,14 @@ app/
 │   ├── models.py            # All ORM models
 │   └── openai/client.py     # Shared OpenAI client
 ├── engine/
-│   ├── coach.py             # Coach: tool registry, Responses API loop
+│   ├── coach.py             # Coach: tool registry, Responses API loop, Guardrail orchestration
+│   ├── guardrails.py        # PURE: Scope + Grounding checks over plain tool results
+│   ├── rejections.py        # app-written Rejection copy: one home for boundary strings
 │   ├── prompts/
 │   │   ├── instructions.py  # build_instructions(today): the system prompt
+│   │   ├── retry.py         # the correction-turn complaints
 │   │   └── tool_schemas.py  # TOOL_SCHEMAS: the model-facing tool schemas
-│   ├── tools.py             # Tool implementations (call handlers, not repositories)
-│   └── helpers.py           # PURE functions only: metrics and time bucketing
+│   └── tools.py             # Tool implementations (call handlers, not repositories)
 ├── eval/
 │   ├── golden/              # authored retrieval golden set (YAML)
 │   ├── coverage.py          # PURE golden-set coverage: gaps per corpus Document
@@ -96,8 +98,10 @@ app/
 │   ├── metrics.py           # PURE retrieval scoring: recall, no_match, margins
 │   └── sweep.py             # PURE cutoff/top-k sweeps and lock rules
 └── shared/
+    ├── constants.py         # string constants crossing module boundaries
     ├── enums/               # StrEnum definitions
     ├── errors/              # Domain exceptions
+    ├── metrics.py           # PURE metric and time-bucketing helpers
     └── schemas/             # Pydantic request/response models
 ```
 
@@ -112,8 +116,13 @@ Layer rules:
   status codes in controllers (see `create_workout` in `controllers/workouts.py`). Some existing
   handlers raise `HTTPException` directly; follow the domain-error pattern in new code, but don't
   refactor existing handlers unless the task asks for it.
-- **`engine/helpers.py` must stay pure:** no ORM imports, no DB, no I/O. Pass plain values or
+- **`shared/metrics.py` must stay pure:** no ORM imports, no DB, no I/O. Pass plain values or
   dataclasses in, get plain values out. This keeps metrics trivially unit-testable.
+- **Analytics is shared through `AnalyticsHandler` (`app/api/handlers/analytics.py`):** the
+  `/analytics` controller and the engine's `query_workouts` tool both call it. Name→id
+  resolution, Decimal conversion, entry construction, and response shaping live there, not in
+  controllers or tools. `engine → api` is the only cross-layer direction; no `api → engine`
+  imports.
 - **`app/eval` must stay pure and offline:** no ORM, database, network, or OpenAI imports outside
   `app/eval/golden_set.py`'s filesystem loader. Scoring, coverage, and lock rules take plain
   dataclasses so the eval tier stays cheap and deterministic.
@@ -162,7 +171,7 @@ Slice rules:
   enum as a `StrEnum` in `app/shared/enums/`, use it in Pydantic schemas, and store `.value` in the
   model. Do not introduce `sqlalchemy.Enum` columns.
 - **Numeric columns** (`weight`, `bodyweight`) come back from the ORM as `Decimal`. Convert with
-  `float(...)` at the boundary before passing values into `helpers.py`.
+  `float(...)` at the boundary before passing values into `app/shared/metrics.py`.
 - **Timestamps** are timezone-aware (`TIMESTAMP(timezone=True)`). Use `TimestampMixin` for
   `created_at`/`updated_at` on new tables where it makes sense.
 - **Date-range filters are inclusive of the end date:** filter with
@@ -186,10 +195,17 @@ Slice rules:
 - The engine uses the OpenAI **Responses API**. Follow-up calls chain with `previous_response_id`
   and **must re-send both `tools=self.TOOLS` and `instructions`**, or the model can lose its tool
   menu or the coach's rules.
-- Adding a tool requires three things that must stay in sync:
+- Adding a tool requires four things that must stay in sync:
   1. The implementation in `app/engine/tools.py` (calls handlers, returns JSON-serializable data)
   2. The JSON schema in `app/engine/prompts/tool_schemas.py` (exposed to the model as `Coach.TOOLS`)
   3. The entry in `Coach.TOOL_REGISTRY`
+  4. Its outcome classification and Receipt scraper in `app/engine/guardrails.py` — a `case` arm
+     in both `tool_evidence` and `scrape_receipts`, and the tool's name in `SCRAPED_TOOLS`.
+     `Coach.__init__` logs an error when a registry tool is not in `SCRAPED_TOOLS`; a member
+     without its `tool_evidence` arm gets the error outcome, and one without its
+     `scrape_receipts` arm backs no Receipts.
+- `query_workouts` delegates name→id resolution, aggregation, and response shaping to
+  `AnalyticsHandler`; tools must not query repositories themselves.
 - Prefer `"strict": True` schemas. With strict mode, every property must be listed in `required`,
   optional values use `["type", "null"]`, and `additionalProperties` must be `False`.
 - Never interpolate model-provided strings into SQL. Tool arguments map to fixed query options or

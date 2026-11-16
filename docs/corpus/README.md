@@ -23,7 +23,7 @@ coaching topic, written to be ingested through `POST /docs/ingest` as a
 The chunker (`app/engine/rag.py`, `chunk_document`) splits documents by
 paragraph. Paragraphs under 40 words merge forward into the next paragraph,
 and paragraphs over 300 words are split, though a short tail can rejoin the
-previous chunk and push it up to 39 words over the limit. Each chunk is
+previous chunk and push it up to 9 words over the limit (309 words). Each chunk is
 embedded with the document title in front of it; the trailing `## Sources`
 section is never embedded. Keep the `text` field in the ingest payload as the
 whole file. Write so each paragraph stands alone:
