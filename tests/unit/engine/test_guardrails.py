@@ -505,6 +505,8 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         ("The total is 33 kg.", _receipts("3000", "4000"), "33"),
         ("The average is 33 kg.", _receipts("3000", "4000"), "33"),
         ("Tonnage rose 33 percent.", _receipts("3000", "4000"), None),
+        ("A 33-percent increase.", _receipts("3000", "4000"), None),
+        ("Tonnage rose 33 per cent.", _receipts("3000", "4000"), None),
         ("Tonnage rose 18%.", _receipts("1.1", "1.3"), None),
         ("Tonnage rose 18.2%.", _receipts("1.1", "1.3"), "18.2"),
         # Sum over a pair, a larger set, and exact decimals.
@@ -567,6 +569,8 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         "whole-number-total-is-not-a-percentage",
         "whole-number-average-is-not-a-percentage",
         "percent-word-is-a-percentage",
+        "hyphenated-percent-is-a-percentage",
+        "per-cent-is-a-percentage",
         "percentage-whole-rounded-decimal-source",
         "percentage-representation-noise-not-supported",
         "sum-pair",

@@ -241,11 +241,15 @@ def extract_numerals(text: str) -> tuple[Numeral, ...]:
     return tuple(numerals)
 
 
-_PERCENT_AFTER = re.compile(r"\s*(?:%|percent\b)", re.IGNORECASE)
+_PERCENT_AFTER = re.compile(r"\s*-?\s*(?:%|percent\b|per\s+cent\b)", re.IGNORECASE)
 
 
 def _is_percent(text: str, end: int) -> bool:
-    """Whether a numeral is a percentage: followed by ``%`` or the word ``percent``."""
+    """Whether a numeral is a percentage: followed by ``%``, ``percent``, or ``per cent``.
+
+    The hyphenated attributive form ("a 33-percent increase") and the British two-word form both
+    count, so a correct whole-percent statistic is never rejected for its spelling.
+    """
     return _PERCENT_AFTER.match(text, end) is not None
 
 
@@ -415,7 +419,11 @@ def _scaled_receipts(receipts: tuple[Decimal, ...], target: Decimal) -> tuple[tu
 
 
 def _scaled_int(value: Decimal, scale: int) -> int:
-    """Express one finite Decimal as an integer at the given decimal scale."""
+    """Express one finite Decimal as an integer at the given decimal scale.
+
+    The coefficient is assembled by hand rather than with ``scaleb``: ``scaleb`` obeys the
+    decimal context, whose rounding could turn representation noise into a Receipt.
+    """
     sign, digits, exponent = value.as_tuple()
     coefficient = 0
     for digit in digits:

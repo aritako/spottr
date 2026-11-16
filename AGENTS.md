@@ -99,6 +99,7 @@ app/
 │   ├── metrics.py           # PURE retrieval scoring: recall, no_match, margins
 │   └── sweep.py             # PURE cutoff/top-k sweeps and lock rules
 └── shared/
+    ├── constants.py         # string constants crossing module boundaries
     ├── enums/               # StrEnum definitions
     ├── errors/              # Domain exceptions
     └── schemas/             # Pydantic request/response models

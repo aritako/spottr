@@ -15,7 +15,7 @@ SCOPE_RETRY = (
     "search_coaching_docs for training principles. Do not answer from your own knowledge."
 )
 
-GROUNDING_RETRY = (
+_GROUNDING_RETRY_TEMPLATE = (
     'Your answer states the number "{numeral}", which is neither present in nor derivable from '
     "the tool results. Answer the lifter's question again, using only numbers that appear in the "
     "tool output, or call a tool to retrieve the number you need."
@@ -24,4 +24,4 @@ GROUNDING_RETRY = (
 
 def grounding_retry(numeral: str) -> str:
     """Build the correction turn for one numeral that no tool output backs."""
-    return GROUNDING_RETRY.format(numeral=numeral)
+    return _GROUNDING_RETRY_TEMPLATE.format(numeral=numeral)
