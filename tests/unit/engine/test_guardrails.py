@@ -361,16 +361,32 @@ def test_scrape_receipts_reads_every_tool_output_shape(
 
 def test_every_scraped_tool_has_a_real_scraper() -> None:
     samples = {
-        "search_coaching_docs": {"status": "ok", "passages": [PASSAGE]},
-        "query_workouts": {"metric": "tonnage", "result": [["2026-W01", 1000.0]]},
-        "query_exercises": [[1, "Back Squat"]],
+        "search_coaching_docs": (
+            {"status": "ok", "passages": [PASSAGE]},
+            ToolOutcome.SUBSTANTIVE,
+            _group(),
+        ),
+        "query_workouts": (
+            {"metric": "tonnage", "result": [["2026-W01", 1000.0]]},
+            ToolOutcome.SUBSTANTIVE,
+            _group("1", "2026", "1000", series=("1000",)),
+        ),
+        "query_exercises": (
+            [[1, "Back Squat"]],
+            ToolOutcome.SUBSTANTIVE,
+            _group(),
+        ),
     }
 
     assert set(samples) == SCRAPED_TOOLS
-    for tool, sample in samples.items():
-        assert tool_evidence(tool, sample).outcome is not ToolOutcome.ERROR
-        assert isinstance(scrape_receipts(tool, sample), Receipts)
-    assert scrape_receipts("query_workouts", samples["query_workouts"]).series
+    for tool, (sample, outcome, receipts) in samples.items():
+        assert tool_evidence(tool, sample).outcome is outcome
+        assert scrape_receipts(tool, sample) == receipts
+
+
+def test_an_unarmed_tool_backs_nothing() -> None:
+    assert scrape_receipts("query_nutrition", {"document_id": 15, "calories": 2500}) == _group()
+    assert tool_evidence("query_nutrition", {"calories": 2500}).outcome is ToolOutcome.ERROR
 
 
 def test_derivations_use_only_one_results_measurements() -> None:

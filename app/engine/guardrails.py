@@ -267,7 +267,9 @@ def scrape_receipts(tool: str, result: object) -> Receipts:
             literal = _numerals_in(_exercise_names(result))
             return Receipts(literal=frozenset(literal), series=())
         case _:
-            return Receipts(literal=frozenset(_numerals_in([_json_text(result)])), series=())
+            # A tool without its own scraper backs nothing: scraping the envelope would let
+            # identifiers and names manufacture Receipts.
+            return Receipts(literal=frozenset(), series=())
 
 
 def _json_text(value: object) -> str:

@@ -866,7 +866,7 @@ def test_ask_coach_ships_a_mixed_answer_unchanged(coach: Coach) -> None:
 
 
 def test_ask_coach_drops_collected_citations_when_the_model_writes_no_text(
-    coach: Coach,
+    coach: Coach, engine_logs: pytest.LogCaptureFixture
 ) -> None:
     tool_call = _tool_call("search_coaching_docs", '{"k": null}')
     responses = [
@@ -885,6 +885,8 @@ def test_ask_coach_drops_collected_citations_when_the_model_writes_no_text(
         "used_tools": ["search_coaching_docs"],
         "citations": [],
     }
+    assert "no text" in engine_logs.text
+    assert "search_coaching_docs" in engine_logs.text
 
 
 def test_ask_coach_collects_evidence_across_every_turn(coach: Coach) -> None:
@@ -1225,6 +1227,41 @@ def test_ask_coach_retries_a_violation_at_the_last_dispatchable_iteration(
     }
     assert create.call_count == 6
     assert create.call_args_list[5].kwargs["input"] == grounding_retry("99,999")
+
+
+def test_ask_coach_answers_unusable_arguments_with_an_error_result(
+    coach: Coach,
+) -> None:
+    bad_call = _tool_call(
+        "query_workouts",
+        '{"metric": "tonnage", "start_date": "June 2026", "end_date": null, '
+        '"group_by": "week", "exercise": null}',
+        "call_bad_dates",
+    )
+    responses = [
+        _response([bad_call], response_id="resp_1"),
+        _response([], "You lifted 10,000 kg.", response_id="resp_2"),
+        _response([], "I still cannot check that.", response_id="resp_3"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        patch.object(
+            coach.tools,
+            "query_workouts",
+            side_effect=ValueError("Invalid isoformat string: 'June 2026'"),
+        ),
+    ):
+        result = coach.ask_coach("How much did I lift?")
+
+    follow_up = create.call_args_list[1].kwargs["input"]
+    assert [item["call_id"] for item in follow_up] == ["call_bad_dates"]
+    assert "Could not use the arguments" in follow_up[0]["output"]
+    assert result == {
+        "answer": OUT_OF_SCOPE,
+        "used_tools": [],
+        "citations": [],
+    }
 
 
 def test_coach_logs_registry_tools_without_a_scraper(

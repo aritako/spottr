@@ -227,11 +227,24 @@ class Coach:
                     )
                     continue
 
+                fn = tool_registry[fn_name]
+                try:
+                    result = fn(**fn_args)
+                except (ValueError, TypeError) as error:
+                    # Valid JSON can still carry values the tool cannot parse, such as a
+                    # model-written "June 2026" date. The call fails like a decode failure.
+                    logger.warning("coach sent unusable arguments for tool %s: %s", fn_name, error)
+                    tool_outputs.append(
+                        failed_call(
+                            tool_call,
+                            fn_name,
+                            f"Could not use the arguments for tool '{fn_name}': {error}.",
+                        )
+                    )
+                    continue
+
                 if fn_name not in used_tools:
                     used_tools.append(fn_name)
-
-                fn = tool_registry[fn_name]
-                result = fn(**fn_args)
                 evidence.append(tool_evidence(fn_name, result))
                 receipt_groups.append(scrape_receipts(fn_name, result))
                 collect_citations = self.CITATION_COLLECTORS.get(fn_name)
