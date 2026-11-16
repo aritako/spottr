@@ -260,7 +260,8 @@ def scrape_receipts(tool: str, result: object) -> Receipts:
             literal = _numerals_in(_passage_texts(result))
             return Receipts(literal=frozenset(literal), series=())
         case "query_workouts":
-            literal = _numerals_in([_json_text(result)])
+            rows = result.get("result") if isinstance(result, dict) else result
+            literal = _numerals_in([_json_text(rows)])
             return Receipts(literal=frozenset(literal), series=_workout_series(result))
         case "query_exercises":
             literal = _numerals_in(_exercise_names(result))

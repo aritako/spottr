@@ -3,6 +3,7 @@ from decimal import Decimal
 import pytest
 
 from app.engine.guardrails import (
+    SCRAPED_TOOLS,
     Receipts,
     ScopeVerdict,
     ToolEvidence,
@@ -334,7 +335,7 @@ def test_grounding_violation_requires_an_exact_receipt(
         (
             "query_workouts",
             {"metric": "e1rm", "result": [["Week of Jun 15, 2026", 125.0]]},
-            _group("1", "15", "2026", "125", series=("125",)),
+            _group("15", "2026", "125", series=("125",)),
         ),
         ("query_workouts", {"result": "No matching workout data found."}, _group()),
         ("search_coaching_docs", {"status": "no_match", "passages": []}, _group()),
@@ -356,6 +357,20 @@ def test_scrape_receipts_reads_every_tool_output_shape(
     tool: str, result: object, expected: Receipts
 ) -> None:
     assert scrape_receipts(tool, result) == expected
+
+
+def test_every_scraped_tool_has_a_real_scraper() -> None:
+    samples = {
+        "search_coaching_docs": {"status": "ok", "passages": [PASSAGE]},
+        "query_workouts": {"metric": "tonnage", "result": [["2026-W01", 1000.0]]},
+        "query_exercises": [[1, "Back Squat"]],
+    }
+
+    assert set(samples) == SCRAPED_TOOLS
+    for tool, sample in samples.items():
+        assert tool_evidence(tool, sample).outcome is not ToolOutcome.ERROR
+        assert isinstance(scrape_receipts(tool, sample), Receipts)
+    assert scrape_receipts("query_workouts", samples["query_workouts"]).series
 
 
 def test_derivations_use_only_one_results_measurements() -> None:

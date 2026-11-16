@@ -201,7 +201,11 @@ def test_ask_coach_normalizes_an_all_empty_correction_turn_to_nothing_found(
 def test_ask_coach_returns_could_not_complete_when_the_retry_budget_is_spent(
     coach: Coach, engine_logs: pytest.LogCaptureFixture
 ) -> None:
-    responses = [_response([], "You are getting stronger.", response_id="resp_1")]
+    unknown_call = _tool_call("query_nutrition", "{}", "call_unknown")
+    responses = [
+        _response([unknown_call], response_id="resp_1"),
+        _response([], "You are getting stronger.", response_id="resp_2"),
+    ]
 
     with patch.object(coach.client.responses, "create", side_effect=responses) as create:
         result = coach.ask_coach("How much did I lift?", max_iterations=1)
@@ -211,32 +215,34 @@ def test_ask_coach_returns_could_not_complete_when_the_retry_budget_is_spent(
         "used_tools": [],
         "citations": [],
     }
-    assert create.call_count == 1
+    assert create.call_count == 2
     assert "blocked" in engine_logs.text
     assert "iteration budget" in engine_logs.text
     assert "query_workouts" in engine_logs.text
 
 
-def test_ask_coach_returns_could_not_complete_when_the_last_iteration_finds_the_violation(
+def test_ask_coach_retries_the_answer_that_follows_the_last_dispatch(
     coach: Coach, engine_logs: pytest.LogCaptureFixture
 ) -> None:
     unknown_call = _tool_call("query_nutrition", "{}", "call_unknown")
     responses = [
         _response([unknown_call], response_id="resp_1"),
         _response([], "I can answer without tools.", response_id="resp_2"),
+        _response([], "Still no tools needed.", response_id="resp_3"),
     ]
 
     with patch.object(coach.client.responses, "create", side_effect=responses) as create:
         result = coach.ask_coach("How much did I lift?", max_iterations=2)
 
     assert result == {
-        "answer": COULD_NOT_COMPLETE,
+        "answer": OUT_OF_SCOPE,
         "used_tools": [],
         "citations": [],
     }
-    assert create.call_count == 2
+    assert create.call_count == 3
+    assert create.call_args_list[2].kwargs["input"] == SCOPE_RETRY
+    assert "retried" in engine_logs.text
     assert "blocked" in engine_logs.text
-    assert "iteration budget" in engine_logs.text
 
 
 def test_ask_coach_accumulates_tools_across_the_correction_turn(coach: Coach) -> None:
@@ -1180,3 +1186,55 @@ def test_ask_coach_ships_the_answer_from_the_final_model_turn(
         "citations": [],
     }
     assert create.call_count == 6
+
+
+def test_ask_coach_retries_a_violation_at_the_last_dispatchable_iteration(
+    coach: Coach,
+) -> None:
+    workout_calls = [
+        _tool_call("query_workouts", '{"metric": "tonnage"}', f"call_workouts_{index}")
+        for index in range(4)
+    ]
+    responses = [
+        *[
+            _response([tool_call], response_id=f"resp_{index + 1}")
+            for index, tool_call in enumerate(workout_calls)
+        ],
+        _response([], "You lifted 99,999 kg.", response_id="resp_5"),
+        _response([], "You lifted 12,400 kg.", response_id="resp_6"),
+    ]
+
+    with (
+        patch.object(coach.client.responses, "create", side_effect=responses) as create,
+        _stub_tool(
+            coach,
+            "query_workouts",
+            {
+                "metric": "tonnage",
+                "group_by": "week",
+                "result": [["Week of Jun 15, 2026", 12400.0]],
+            },
+        ),
+    ):
+        result = coach.ask_coach("How much did I lift?")
+
+    assert result == {
+        "answer": "You lifted 12,400 kg.",
+        "used_tools": ["query_workouts"],
+        "citations": [],
+    }
+    assert create.call_count == 6
+    assert create.call_args_list[5].kwargs["input"] == grounding_retry("99,999")
+
+
+def test_coach_logs_registry_tools_without_a_scraper(
+    engine_logs: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.engine.coach.SCRAPED_TOOLS", frozenset({"query_workouts"}))
+
+    Coach(MagicMock())
+
+    assert "Guardrail classification" in engine_logs.text
+    assert "query_exercises" in engine_logs.text
+    assert "search_coaching_docs" in engine_logs.text

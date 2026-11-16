@@ -166,8 +166,10 @@ class Coach:
                     context=_GuardrailContext(
                         retry_used=retry_used,
                         # The correction turn spends this iteration, so its response needs the
-                        # next one in which to be judged.
-                        retry_available=iteration + 1 < max_iterations,
+                        # next one in which to be judged. The loop runs one round past the tool
+                        # budget, so a Violation at the last dispatchable iteration still earns
+                        # its correction turn.
+                        retry_available=iteration + 1 <= max_iterations,
                         used_tools=used_tools,
                         available_tools=available_tools,
                     ),
@@ -292,6 +294,12 @@ class Coach:
                 context=context,
             )
         if not output_text:
+            logger.warning(
+                "coach answer blocked: the model returned no text; returning the "
+                "couldn't-complete Rejection; tools in flight: %s; available tools: %s",
+                _tools_in_flight(context.used_tools),
+                context.available_tools,
+            )
             return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=COULD_NOT_COMPLETE)
         violation = grounding_violation(output_text, receipt_groups)
         if violation is not None:
