@@ -718,7 +718,7 @@ def test_ask_coach_deduplicates_repeated_passages_across_searches(coach: Coach) 
     ]
 
 
-def test_ask_coach_reports_no_citations_when_nothing_matches(coach: Coach) -> None:
+def test_ask_coach_normalizes_no_match_to_nothing_found(coach: Coach) -> None:
     tool_call = _tool_call("search_coaching_docs", '{"k": null}')
     responses = [
         _response([tool_call]),
@@ -731,6 +731,7 @@ def test_ask_coach_reports_no_citations_when_nothing_matches(coach: Coach) -> No
     ):
         result = coach.ask_coach("How should I train for a marathon?")
 
+    assert result["answer"] == NOTHING_FOUND
     assert result["used_tools"] == ["search_coaching_docs"]
     assert result["citations"] == []
 
