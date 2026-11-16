@@ -322,6 +322,12 @@ def _workout_series(result: object) -> tuple[Decimal, ...]:
     return tuple(values)
 
 
+# A numeral whose written exponent is beyond this magnitude cannot be a legitimate derived
+# statistic, and scaling it to integers would allocate an enormous coefficient. Such a numeral
+# is treated as unbacked when it is not literal.
+_MAX_DERIVATION_EXPONENT = 12
+
+
 def grounding_violation(
     output_text: str, receipts: Sequence[Receipts]
 ) -> GroundingViolation | None:
@@ -337,13 +343,25 @@ def grounding_violation(
     for numeral in extract_numerals(output_text):
         if numeral.value in literals:
             continue
-        if any(_is_derived(numeral.value, group.series) for group in receipts):
+        if abs(numeral.value.as_tuple().exponent) > _MAX_DERIVATION_EXPONENT:
+            return GroundingViolation(numeral=numeral.text, value=numeral.value)
+        written_whole = _written_whole(numeral.text)
+        if any(
+            _is_derived(numeral.value, group.series, written_whole=written_whole)
+            for group in receipts
+        ):
             continue
         return GroundingViolation(numeral=numeral.text, value=numeral.value)
     return None
 
 
-def _is_derived(value: Decimal, series: Sequence[Decimal]) -> bool:
+def _written_whole(text: str) -> bool:
+    """Whether a numeral was written without a fractional part, whatever its value normalizes to."""
+    mantissa = text.split("e")[0].split("E")[0]
+    return "." not in mantissa
+
+
+def _is_derived(value: Decimal, series: Sequence[Decimal], *, written_whole: bool) -> bool:
     """Whether one of the four recipes re-derives this value from one result's measurements."""
     if len(series) < 2:
         # No recipe has a source pair or set to work from.
@@ -355,7 +373,7 @@ def _is_derived(value: Decimal, series: Sequence[Decimal]) -> bool:
         return True
     if sum(scaled) == target * len(scaled):
         return True
-    return _is_percentage_change(value, scaled)
+    return _is_percentage_change(value, scaled, written_whole=written_whole)
 
 
 def _scaled_receipts(receipts: tuple[Decimal, ...], target: Decimal) -> tuple[tuple[int, ...], int]:
@@ -399,12 +417,13 @@ def _has_second(counts: Counter[int], candidate: int, present: int) -> bool:
     return candidate != present or counts[present] >= 2
 
 
-def _is_percentage_change(value: Decimal, values: Sequence[int]) -> bool:
+def _is_percentage_change(value: Decimal, values: Sequence[int], *, written_whole: bool) -> bool:
     """Whether an ordered pair of measurements yields this signed percentage change.
 
     The recomputation is ``100 * (end - start) / start``, so an increase is positive and a
     decrease is negative; both directions are derived. Whole-percent rounding is the only
-    relaxation: any fractional statement must match the exact recomputation.
+    relaxation, and only for a percentage written as a whole percent: a statement written with
+    fractional digits (``33.0%``, ``3.3e1%``) must match the exact recomputation.
     """
     numerator, denominator = value.as_integer_ratio()
     counts = Counter(values)
@@ -422,9 +441,7 @@ def _is_percentage_change(value: Decimal, values: Sequence[int]) -> bool:
         if _has_second(counts, end, start):
             return True
 
-    if value.as_tuple().exponent < 0:
-        # A statement written with fractional digits is not "stated as a whole percent", even
-        # when its value happens to be integral (33.0% against a recomputation of 33.333).
+    if not written_whole:
         return False
 
     # Whole-percent statements are checked against the exact recomputation rounded half-up.

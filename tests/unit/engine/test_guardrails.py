@@ -490,6 +490,8 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         # is integral: tenths precision supports 33.3, not 33.0.
         ("Tonnage rose 33.0%.", _receipts("3000", "4000"), "33.0"),
         ("Tonnage rose 33.00%.", _receipts("3000", "4000"), "33.00"),
+        # A fractional mantissa is fractional however the exponent normalizes it.
+        ("Tonnage rose 3.3e1%.", _receipts("3000", "4000"), "3.3e1"),
         ("Tonnage rose 34%.", _receipts("3000", "4000"), "34"),
         ("Tonnage fell 16.7%.", _receipts("10000", "12000"), "16.7"),
         ("Tonnage rose 16%.", _receipts("10000", "12000"), "16"),
@@ -526,6 +528,9 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         # Neither literal nor derivable is still the unchanged Violation.
         ("You lifted 5,000 kg.", _receipts("10000", "12000"), "5,000"),
         ("You lifted 10,000 kg.", _receipts("10000"), None),
+        # An extreme written exponent is unbacked without scaling huge integers to test it.
+        ("You lifted 1e-999999999 kg.", _receipts("10000"), "1e-999999999"),
+        ("You lifted 1e999999999 kg.", _receipts("10000"), "1e999999999"),
     ],
     ids=[
         "difference-increase",
@@ -543,6 +548,7 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         "percentage-fraction-not-supported",
         "percentage-written-tenths-is-not-whole",
         "percentage-written-hundredths-is-not-whole",
+        "percentage-scientific-fraction-is-not-whole",
         "percentage-near-miss-whole",
         "percentage-decrease-fraction-not-supported",
         "percentage-wrong-whole-rounding",
@@ -567,6 +573,8 @@ def test_equal_measurements_derive_a_zero_difference() -> None:
         "percentage-single-receipt",
         "unrelated-numeral-still-unbacked",
         "literal-still-backed",
+        "unbounded-negative-exponent",
+        "unbounded-positive-exponent",
     ],
 )
 def test_grounding_derivation_recipes(
