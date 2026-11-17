@@ -201,7 +201,7 @@ export function formatCategory(category: string | null): string {
 }
 
 const kgFormatter = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 1,
+  maximumFractionDigits: 2,
 });
 
 /** "1240" -> "1,240". Keeps one decimal when the value has one. */

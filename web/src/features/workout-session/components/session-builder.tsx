@@ -47,7 +47,15 @@ function toDraft(handoff: RelogHandoff, catalog: Exercise[]): DraftExercise[] {
     }));
 }
 
-function MobileBar({ sets, tonnage }: { sets: number; tonnage: number }) {
+function MobileBar({
+  sets,
+  tonnage,
+  isPending,
+}: {
+  sets: number;
+  tonnage: number;
+  isPending: boolean;
+}) {
   return (
     <div className="bg-lab-900/95 sticky bottom-[calc(env(safe-area-inset-bottom)+88px)] z-30 -mx-1 mt-2 px-1 py-2 backdrop-blur-md lg:hidden">
       <div className="bg-lab-800 ring-lab-600 flex items-center gap-3 rounded-full py-2 pl-5 pr-2 ring-1 ring-inset">
@@ -59,8 +67,9 @@ function MobileBar({ sets, tonnage }: { sets: number; tonnage: number }) {
           variant="primary"
           size="md"
           aria-label="Finish workout"
+          disabled={isPending}
         >
-          Finish
+          {isPending ? "Saving…" : "Finish"}
         </Button>
       </div>
     </div>
@@ -382,7 +391,11 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
             />
           </div>
 
-          <MobileBar sets={totals.sets} tonnage={totals.tonnage} />
+          <MobileBar
+            sets={totals.sets}
+            tonnage={totals.tonnage}
+            isPending={isPending}
+          />
         </form>
       </div>
 
