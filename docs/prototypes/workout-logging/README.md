@@ -105,6 +105,10 @@ pnpm dev:prototype                      # in another shell
 pnpm record:workout-logging
 ```
 
+On a minimal WSL image, Playwright's Chromium also needs the usual system libraries
+(`sudo pnpm exec playwright install-deps chromium`); the recording run in this repo used a
+local `libasound2` extraction because the environment had no sudo.
+
 It records the full flow: home → picker → three exercises and six sets → inline
 correction → simulated POST failure with state preserved → retry → saved summary →
 delete-and-re-log → corrected re-save. The test verifies the deleted workout is gone
