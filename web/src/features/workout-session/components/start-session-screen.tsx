@@ -23,7 +23,7 @@ export async function StartSessionScreen() {
           <EmptyState
             eyebrow="Catalog unavailable"
             title="Couldn't load exercises"
-            body="The exercise catalog could not be loaded from GET /exercises. Check that the API is running and try again — nothing is lost."
+            body="Exercises didn't load. Try again — nothing is lost."
           >
             <Link
               href="/workouts/start"

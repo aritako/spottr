@@ -53,7 +53,8 @@ export function DeleteAndRelog({
 
       <dialog
         ref={dialogRef}
-        aria-label="Confirm delete and re-log"
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
         onClick={(event) => {
           if (event.target === dialogRef.current) close();
         }}
@@ -62,15 +63,22 @@ export function DeleteAndRelog({
         <form
           action={formAction}
           onSubmit={() => writeRelogHandoff(handoff)}
-          className="flex flex-col gap-4 p-[18px]"
+          className="flex flex-col gap-4 p-5 sm:p-6"
         >
           <input type="hidden" name="workout_id" value={workoutId} />
           <div className="flex flex-col gap-1.5">
-            <span className="eyebrow text-accent">Delete &amp; re-log</span>
-            <h2 className="display text-xl leading-none">Start over?</h2>
-            <p className="text-bone-300 text-sm leading-relaxed">
-              The saved workout will be permanently deleted. Its sets stay in
-              this browser so you can edit anything and save again.
+            <h2
+              id="delete-dialog-title"
+              className="display text-xl leading-none"
+            >
+              Delete and re-log?
+            </h2>
+            <p
+              id="delete-dialog-description"
+              className="text-bone-300 text-sm leading-relaxed"
+            >
+              This permanently deletes the saved workout. Your sets reopen in
+              the builder so you can fix them and save again.
             </p>
           </div>
 
@@ -84,7 +92,7 @@ export function DeleteAndRelog({
             </p>
           ) : null}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="ghost"
@@ -92,6 +100,7 @@ export function DeleteAndRelog({
               data-testid="cancel-delete"
               onClick={close}
               disabled={isPending}
+              className="w-full sm:w-auto"
             >
               Keep workout
             </Button>
@@ -101,6 +110,7 @@ export function DeleteAndRelog({
               size="md"
               data-testid="confirm-delete"
               disabled={isPending}
+              className="w-full sm:w-auto"
             >
               {isPending ? "Deleting…" : "Delete & re-log"}
             </Button>

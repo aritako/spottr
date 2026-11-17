@@ -104,11 +104,24 @@ export function validateSession(
       const fields: SetFieldErrors = {};
       const label = `${name} set ${index + 1}`;
 
-      const weight = parseWeight(set.weight);
+      const rawWeight = set.weight.trim();
+      const weight = parseWeight(rawWeight);
       if (weight === null) {
         fields.weight = "Enter a load in kg.";
         summary.push(`${label}: enter a load in kg.`);
-      } else if (Number.isNaN(weight) || weight < 0 || weight > MAX_WEIGHT_KG) {
+      } else if (Number.isNaN(weight)) {
+        const numeric = Number(rawWeight);
+        if (
+          Number.isFinite(numeric) &&
+          (numeric < 0 || numeric > MAX_WEIGHT_KG)
+        ) {
+          fields.weight = `Load must be 0–${MAX_WEIGHT_KG} kg.`;
+          summary.push(`${label}: load must be 0–${MAX_WEIGHT_KG} kg.`);
+        } else {
+          fields.weight = "Use a load like 82.5 (2 decimals max).";
+          summary.push(`${label}: use a load like 82.5, up to 2 decimals.`);
+        }
+      } else if (weight < 0 || weight > MAX_WEIGHT_KG) {
         fields.weight = `Load must be 0–${MAX_WEIGHT_KG} kg.`;
         summary.push(`${label}: load must be 0–${MAX_WEIGHT_KG} kg.`);
       }
@@ -117,7 +130,12 @@ export function validateSession(
       if (reps === null) {
         fields.reps = "Enter reps.";
         summary.push(`${label}: enter reps.`);
-      } else if (!Number.isInteger(reps) || reps < 1 || reps > MAX_REPS) {
+      } else if (Number.isNaN(reps)) {
+        fields.reps = `Use whole reps, 1–${MAX_REPS}.`;
+        summary.push(
+          `${label}: reps must be a whole number from 1–${MAX_REPS}.`,
+        );
+      } else if (reps < 1 || reps > MAX_REPS) {
         fields.reps = `Reps must be 1–${MAX_REPS}.`;
         summary.push(
           `${label}: reps must be a whole number from 1–${MAX_REPS}.`,
@@ -125,7 +143,10 @@ export function validateSession(
       }
 
       const rpe = parseRpe(set.rpe);
-      if (rpe !== null && (Number.isNaN(rpe) || rpe < 0 || rpe > MAX_RPE)) {
+      if (rpe !== null && Number.isNaN(rpe)) {
+        fields.rpe = `Use a number from 0 to ${MAX_RPE}.`;
+        summary.push(`${label}: RPE must be a number from 0 to ${MAX_RPE}.`);
+      } else if (rpe !== null && (rpe < 0 || rpe > MAX_RPE)) {
         fields.rpe = `RPE must be 0–${MAX_RPE}.`;
         summary.push(`${label}: RPE must be 0–${MAX_RPE}.`);
       }
@@ -304,6 +325,6 @@ export function exerciseNameById(
   exerciseId: number,
 ): string {
   return (
-    catalog.find((entry) => entry.id === exerciseId)?.name ?? "Unknown lift"
+    catalog.find((entry) => entry.id === exerciseId)?.name ?? "Unknown exercise"
   );
 }

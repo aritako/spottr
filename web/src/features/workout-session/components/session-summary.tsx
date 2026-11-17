@@ -1,4 +1,4 @@
-import { Button, PlateLoader, platesForWeight } from "~/components/ui";
+import { Button, PlateLoader, cn, platesForWeight } from "~/components/ui";
 
 import { MAX_NOTES_LENGTH } from "../model/constants";
 import { formatKg, type SessionTotals } from "../model/session";
@@ -10,11 +10,11 @@ interface SessionSummaryProps {
   notesError?: string;
   showErrors: boolean;
   isPending: boolean;
-  formError: string | null;
   onNotesChange: (value: string) => void;
   simulateFailure: boolean;
   onSimulateChange: (value: boolean) => void;
   onDiscard: () => void;
+  className?: string;
 }
 
 function Stat({
@@ -44,26 +44,29 @@ export function SessionSummary({
   notesError,
   showErrors,
   isPending,
-  formError,
   onNotesChange,
   simulateFailure,
   onSimulateChange,
   onDiscard,
+  className,
 }: SessionSummaryProps) {
   const topWeight = totals.topSet?.weight ?? 0;
   const plates = platesForWeight(topWeight);
   const caption =
     plates.length > 0
-      ? `20 + 2 × (${plates.join(" · ")})`
-      : "Empty bar · add a top set";
+      ? `20 kg bar · ${plates.join(" + ")} per side`
+      : "Add a top set to load the bar";
 
   return (
-    <aside aria-label="Session summary" className="lg:sticky lg:top-8">
+    <aside
+      aria-label="Session summary"
+      className={cn("lg:sticky lg:top-8", className)}
+    >
       <div className="rounded-panel bg-lab-800 flex flex-col gap-5 p-[18px]">
         <div className="flex flex-col gap-1">
           <span className="eyebrow">Session total</span>
           <p className="text-ash-300 text-[12px] leading-relaxed">
-            All loads in kilograms. One POST saves the whole session.
+            All loads in kilograms.
           </p>
         </div>
 
@@ -71,7 +74,7 @@ export function SessionSummary({
           <Stat label="Exercises" testid="session-total-exercises">
             {totals.exercises}
           </Stat>
-          <Stat label="Working sets" testid="session-total-sets">
+          <Stat label="Sets" testid="session-total-sets">
             {totals.sets}
           </Stat>
           <Stat label="Tonnage" testid="session-tonnage">
@@ -92,12 +95,12 @@ export function SessionSummary({
                 : "Empty barbell, no top set logged yet."
             }
           />
-          <figcaption className="num text-ash-500 text-center text-[10px]">
+          <figcaption className="num text-ash-400 text-center text-[10px]">
             {caption}
           </figcaption>
         </figure>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="border-lab-700/70 flex flex-col gap-1.5 border-t pt-4">
           <label htmlFor="notes-input" className="eyebrow">
             Session notes
           </label>
@@ -106,16 +109,18 @@ export function SessionSummary({
             data-testid="notes-input"
             name="notes"
             value={notes}
-            maxLength={MAX_NOTES_LENGTH + 50}
+            maxLength={MAX_NOTES_LENGTH}
             rows={3}
             placeholder="How did it move?"
             onChange={(event) => onNotesChange(event.target.value)}
             aria-invalid={(showErrors && notesError !== undefined) || undefined}
             className="bg-lab-700 placeholder:text-ash-500 min-h-20 w-full resize-y rounded-2xl px-3.5 py-3 text-[14px] leading-relaxed shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus:shadow-[inset_0_0_0_1.5px_var(--color-accent)] focus:outline-none"
           />
-          <span className="num text-ash-500 self-end text-[10px]">
-            {notes.length}/{MAX_NOTES_LENGTH}
-          </span>
+          {notes.length > 0 ? (
+            <span className="num text-ash-400 self-end text-[10px]">
+              {MAX_NOTES_LENGTH - notes.length} left
+            </span>
+          ) : null}
           {showErrors && notesError ? (
             <span role="alert" className="text-accent text-[12px]">
               {notesError}
@@ -134,22 +139,16 @@ export function SessionSummary({
           >
             {isPending ? "Saving…" : "Finish workout"}
           </Button>
-          {formError ? (
-            <p role="alert" className="text-accent text-[12px] leading-relaxed">
-              Couldn’t save — your session is still here. Review the error up
-              top and retry.
-            </p>
-          ) : null}
         </div>
 
         <details
           data-testid="prototype-controls"
-          className="ring-lab-600 rounded-2xl px-3 py-2 ring-1 ring-inset"
+          className="border-lab-600/70 rounded-2xl border px-3.5 py-2.5"
         >
-          <summary className="text-ash-300 cursor-pointer text-[12px] font-medium">
+          <summary className="text-ash-300 cursor-pointer text-[11px] font-medium tracking-wide">
             Prototype controls
           </summary>
-          <div className="flex flex-col gap-3 py-3">
+          <div className="flex flex-col gap-3 pb-1 pt-3">
             <label
               htmlFor="simulate-failure"
               className="flex cursor-pointer items-center gap-2.5 text-[13px]"
@@ -163,7 +162,7 @@ export function SessionSummary({
                 onChange={(event) => onSimulateChange(event.target.checked)}
                 className="accent-accent size-4"
               />
-              Simulate a failed save (prototype)
+              Simulate a failed save
             </label>
             <Button
               type="button"
@@ -171,7 +170,7 @@ export function SessionSummary({
               size="sm"
               data-testid="discard-session"
               onClick={onDiscard}
-              className="self-start px-0"
+              className="text-ash-300 hover:text-bone-100 self-start px-0"
             >
               Discard session
             </Button>

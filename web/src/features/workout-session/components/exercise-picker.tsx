@@ -8,7 +8,6 @@ import {
   CloseIcon,
   PlusIcon,
   SearchIcon,
-  cn,
 } from "~/components/ui";
 
 import { formatCategory } from "../model/session";
@@ -18,19 +17,6 @@ interface ExercisePickerProps {
   catalog: Exercise[];
   addedIds: Set<number>;
   onAdd: (exerciseId: number) => void;
-}
-
-function CompoundMarker({ compound }: { compound: boolean }) {
-  return (
-    <span
-      className={cn(
-        "num rounded-full px-2 py-0.5 text-[10px]",
-        compound ? "bg-accent/15 text-accent" : "bg-lab-700 text-ash-300",
-      )}
-    >
-      {compound ? "Compound" : "Accessory"}
-    </span>
-  );
 }
 
 /** Modal exercise picker over the loaded catalog. Stays open for multi-add. */
@@ -68,8 +54,8 @@ export function ExercisePicker({
           <div className="flex flex-col gap-1.5">
             <span className="eyebrow">Exercise catalog</span>
             <h2 className="display text-xl leading-none">Add exercise</h2>
-            <p className="num text-ash-300 text-[11px]">
-              {catalog.length} loaded · all pages from GET /exercises
+            <p className="num text-ash-400 text-[11px]">
+              {catalog.length} exercises
             </p>
           </div>
           <Button
@@ -78,7 +64,7 @@ export function ExercisePicker({
             size="icon"
             aria-label="Close picker"
             onClick={close}
-            className="size-10 shrink-0"
+            className="shrink-0"
           >
             <CloseIcon className="size-4" />
           </Button>
@@ -95,7 +81,7 @@ export function ExercisePicker({
               data-testid="exercise-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search lifts"
+              placeholder="Search exercises"
               autoComplete="off"
               className="placeholder:text-ash-500 h-11 min-w-0 flex-1 bg-transparent text-[15px] focus:outline-none"
             />
@@ -114,11 +100,9 @@ export function ExercisePicker({
                   <span className="truncate text-[15px] font-medium">
                     {entry.name}
                   </span>
-                  <span className="flex items-center gap-2">
-                    <span className="eyebrow normal-case tracking-normal">
-                      {formatCategory(entry.category)}
-                    </span>
-                    <CompoundMarker compound={entry.is_compound} />
+                  <span className="text-ash-300 text-[12px]">
+                    {formatCategory(entry.category)}
+                    {entry.is_compound ? " · compound" : ""}
                   </span>
                 </div>
                 {added ? (
@@ -150,7 +134,7 @@ export function ExercisePicker({
           })}
           {filtered.length === 0 ? (
             <li className="text-ash-300 px-3 py-8 text-center text-sm">
-              No lifts match “{query.trim()}”.
+              No exercises match “{query.trim()}”.
             </li>
           ) : null}
         </ul>
@@ -162,6 +146,7 @@ export function ExercisePicker({
             size="md"
             data-testid="picker-done"
             onClick={close}
+            className="w-full sm:w-auto"
           >
             Done
           </Button>

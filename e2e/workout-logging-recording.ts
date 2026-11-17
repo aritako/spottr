@@ -64,22 +64,23 @@ async function caption(page: Page, text: string): Promise<void> {
           "style",
           [
             "position:fixed",
-            mobile ? "left:12px" : "left:244px",
-            mobile ? "bottom:12px" : "bottom:20px",
+            mobile ? "left:12px" : "left:50%",
+            mobile ? "bottom:180px" : "bottom:20px",
+            mobile ? "transform:none" : "transform:translateX(-50%)",
             "z-index:2147483647",
             "display:flex",
             "align-items:center",
             "gap:8px",
-            mobile ? "padding:8px 10px" : "padding:10px 14px",
+            mobile ? "padding:8px 11px" : "padding:10px 14px",
             "border-radius:9999px",
             "background:rgba(26,22,22,0.94)",
             "box-shadow:0 0 0 1px #3A3030, 0 12px 32px rgba(0,0,0,0.45)",
             "color:#F0EBE8",
             mobile
-              ? "font:600 9.5px/1.2 Archivo, system-ui, sans-serif"
-              : "font:600 11px/1.2 Archivo, system-ui, sans-serif",
-            "letter-spacing:0.08em",
-            "text-transform:uppercase",
+              ? "font:600 10.5px/1.3 Archivo, system-ui, sans-serif"
+              : "font:600 11.5px/1.3 Archivo, system-ui, sans-serif",
+            "letter-spacing:0.01em",
+            "text-transform:none",
             "max-width:calc(100vw - 24px)",
             "pointer-events:none",
             "backdrop-filter:blur(6px)",
@@ -127,16 +128,16 @@ export async function recordFlow(
   });
   await expect(page.getByTestId("start-workout")).toBeVisible();
   await beat(page, 800);
-  await caption(page, "Home · start a session");
+  await caption(page, "Home");
   await beat(page, 900);
 
   await page.getByTestId("start-workout").click();
   await expect(page.getByTestId("start-session-screen")).toBeVisible();
   await beat(page, 900);
-  await caption(page, "Empty session · build today's workout");
+  await caption(page, "Start a workout");
 
   // Add three exercises through the catalog picker.
-  await caption(page, "Exercise catalog · search + pagination handled");
+  await caption(page, "Find an exercise");
   await page.locator('[data-testid="add-exercise"]:visible').first().click();
   await expect(page.getByTestId("exercise-picker")).toBeVisible();
   const search = page.getByTestId("exercise-search");
@@ -172,7 +173,7 @@ export async function recordFlow(
   await page.getByTestId("picker-done").click();
   await expect(page.getByTestId("exercise-picker")).toBeHidden();
   await beat(page, 700);
-  await caption(page, "Three exercises · log weight, reps and RPE");
+  await caption(page, "Three exercises, six sets");
 
   // Back Squat: three working sets.
   await typeInto(
@@ -215,7 +216,7 @@ export async function recordFlow(
   await typeInto(setRow(page, "Bench Press", 1).getByTestId("set-rpe"), "8.5");
   await beat(page, 400);
 
-  await caption(page, "Correct a mistake before saving");
+  await caption(page, "Fix a typo");
   await typeInto(setRow(page, "Bench Press", 0).getByTestId("set-reps"), "6");
   await beat(page, 500);
 
@@ -235,7 +236,7 @@ export async function recordFlow(
   await beat(page, 500);
 
   // Edit a saved value: 100 -> 102.5 kg.
-  await caption(page, "Inline editing · summary recalculates");
+  await caption(page, "Live totals");
   await typeInto(
     setRow(page, "Back Squat", 0).getByTestId("set-weight"),
     "102.5",
@@ -246,7 +247,6 @@ export async function recordFlow(
   await expect(summary).toBeVisible();
   await page.getByTestId("session-tonnage").scrollIntoViewIfNeeded();
   await beat(page, 1400);
-  await caption(page, "Session summary · one POST on finish");
 
   // Demonstrate the failed-save UX without losing the session.
   await page.getByTestId("prototype-controls").locator("summary").click();
@@ -260,7 +260,7 @@ export async function recordFlow(
   await expect(submitError).toBeVisible();
   await submitError.scrollIntoViewIfNeeded();
   await beat(page, 1400);
-  await caption(page, "Failed save · form state preserved");
+  await caption(page, "Save failed, sets kept");
   await expect(
     setRow(page, "Back Squat", 1).getByTestId("set-weight"),
   ).toHaveValue("105");
@@ -271,7 +271,7 @@ export async function recordFlow(
 
   await page.getByTestId("simulate-failure").uncheck();
   await beat(page, 300);
-  await caption(page, "Retry · one POST persists the whole session");
+  await caption(page, "Try again");
   await page.locator('[data-testid="finish-workout"]:visible').first().click();
 
   await page.waitForURL(/\/workouts\/\d+/, { timeout: 30_000 });
@@ -279,12 +279,12 @@ export async function recordFlow(
   expect(firstWorkoutId).toBeGreaterThan(0);
   await expect(page.getByTestId("workout-saved")).toBeVisible();
   await beat(page, 900);
-  await caption(page, "Saved · redirect to the session summary");
+  await caption(page, "Saved");
   await beat(page, 1200);
 
   await page.getByTestId("saved-workout-summary").scrollIntoViewIfNeeded();
   await beat(page, 1500);
-  await caption(page, "Post-submit correction · no update endpoint yet");
+  await caption(page, "Delete and re-log");
   await page.getByTestId("delete-and-relog").click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await beat(page, 900);
@@ -297,7 +297,7 @@ export async function recordFlow(
   ).toHaveValue("102.5");
   deletedWorkoutId = firstWorkoutId;
   await beat(page, 1200);
-  await caption(page, "Delete & re-log · sets kept in the browser");
+  await caption(page, "Sets kept");
 
   // Fix the typo we meant to log, then finish again.
   await typeInto(
@@ -305,13 +305,13 @@ export async function recordFlow(
     "100",
   );
   await beat(page, 600);
-  await caption(page, "Corrected session · save again");
+  await caption(page, "Fix and save");
   await page.locator('[data-testid="finish-workout"]:visible').first().click();
   await page.waitForURL(/\/workouts\/\d+/, { timeout: 30_000 });
   const correctedWorkoutId = Number(page.url().match(/\/workouts\/(\d+)/)?.[1]);
   await expect(page.getByTestId("workout-saved")).toBeVisible();
   await beat(page, 1400);
-  await caption(page, "Correction complete · new workout persisted");
+  await caption(page, "Done");
   await expect(page.getByTestId("workout-saved")).toContainText("100 × 5");
   await beat(page, 1800);
 

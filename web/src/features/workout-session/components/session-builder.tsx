@@ -57,8 +57,8 @@ function MobileBar({
   isPending: boolean;
 }) {
   return (
-    <div className="bg-lab-900/95 sticky bottom-[calc(env(safe-area-inset-bottom)+88px)] z-30 -mx-1 mt-2 px-1 py-2 backdrop-blur-md lg:hidden">
-      <div className="bg-lab-800 ring-lab-600 flex items-center gap-3 rounded-full py-2 pl-5 pr-2 ring-1 ring-inset">
+    <div className="border-lab-600 bg-lab-900/95 sticky bottom-[calc(env(safe-area-inset-bottom)+88px)] z-30 -mx-4 mt-1 border-t px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md sm:-mx-6 lg:hidden">
+      <div className="flex items-center justify-between gap-4">
         <p className="num text-bone-300 min-w-0 flex-1 truncate text-[12px]">
           {sets} {sets === 1 ? "set" : "sets"} · {formatKg(tonnage)} kg
         </p>
@@ -251,10 +251,11 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
               size="sm"
               data-testid="add-exercise"
               onClick={openPicker}
+              aria-label="Add exercise"
               className="whitespace-nowrap"
             >
               <PlusIcon className="size-4" />
-              Add exercise
+              <span className="hidden sm:inline">Add exercise</span>
             </Button>
           ) : undefined
         }
@@ -270,9 +271,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
               aria-hidden="true"
               className="border-accent size-5 shrink-0 animate-spin rounded-full border-2 border-t-transparent"
             />
-            <p className="text-bone-300 text-sm">
-              Workout saved — taking you to the summary…
-            </p>
+            <p className="text-bone-300 text-sm">Saved. Opening the summary…</p>
           </div>
         ) : null}
 
@@ -282,21 +281,19 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
             data-testid="submit-error"
             className="rounded-card bg-accent/5 ring-accent/30 flex flex-col gap-3 p-4 ring-1 ring-inset"
           >
-            <span className="eyebrow text-accent">
-              Couldn’t save this workout
-            </span>
+            <span className="eyebrow text-accent">Save failed</span>
             <p className="text-bone-300 text-sm leading-relaxed">
-              {saveState.message} Your session is still here — nothing was lost.
+              {saveState.message}
             </p>
             <Button
               type="submit"
               form="session-form"
-              variant="primary"
+              variant="secondary"
               size="sm"
               disabled={isPending}
               className="self-start"
             >
-              {isPending ? "Saving…" : "Retry save"}
+              {isPending ? "Saving…" : "Try again"}
             </Button>
           </div>
         ) : null}
@@ -320,7 +317,8 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
             data-testid="relog-notice"
             className="bg-lab-800/70 text-ash-300 ring-lab-600 rounded-2xl px-3.5 py-2.5 text-[12px] leading-relaxed ring-1 ring-inset"
           >
-            Re-logging a deleted session — edit anything, then finish again.
+            Your sets are prefilled from the deleted workout. Fix anything, then
+            finish.
           </p>
         ) : null}
 
@@ -336,10 +334,10 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
             <div className="flex min-w-0 flex-col gap-4">
               {blocks.length === 0 ? (
                 <EmptyState
-                  eyebrow="Next up"
+                  eyebrow="Start here"
                   title="Build your session"
                   icon={<BarbellIcon className="size-9" />}
-                  body="Your session is built locally, one exercise at a time. Nothing is saved until you finish the workout."
+                  body="Add an exercise, log your sets, and finish when you’re done. Nothing saves until then."
                 >
                   <Button
                     type="button"
@@ -376,15 +374,13 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
             </div>
 
             <SessionSummary
+              className={blocks.length === 0 ? "hidden lg:block" : undefined}
               totals={totals}
               topSetLabel={topSetLabel}
               notes={notes}
               notesError={validation.notesError}
               showErrors={showErrors}
               isPending={isPending}
-              formError={
-                saveState.status === "error" ? saveState.message : null
-              }
               onNotesChange={setNotes}
               simulateFailure={simulateFailure}
               onSimulateChange={setSimulateFailure}
@@ -392,11 +388,13 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
             />
           </div>
 
-          <MobileBar
-            sets={totals.sets}
-            tonnage={totals.tonnage}
-            isPending={isPending}
-          />
+          {blocks.length > 0 ? (
+            <MobileBar
+              sets={totals.sets}
+              tonnage={totals.tonnage}
+              isPending={isPending}
+            />
+          ) : null}
         </form>
       </div>
 

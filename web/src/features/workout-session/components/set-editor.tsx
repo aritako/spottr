@@ -113,9 +113,9 @@ export function SetEditor({
             <h3 className="display text-[17px] leading-tight">
               {exercise.name}
             </h3>
-            <span className="eyebrow normal-case tracking-normal">
+            <span className="text-ash-300 text-[12px] leading-tight">
               {formatCategory(exercise.category)}
-              {exercise.is_compound ? " · Compound" : ""}
+              {exercise.is_compound ? " · compound" : ""}
             </span>
           </div>
         </div>

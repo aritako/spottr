@@ -46,8 +46,7 @@ export async function saveWorkout(
   if (formData.get("simulate_failure") !== null) {
     return {
       status: "error",
-      message:
-        "Simulated save failure (prototype control). The API was not called.",
+      message: "Something interrupted the save. Your sets and notes are here.",
     };
   }
 
@@ -65,7 +64,7 @@ export async function saveWorkout(
   } catch {
     return {
       status: "error",
-      message: "Could not read your session data.",
+      message: "Couldn't read this session. Try saving again.",
     };
   }
 
@@ -73,8 +72,7 @@ export async function saveWorkout(
   if (!parsed.success) {
     return {
       status: "error",
-      message:
-        "Some sets need attention before saving (load 0–9999.99 kg, reps 1–999, RPE 0–10).",
+      message: "Check your sets and try again.",
     };
   }
 
@@ -97,12 +95,12 @@ export async function saveWorkout(
     if (error instanceof ApiError) {
       return {
         status: "error",
-        message: `Couldn't save this workout (API ${error.status}: ${error.detail}).`,
+        message: "We couldn't save this workout. Your sets and notes are here.",
       };
     }
     return {
       status: "error",
-      message: "Could not reach the workout service.",
+      message: "Couldn't connect. Your sets and notes are here.",
     };
   }
 }
@@ -116,7 +114,7 @@ export async function deleteWorkout(
   if (!Number.isInteger(id) || id <= 0) {
     return {
       status: "error",
-      message: "Missing workout id. Nothing was deleted.",
+      message: "Couldn't identify this workout. Nothing was deleted.",
     };
   }
 
@@ -128,20 +126,18 @@ export async function deleteWorkout(
     if (error instanceof ApiError && error.status === 404) {
       return {
         status: "error",
-        message:
-          "That workout was already gone (404). Your re-log draft is still in this browser.",
+        message: "This workout was already deleted.",
       };
     }
     if (error instanceof ApiError) {
       return {
         status: "error",
-        message: `Couldn't delete this workout (API ${error.status}: ${error.detail}). Nothing was deleted.`,
+        message: "Couldn't delete this workout. Nothing was deleted.",
       };
     }
     return {
       status: "error",
-      message:
-        "Could not reach the workout service. Nothing was deleted — try again.",
+      message: "Couldn't connect. Nothing was deleted — try again.",
     };
   }
 }

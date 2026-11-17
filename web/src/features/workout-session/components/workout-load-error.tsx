@@ -7,17 +7,17 @@ import { buttonClasses, EmptyState } from "~/components/ui";
 export function WorkoutLoadError() {
   return (
     <>
-      <PageHeader eyebrow="Session complete" title="Workout saved" />
+      <PageHeader eyebrow="Session summary" title="Workout saved" />
       <EmptyState
         eyebrow="Unavailable"
         title="Couldn't load this workout"
-        body="The saved workout could not be loaded. Check that the API is running and try again — your data is safe."
+        body="Try again in a moment, or start another session."
       >
         <Link
           href="/workouts/start"
           className={buttonClasses({ variant: "primary", size: "md" })}
         >
-          Log another workout
+          Start another workout
         </Link>
       </EmptyState>
     </>

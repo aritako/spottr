@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Exercise, SetRead, Workout } from "@spottr/api-client";
 
 import { PageHeader } from "~/components/page-header";
-import { buttonClasses, Card } from "~/components/ui";
+import { buttonClasses, Card, CheckIcon } from "~/components/ui";
 
 import {
   exerciseNameById,
@@ -40,58 +40,20 @@ function groupSets(workout: Workout): ExerciseGroup[] {
   }));
 }
 
-function SavedStamp() {
+/** Confirmation seal. A check inside a ring, with nothing to collide. */
+function SavedSeal() {
   return (
-    <svg
-      width="96"
-      height="96"
-      viewBox="0 0 100 100"
+    <span
       role="img"
-      aria-label="Workout saved stamp"
-      className="shrink-0"
+      aria-label="Workout saved"
+      className="bg-accent/10 ring-accent relative grid size-14 shrink-0 place-items-center rounded-full ring-2 sm:size-20"
     >
-      <circle
-        cx="50"
-        cy="50"
-        r="46"
-        fill="none"
-        strokeWidth="3"
-        className="stroke-accent"
+      <span
+        aria-hidden="true"
+        className="border-accent/40 absolute inset-1.5 rounded-full border border-dashed"
       />
-      <circle
-        cx="50"
-        cy="50"
-        r="37"
-        fill="none"
-        strokeWidth="1.5"
-        strokeDasharray="3 3.5"
-        className="stroke-accent"
-      />
-      <text
-        x="50"
-        y="46"
-        textAnchor="middle"
-        fontFamily="Archivo, system-ui, sans-serif"
-        fontWeight="900"
-        fontSize="17"
-        letterSpacing="1.5"
-        className="fill-accent"
-        style={{ fontStretch: "125%" }}
-      >
-        SAVED
-      </text>
-      <text
-        x="50"
-        y="63"
-        textAnchor="middle"
-        fontFamily="Martian Mono, ui-monospace, monospace"
-        fontSize="9"
-        letterSpacing="2"
-        className="fill-ash-300"
-      >
-        LOGGED
-      </text>
-    </svg>
+      <CheckIcon className="text-accent relative size-6 sm:size-8" />
+    </span>
   );
 }
 
@@ -151,50 +113,40 @@ export function WorkoutSavedScreen({
 
   return (
     <div data-testid="workout-saved" className="flex flex-col gap-4">
-      <PageHeader eyebrow="Session complete" title="Workout saved" />
+      <PageHeader eyebrow="Session summary" title="Workout saved" />
 
-      <Card className="rounded-panel flex flex-col gap-5 p-[18px] sm:flex-row sm:items-center sm:gap-6">
-        <SavedStamp />
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="eyebrow">
+      <Card
+        data-testid="saved-workout-summary"
+        className="rounded-panel flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6 sm:p-6"
+      >
+        <div className="flex items-center gap-4 sm:contents">
+          <SavedSeal />
+          <span className="eyebrow sm:hidden">
             Logged {formatPerformedAt(workout.performed_at)}
           </span>
-          <p className="display text-[22px] leading-none">
-            {groups.length} {groups.length === 1 ? "lift" : "lifts"} ·{" "}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <span className="eyebrow hidden sm:block">
+            Logged {formatPerformedAt(workout.performed_at)}
+          </span>
+          <p className="display text-[21px] leading-none sm:text-[28px]">
+            {groups.length} {groups.length === 1 ? "exercise" : "exercises"} ·{" "}
             {workout.sets.length} sets
           </p>
           <p className="text-bone-300 text-sm leading-relaxed">
             {formatKg(tonnage)} kg moved
-            {topSet
-              ? ` · top set ${formatKg(topSet.weight)} × ${topSet.reps}`
-              : ""}
-            . All loads in kilograms.
+          </p>
+        </div>
+        <div className="border-lab-700 flex w-full items-baseline justify-between gap-4 border-t pt-3 sm:block sm:w-auto sm:shrink-0 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+          <span className="eyebrow">Top set</span>
+          <p className="num text-[18px] leading-none sm:mt-2 sm:text-[20px]">
+            {topSet ? `${formatKg(topSet.weight)} × ${topSet.reps}` : "—"}
           </p>
         </div>
       </Card>
 
-      <div
-        data-testid="saved-workout-summary"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-      >
-        {[
-          { label: "Exercises", value: String(groups.length) },
-          { label: "Sets", value: String(workout.sets.length) },
-          { label: "Tonnage", value: `${formatKg(tonnage)} kg` },
-          {
-            label: "Top set",
-            value: topSet ? `${formatKg(topSet.weight)} × ${topSet.reps}` : "—",
-          },
-        ].map((stat) => (
-          <Card key={stat.label} className="flex flex-col gap-1 p-4">
-            <span className="eyebrow">{stat.label}</span>
-            <span className="num text-[18px] leading-none">{stat.value}</span>
-          </Card>
-        ))}
-      </div>
-
       {workout.notes ? (
-        <Card className="flex flex-col gap-1.5 p-[18px]">
+        <Card className="flex flex-col gap-1.5 p-5">
           <span className="eyebrow">Session notes</span>
           <p className="text-bone-300 text-sm leading-relaxed">
             {workout.notes}
@@ -202,14 +154,14 @@ export function WorkoutSavedScreen({
         </Card>
       ) : null}
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         {groups.map((group) => (
-          <Card key={group.exerciseId} className="p-[18px]">
-            <div className="flex flex-col gap-1 pb-1">
-              <h2 className="display text-[16px] leading-tight">
+          <Card key={group.exerciseId} className="p-5">
+            <div className="flex flex-col gap-1">
+              <h2 className="display text-[17px] leading-tight">
                 {exerciseNameById(exercises, group.exerciseId)}
               </h2>
-              <span className="eyebrow normal-case tracking-normal">
+              <span className="text-ash-300 text-[12px] leading-tight">
                 {formatCategory(
                   exercises.find((entry) => entry.id === group.exerciseId)
                     ?.category ?? null,
@@ -225,13 +177,13 @@ export function WorkoutSavedScreen({
         ))}
       </div>
 
-      <Card className="rounded-panel flex flex-col gap-3 p-[18px]">
+      <Card className="rounded-panel flex flex-col gap-3 p-5">
         <div className="flex flex-col gap-1">
-          <span className="eyebrow">Need to fix something?</span>
+          <span className="eyebrow">Corrections</span>
+          <h2 className="display text-[17px] leading-tight">Fix a mistake</h2>
           <p className="text-bone-300 text-sm leading-relaxed">
-            There is no edit endpoint in this prototype, so corrections work as
-            delete-and-re-log: the saved workout is permanently deleted, then
-            its sets reopen in the builder for editing.
+            Deleting is permanent. Your sets reopen in the builder so you can
+            fix them and save again.
           </p>
         </div>
         <DeleteAndRelog workoutId={workout.id} handoff={toHandoff(workout)} />
