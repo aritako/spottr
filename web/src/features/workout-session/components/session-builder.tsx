@@ -66,6 +66,7 @@ function MobileBar({
           type="submit"
           variant="primary"
           size="md"
+          data-testid="finish-workout"
           aria-label="Finish workout"
           disabled={isPending}
         >

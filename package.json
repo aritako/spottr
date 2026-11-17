@@ -16,7 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:api": "scripts/test.sh",
-    "record:workout-logging": "playwright test e2e/record-workout-logging.spec.ts"
+    "record:workout-logging": "playwright test e2e"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",

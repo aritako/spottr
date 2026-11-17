@@ -6,7 +6,9 @@ import { defineConfig } from "@playwright/test";
  * Start the prototype web app from this worktree on port 3001 and keep the API
  * on :8000, then run:
  *
- *   pnpm exec playwright test e2e/record-workout-logging.spec.ts
+ *   pnpm record:workout-logging
+ *
+ * That runs the desktop (1440x900) and phone (390x844) recordings.
  */
 export default defineConfig({
   testDir: "./e2e",
