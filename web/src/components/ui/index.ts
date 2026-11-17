@@ -16,15 +16,21 @@ export { EmptyState } from "./empty-state";
 export type { EmptyStateProps } from "./empty-state";
 export {
   BarbellIcon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CloseIcon,
   CoachIcon,
   HistoryIcon,
   PlusIcon,
   ProgressIcon,
+  SearchIcon,
   SendIcon,
+  TrashIcon,
 } from "./icons";
 export type { IconProps } from "./icons";
 export { Logo } from "./logo";
 export type { LogoProps } from "./logo";
+export { BAR_WEIGHT_KG, PlateLoader, platesForWeight } from "./plate-loader";
+export type { PlateLoaderProps } from "./plate-loader";

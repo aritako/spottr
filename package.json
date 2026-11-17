@@ -8,15 +8,18 @@
   },
   "scripts": {
     "dev": "pnpm --filter @spottr/web dev",
+    "dev:prototype": "pnpm --filter @spottr/web exec next dev --turbo -p 3001",
     "build": "pnpm --filter @spottr/web build",
     "start": "pnpm --filter @spottr/web start",
     "lint": "pnpm --filter @spottr/web lint",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:api": "scripts/test.sh"
+    "test:api": "scripts/test.sh",
+    "record:workout-logging": "playwright test e2e/record-workout-logging.spec.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11"
   }
