@@ -328,7 +328,11 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     (total, block) => total + block.sets.length,
     0,
   );
-  const canFinish = totals.sets > 0;
+  const completedSets = blocks.reduce(
+    (total, block) => total + block.sets.filter((set) => set.completed).length,
+    0,
+  );
+  const canFinish = completedSets > 0;
   const draftSetCount = pendingDraft
     ? pendingDraft.exercises.reduce(
         (total, entry) => total + entry.sets.length,
@@ -754,6 +758,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                 showErrors={showErrors}
                 errorCount={errorCount}
                 totalSets={totalSets}
+                completedSets={completedSets}
                 canFinish={canFinish}
                 isPending={isPending}
                 onNotesChange={setNotes}
@@ -766,7 +771,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
 
           {blocks.length > 0 ? (
             <MobileBar
-              sets={totals.sets}
+              sets={completedSets}
               totalSets={totalSets}
               tonnage={totals.tonnage}
               errorCount={errorCount}

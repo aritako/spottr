@@ -15,6 +15,7 @@ interface SessionSummaryProps {
   showErrors: boolean;
   errorCount: number;
   totalSets: number;
+  completedSets: number;
   canFinish: boolean;
   isPending: boolean;
   onNotesChange: (value: string) => void;
@@ -54,6 +55,7 @@ export function SessionSummary({
   showErrors,
   errorCount,
   totalSets,
+  completedSets,
   canFinish,
   isPending,
   onNotesChange,
@@ -86,9 +88,9 @@ export function SessionSummary({
       <div className="rounded-panel bg-lab-800 flex flex-col gap-5 p-5">
         <dl className="flex flex-col gap-2.5">
           <Figure label="Sets" testid="session-total-sets">
-            {totals.sets === totalSets
-              ? totals.sets
-              : `${totals.sets} of ${totalSets}`}
+            {completedSets === totalSets
+              ? completedSets
+              : `${completedSets} of ${totalSets}`}
           </Figure>
           <Figure label="Volume" testid="session-tonnage">
             {formatKg(totals.tonnage)} kg
