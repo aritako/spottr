@@ -52,3 +52,8 @@ specs/
 # Postman
 postman/
 .postman/
+
+# Prototype capture artifacts (generated locally)
+docs/prototypes/**/*.png
+docs/prototypes/**/*.webm
+docs/prototypes/**/*.mp4
