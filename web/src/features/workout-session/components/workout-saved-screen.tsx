@@ -6,7 +6,6 @@ import { buttonClasses, CheckIcon } from "~/components/ui";
 
 import {
   exerciseNameById,
-  formatDuration,
   formatKg,
   formatPerformedAt,
   type RelogHandoff,
@@ -39,23 +38,6 @@ function groupSets(workout: Workout): ExerciseGroup[] {
   }));
 }
 
-/** Confirmation seal. A check inside a ring, with nothing to collide. */
-function SavedSeal() {
-  return (
-    <span
-      role="img"
-      aria-label="Workout saved"
-      className="bg-accent/10 ring-accent relative grid size-12 shrink-0 place-items-center rounded-full ring-2 sm:size-14"
-    >
-      <span
-        aria-hidden="true"
-        className="border-accent/40 absolute inset-1.5 rounded-full border border-dashed"
-      />
-      <CheckIcon className="text-accent relative size-5 sm:size-6" />
-    </span>
-  );
-}
-
 function SetLine({ set, index }: { set: SetRead; index: number }) {
   return (
     <li className="flex items-baseline justify-between gap-3 py-1">
@@ -81,6 +63,7 @@ function toHandoff(workout: Workout): RelogHandoff {
         weight: String(set.weight),
         reps: String(set.reps),
         rpe: set.rpe === null ? "" : String(set.rpe),
+        completed: true,
       })),
     })),
   };
@@ -99,28 +82,6 @@ export function WorkoutSavedScreen({
     (total, set) => total + set.weight * set.reps,
     0,
   );
-  const topSet = workout.sets.reduce<SetRead | null>((top, set) => {
-    if (
-      top === null ||
-      set.weight > top.weight ||
-      (set.weight === top.weight && set.reps > top.reps)
-    ) {
-      return set;
-    }
-    return top;
-  }, null);
-  // created_at is the save time, so this is the session length. Seeded rows
-  // have a months-old performed_at; keep implausible durations off screen.
-  const durationSeconds =
-    (Date.parse(workout.created_at) - Date.parse(workout.performed_at)) / 1000;
-  const showDuration =
-    Number.isFinite(durationSeconds) &&
-    durationSeconds >= 1 &&
-    durationSeconds <= 4 * 3600;
-  const topSetExerciseName = topSet
-    ? exerciseNameById(exercises, topSet.exercise_id)
-    : null;
-
   return (
     <div
       data-testid="workout-saved"
@@ -128,33 +89,24 @@ export function WorkoutSavedScreen({
     >
       <header
         data-testid="saved-workout-summary"
-        className="flex flex-col gap-2 pb-2"
+        className="flex flex-col items-center gap-2 pb-3 text-center"
       >
-        <div className="flex items-center justify-between gap-4">
-          <h1
-            aria-label={`Workout saved — ${formatKg(tonnage)} kilograms lifted`}
-            className="display min-w-0 text-[40px] leading-none sm:text-[52px]"
-          >
-            {formatKg(tonnage)}
-            <span className="num text-ash-300 ml-2 align-baseline text-[13px] font-normal tracking-[0.02em] sm:text-[16px]">
-              kg lifted
-            </span>
-          </h1>
-          <SavedSeal />
-        </div>
+        <h1
+          aria-label={`Workout saved — ${formatKg(tonnage)} kilograms lifted`}
+          className="display text-[40px] leading-none sm:text-[52px]"
+        >
+          {formatKg(tonnage)}
+          <span className="num text-ash-300 ml-2 align-baseline text-[13px] font-normal tracking-[0.02em] sm:text-[16px]">
+            kg lifted
+          </span>
+        </h1>
         <p className="num text-bone-300 text-[13px] leading-relaxed">
           {workout.sets.length} sets · {groups.length}{" "}
           {groups.length === 1 ? "exercise" : "exercises"}
         </p>
-        {topSet ? (
-          <p className="num text-bone-300 text-[13px] leading-relaxed">
-            top set {topSetExerciseName} {formatKg(topSet.weight)} ×{" "}
-            {topSet.reps}
-          </p>
-        ) : null}
-        <p className="num text-ash-400 text-pretty text-[12px] leading-relaxed">
-          {formatPerformedAt(workout.performed_at)}
-          {showDuration ? ` · ${formatDuration(durationSeconds)}` : ""}
+        <p className="num text-ash-400 inline-flex items-center gap-1.5 text-[12px] leading-relaxed">
+          <CheckIcon className="text-accent size-3.5" />
+          Completed {formatPerformedAt(workout.performed_at)}
         </p>
       </header>
 

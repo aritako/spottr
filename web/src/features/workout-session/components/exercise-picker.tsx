@@ -47,9 +47,9 @@ export function ExercisePicker({
       onClick={(event) => {
         if (event.target === dialogRef.current) close();
       }}
-      className="bg-lab-800 text-bone-100 rounded-panel m-auto max-h-[80dvh] w-[min(520px,calc(100vw-2rem))] p-0 backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+      className="bg-lab-800 text-bone-100 rounded-panel m-auto max-h-[80dvh] w-[min(520px,calc(100vw-2rem))] p-0 backdrop:bg-black/70 backdrop:backdrop-blur-sm max-sm:m-0 max-sm:mt-auto max-sm:max-h-[85dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none"
     >
-      <div className="flex max-h-[80dvh] flex-col">
+      <div className="flex max-h-[80dvh] flex-col max-sm:max-h-[85dvh]">
         <div className="flex items-center justify-between gap-4 p-4 pb-0 sm:p-5 sm:pb-0">
           <h2 className="display text-lg leading-none">Add exercise</h2>
           <Button
@@ -126,13 +126,23 @@ export function ExercisePicker({
             );
           })}
           {filtered.length === 0 ? (
-            <li className="text-ash-300 px-3 py-8 text-center text-sm">
-              No exercises match “{query.trim()}”.
+            <li className="flex flex-col items-center gap-3 px-3 py-8 text-center">
+              <span className="text-ash-300 text-sm">
+                No exercises match “{query.trim()}”.
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setQuery("")}
+              >
+                Clear search
+              </Button>
             </li>
           ) : null}
         </ul>
 
-        <div className="border-lab-700 flex items-center justify-between gap-3 border-t p-3 sm:p-4">
+        <div className="border-lab-700 flex items-center justify-between gap-3 border-t p-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
           <span className="num text-ash-400 pl-2 text-[11px]">
             {addedIds.size} added
           </span>

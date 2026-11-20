@@ -45,6 +45,21 @@ async function typeInto(locator: Locator, value: string): Promise<void> {
   await locator.pressSequentially(value, { delay: 55 });
 }
 
+async function setRpe(row: Locator, value: string): Promise<void> {
+  const rpe = row.getByTestId("set-rpe");
+  const tag = await rpe.evaluate((el) => el.tagName);
+  if (tag === "SELECT") await rpe.selectOption(value);
+  else await typeInto(rpe, value);
+}
+
+async function completeAll(page: Page): Promise<void> {
+  const toggles = page.locator('[data-testid="toggle-set"]');
+  const count = await toggles.count();
+  for (let index = 0; index < count; index += 1) {
+    await toggles.nth(index).click();
+  }
+}
+
 async function beat(page: Page, ms = 450): Promise<void> {
   await page.waitForTimeout(ms);
 }
@@ -181,7 +196,7 @@ export async function recordFlow(
     "100",
   );
   await typeInto(setRow(page, "Back Squat", 0).getByTestId("set-reps"), "5");
-  await typeInto(setRow(page, "Back Squat", 0).getByTestId("set-rpe"), "8");
+  await setRpe(setRow(page, "Back Squat", 0), "8");
   await beat(page, 350);
 
   await card(page, "Back Squat").getByTestId("add-set").click();
@@ -189,7 +204,8 @@ export async function recordFlow(
     setRow(page, "Back Squat", 1).getByTestId("set-weight"),
     "105",
   );
-  await typeInto(setRow(page, "Back Squat", 1).getByTestId("set-rpe"), "8.5");
+  await typeInto(setRow(page, "Back Squat", 1).getByTestId("set-reps"), "5");
+  await setRpe(setRow(page, "Back Squat", 1), "8.5");
   await beat(page, 350);
 
   await card(page, "Back Squat").getByTestId("add-set").click();
@@ -198,7 +214,7 @@ export async function recordFlow(
     "110",
   );
   await typeInto(setRow(page, "Back Squat", 2).getByTestId("set-reps"), "3");
-  await typeInto(setRow(page, "Back Squat", 2).getByTestId("set-rpe"), "9");
+  await setRpe(setRow(page, "Back Squat", 2), "9");
   await beat(page, 450);
 
   // Bench Press: two sets, then correct a reps mistake.
@@ -207,13 +223,14 @@ export async function recordFlow(
     "70",
   );
   await typeInto(setRow(page, "Bench Press", 0).getByTestId("set-reps"), "5");
-  await typeInto(setRow(page, "Bench Press", 0).getByTestId("set-rpe"), "8");
+  await setRpe(setRow(page, "Bench Press", 0), "8");
   await card(page, "Bench Press").getByTestId("add-set").click();
   await typeInto(
     setRow(page, "Bench Press", 1).getByTestId("set-weight"),
     "72.5",
   );
-  await typeInto(setRow(page, "Bench Press", 1).getByTestId("set-rpe"), "8.5");
+  await typeInto(setRow(page, "Bench Press", 1).getByTestId("set-reps"), "6");
+  await setRpe(setRow(page, "Bench Press", 1), "8.5");
   await beat(page, 400);
 
   await caption(page, "Fix a typo");
@@ -229,10 +246,7 @@ export async function recordFlow(
     setRow(page, "Romanian Deadlift", 0).getByTestId("set-reps"),
     "8",
   );
-  await typeInto(
-    setRow(page, "Romanian Deadlift", 0).getByTestId("set-rpe"),
-    "7.5",
-  );
+  await setRpe(setRow(page, "Romanian Deadlift", 0), "7.5");
   await beat(page, 500);
 
   // Edit a saved value: 100 -> 102.5 kg.
@@ -243,6 +257,7 @@ export async function recordFlow(
   );
   await beat(page, 500);
 
+  await completeAll(page);
   const summary = page.getByTestId("session-total-sets");
   await expect(summary).toBeVisible();
   await page.getByTestId("session-tonnage").scrollIntoViewIfNeeded();

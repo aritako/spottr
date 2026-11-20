@@ -50,21 +50,23 @@ API origin.
 1. **Home → Start workout** opens the session builder.
 2. **Add exercise** opens the catalog picker. It loads every page of `GET /exercises`
    (8 per page while looping) and filters locally as you type.
-3. Each exercise gets editable set rows: kg, reps, optional RPE. Sets can be added,
-   edited inline, and removed before saving.
+3. Each exercise gets a ruled set row: kg, reps, optional RPE. The left cell is a
+   completion check; only checked sets count toward the totals and are saved. A new
+   set is a plan: it copies the last load, leaves reps blank, and stays unchecked. RPE
+   opens a native picker on mobile (1–10 in 0.5 steps).
 4. The header shows elapsed time once the first exercise is added. The sidebar shows
-   sets, tonnage, the top set, and a plate loader for the heaviest load. Notes are
+   sets, volume, the top set, and a plate loader for the heaviest load. Notes are
    optional.
-5. **Finish workout** validates on the client and in the server action, then sends one
-   `POST /workouts` with all nested sets.
+5. **Finish workout** validates the checked sets on the client and in the server action,
+   then sends one `POST /workouts` with the completed sets.
 6. **Failure** leaves every set and note intact and shows a retry panel. Retrying posts
    the same session again. The prototype controls include **Simulate a failed save** so
    the failure state can be reviewed without editing code.
-7. **Success** redirects to `/workouts/[id]`, a server-rendered saved-session summary
-   led by the total volume.
+7. **Success** redirects to `/workouts/[id]`, a centered receipt led by the total
+   volume, then sets, exercises, and the completion date. No top set or duration.
 8. **Leaving or reloading** warns while sets are unsaved. The draft is mirrored to
    `localStorage`; returning offers **Resume** or **Discard**, and the clock continues
-   from the original start.
+   from the original start. On mobile, Discard lives in the action bar.
 9. **Delete & re-log** is the correction path. It confirms the delete, keeps the sets in
    `sessionStorage`, deletes with `DELETE /workouts/{id}`, and reopens the builder
    prefilled. Saving again creates a new workout.
@@ -73,30 +75,34 @@ API origin.
 
 - The screens keep the existing **Red Lab** palette, type tokens, and primitives; the
   cleanup adds no new UI component.
-- The saved screen leads with the session volume, then sets / exercises / top set,
-  then one set sheet. There is no second stats grid repeating the same totals.
-- The mobile bar holds add-exercise, the live totals (or the field-error count), and
-  Finish. The header carries the elapsed clock, so the page title stays on one line.
+- The saved screen is a centered receipt: volume, sets, exercises, and the completion
+  date with a small inline check. No top set, no duration, no large stamp.
+- The mobile bar holds discard, add-exercise, the live totals (or the field-error
+  count), and Finish. The header carries the elapsed clock in a pill, so the page title
+  stays on one line.
 - Copy is sentence case and user-facing. API, endpoint, and storage details live in this
   document, not in the UI.
-- The SAVED stamp is a check seal. It has no text inside the ring, so it cannot collide.
 - Set rows are a ruled grid: units are labelled once in the sheet header, not per card.
   The header stays pinned while the sheet scrolls. Remove-set is visible on touch and
   appears on hover/focus with a pointer.
+- The exercise picker is a bottom sheet below `sm` and the centered 520px modal above it.
 
 ## Decisions recorded by this prototype
 
-- The session is client form state until finish; one `POST /workouts` persists it. No
-  set-level API calls and no server draft endpoint. The active session is mirrored to
-  browser `localStorage` so a reload or discarded tab can resume it; it is cleared on
-  save or discard and expires after 24 hours.
+- The session is client form state until finish; one `POST /workouts` persists the
+  checked sets. No set-level API calls and no server draft endpoint. The active session
+  is mirrored to browser `localStorage` so a reload or discarded tab can resume it; it
+  is cleared on save or discard and expires after 24 hours.
+- Only checked sets are validated, counted, and sent. A new set copies the last load,
+  leaves reps blank, and starts unchecked; the check is the commit.
 - `performed_at` is the session start time, not the save time.
 - Unit is fixed to **kg**. A unit toggle needs conversion and is out of scope for #10.
 - Exercises are sent by `id`; the UI never uses the API's exact, case-sensitive name
   matching.
-- Session length is wall-clock from the first exercise added to the save. The saved
-  screen hides implausible durations (seeded rows have a months-old `performed_at`). A
-  stored `ended_at` or `duration_seconds` is the production follow-up.
+- The builder shows wall-clock elapsed time from the first exercise. The saved receipt
+  records the completion date/time, not a duration; a stored `ended_at` or
+  `duration_seconds` is the production follow-up if the coach needs session length.
+- RPE uses a 1–10 picker in 0.5 steps on mobile; the API still accepts any 0–10 value.
 - **Delete-and-re-log is acceptable for the MVP**, with these caveats: the confirmation
   dialog must be explicit, the sets stay in the browser, and a failed delete must leave
   the saved workout untouched. If corrections become common, a `PUT /workouts/{id}`
@@ -111,6 +117,10 @@ API origin.
 - Draft recovery is browser-local: another device or cleared storage loses it. It is
   not a server draft, and the clock is wall-clock rather than pause-aware.
 - Removing an exercise offers a six-second undo; removing a set is immediate.
+- The picker's no-match state offers Clear search; creating a missing exercise from
+  inside the picker is a follow-up.
+- The saved receipt has no duration and no top set; the builder's top set is the
+  heaviest completed set, not a programmed top set.
 - No unit toggle, routine prefill, rest timer, PR detection, or notes templates.
 - The saved-session page fetches the catalog again only to map exercise ids to names; a
   denormalized read model would avoid that.

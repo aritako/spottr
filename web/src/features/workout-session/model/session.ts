@@ -15,6 +15,7 @@ export interface DraftSet {
   weight: string;
   reps: string;
   rpe: string;
+  completed: boolean;
 }
 
 /** One exercise card in the session builder. */
@@ -110,6 +111,7 @@ export function validateSession(
       continue;
     }
     block.sets.forEach((set, index) => {
+      if (!set.completed) return;
       const fields: SetFieldErrors = {};
       const label = `${name} set ${index + 1}`;
 
@@ -182,6 +184,7 @@ export function computeTotals(blocks: DraftExercise[]): SessionTotals {
 
   for (const block of blocks) {
     for (const set of block.sets) {
+      if (!set.completed) continue;
       const weight = parseWeight(set.weight);
       const reps = parseReps(set.reps);
       if (
@@ -214,13 +217,15 @@ export function computeTotals(blocks: DraftExercise[]): SessionTotals {
 /** Flatten the draft into API-shaped rows with per-exercise set indexes. */
 export function buildSetsPayload(blocks: DraftExercise[]): DraftSetPayload[] {
   return blocks.flatMap((block) =>
-    block.sets.map((set, setIndex) => ({
-      exerciseId: block.exerciseId,
-      weight: parseWeight(set.weight) ?? Number.NaN,
-      reps: parseReps(set.reps) ?? Number.NaN,
-      rpe: parseRpe(set.rpe),
-      setIndex,
-    })),
+    block.sets
+      .filter((set) => set.completed)
+      .map((set, setIndex) => ({
+        exerciseId: block.exerciseId,
+        weight: parseWeight(set.weight) ?? Number.NaN,
+        reps: parseReps(set.reps) ?? Number.NaN,
+        rpe: parseRpe(set.rpe),
+        setIndex,
+      })),
   );
 }
 
@@ -283,7 +288,12 @@ export interface RelogHandoff {
   notes: string;
   exercises: Array<{
     exerciseId: number;
-    sets: Array<{ weight: string; reps: string; rpe: string }>;
+    sets: Array<{
+      weight: string;
+      reps: string;
+      rpe: string;
+      completed?: boolean;
+    }>;
   }>;
 }
 
@@ -326,6 +336,8 @@ function normalizeHandoff(parsed: unknown): RelogHandoff | null {
             weight: typeof set.weight === "string" ? set.weight : "",
             reps: typeof set.reps === "string" ? set.reps : "",
             rpe: typeof set.rpe === "string" ? set.rpe : "",
+            completed:
+              typeof set.completed === "boolean" ? set.completed : true,
           })),
       })),
   };

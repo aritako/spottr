@@ -15,6 +15,7 @@ interface SessionSummaryProps {
   showErrors: boolean;
   errorCount: number;
   totalSets: number;
+  canFinish: boolean;
   isPending: boolean;
   onNotesChange: (value: string) => void;
   simulateFailure: boolean;
@@ -53,6 +54,7 @@ export function SessionSummary({
   showErrors,
   errorCount,
   totalSets,
+  canFinish,
   isPending,
   onNotesChange,
   simulateFailure,
@@ -145,7 +147,11 @@ export function SessionSummary({
         </div>
 
         <div className="hidden flex-col gap-2 lg:flex">
-          {showErrors && errorCount > 0 ? (
+          {!canFinish ? (
+            <p role="status" className="text-accent text-[12px] leading-snug">
+              Check a set to finish.
+            </p>
+          ) : showErrors && errorCount > 0 ? (
             <p role="status" className="text-accent text-[12px] leading-snug">
               Fix {errorCount} {errorCount === 1 ? "field" : "fields"} before
               finishing.
@@ -157,7 +163,7 @@ export function SessionSummary({
             size="lg"
             fullWidth
             data-testid="finish-workout"
-            disabled={isPending}
+            disabled={isPending || !canFinish}
           >
             {isPending ? "Saving…" : "Finish workout"}
           </Button>
@@ -183,30 +189,33 @@ export function SessionSummary({
               />
               Simulate a failed save
             </label>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              data-testid="discard-session"
-              onClick={() => {
-                if (!confirmDiscard) {
-                  setConfirmDiscard(true);
-                  return;
-                }
-                setConfirmDiscard(false);
-                onDiscard();
-              }}
-              className={cn(
-                "self-start px-0",
-                confirmDiscard
-                  ? "text-accent hover:text-accent-soft"
-                  : "text-ash-300 hover:text-bone-100",
-              )}
-            >
-              {confirmDiscard ? "Tap again to discard" : "Discard session"}
-            </Button>
           </div>
         </details>
+
+        <div className="border-lab-700/70 hidden border-t pt-4 lg:flex">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid="discard-session"
+            onClick={() => {
+              if (!confirmDiscard) {
+                setConfirmDiscard(true);
+                return;
+              }
+              setConfirmDiscard(false);
+              onDiscard();
+            }}
+            className={cn(
+              "px-0",
+              confirmDiscard
+                ? "text-accent hover:text-accent-soft"
+                : "text-ash-300 hover:text-bone-100",
+            )}
+          >
+            {confirmDiscard ? "Tap again to discard" : "Discard session"}
+          </Button>
+        </div>
       </div>
     </aside>
   );

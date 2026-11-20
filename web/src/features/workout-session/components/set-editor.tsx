@@ -1,6 +1,14 @@
 import type { Exercise } from "@spottr/api-client";
 
-import { Button, CloseIcon, PlusIcon, TrashIcon, cn } from "~/components/ui";
+import {
+  Button,
+  CheckIcon,
+  ChevronDownIcon,
+  CloseIcon,
+  PlusIcon,
+  TrashIcon,
+  cn,
+} from "~/components/ui";
 
 import type { DraftExercise, SetFieldErrors } from "../model/session";
 
@@ -19,6 +27,7 @@ interface SetEditorProps {
   onAddSet: (blockKey: string) => void;
   onRemoveSet: (blockKey: string, setKey: string) => void;
   onRemoveExercise: (blockKey: string) => void;
+  onToggleSet: (blockKey: string, setKey: string) => void;
 }
 
 const fieldClasses =
@@ -32,10 +41,14 @@ const fieldClasses =
 const invalidClasses =
   "bg-accent/5 shadow-[inset_0_-2px_0_0_var(--color-accent)] hover:shadow-[inset_0_-2px_0_0_var(--color-accent)]";
 
+const RPE_OPTIONS = Array.from({ length: 19 }, (_, index) =>
+  String(1 + index / 2),
+);
+
 interface NumberFieldProps {
   id: string;
   label: string;
-  testid: "set-weight" | "set-reps" | "set-rpe";
+  testid: "set-weight" | "set-reps";
   value: string;
   error?: string;
   showErrors: boolean;
@@ -84,6 +97,64 @@ function NumberField({
   );
 }
 
+interface RpeFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  error?: string;
+  showErrors: boolean;
+  onChange: (value: string) => void;
+}
+
+function RpeField({
+  id,
+  label,
+  value,
+  error,
+  showErrors,
+  onChange,
+}: RpeFieldProps) {
+  const invalid = showErrors && error !== undefined;
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <label htmlFor={id} className="sr-only">
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          id={id}
+          data-testid="set-rpe"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? `${id}-error` : undefined}
+          className={cn(
+            fieldClasses,
+            "appearance-none pr-4",
+            invalid && invalidClasses,
+          )}
+        >
+          <option value="">–</option>
+          {RPE_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <ChevronDownIcon className="text-ash-400 pointer-events-none absolute right-0 top-1/2 size-3 -translate-y-1/2" />
+      </div>
+      {invalid ? (
+        <span
+          id={`${id}-error`}
+          className="text-accent text-right text-[12px] leading-tight"
+        >
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** One exercise block: a ruled set list on the shared session sheet. */
 export function SetEditor({
   exercise,
@@ -95,6 +166,7 @@ export function SetEditor({
   onAddSet,
   onRemoveSet,
   onRemoveExercise,
+  onToggleSet,
 }: SetEditorProps) {
   return (
     <section
@@ -128,11 +200,35 @@ export function SetEditor({
             <li
               key={set.key}
               data-testid="set-row"
-              className="group grid grid-cols-[1.25rem_1fr_1fr_1fr_2.75rem] items-start gap-x-2"
+              className="group grid grid-cols-[2.75rem_1fr_1fr_1fr_2.75rem] items-start gap-x-2"
             >
-              <span className="num text-ash-400 flex h-11 items-center justify-center text-[11px]">
-                {index + 1}
-              </span>
+              <button
+                type="button"
+                data-testid="toggle-set"
+                aria-pressed={set.completed}
+                aria-label={
+                  set.completed
+                    ? `Set ${index + 1} completed`
+                    : `Mark set ${index + 1} complete`
+                }
+                onClick={() => onToggleSet(block.key, set.key)}
+                className={cn(
+                  "num flex h-11 w-11 items-center justify-center rounded-full text-[12px] transition-colors",
+                  set.completed
+                    ? "text-accent"
+                    : "text-ash-300 hover:bg-lab-700/60",
+                )}
+              >
+                {set.completed ? (
+                  <span className="bg-accent/15 ring-accent/40 grid size-7 place-items-center rounded-full ring-1 ring-inset">
+                    <CheckIcon className="size-4" />
+                  </span>
+                ) : (
+                  <span className="ring-lab-600 grid size-7 place-items-center rounded-full ring-1 ring-inset">
+                    {index + 1}
+                  </span>
+                )}
+              </button>
               <NumberField
                 id={`${block.key}-${set.key}-weight`}
                 label={`${exercise.name} set ${index + 1} weight in kilograms`}
@@ -157,14 +253,12 @@ export function SetEditor({
                   onChangeSet(block.key, set.key, "reps", value)
                 }
               />
-              <NumberField
+              <RpeField
                 id={`${block.key}-${set.key}-rpe`}
                 label={`${exercise.name} set ${index + 1} RPE, optional`}
-                testid="set-rpe"
                 value={set.rpe}
                 error={errors.rpe}
                 showErrors={showErrors}
-                inputMode="decimal"
                 onChange={(value) =>
                   onChangeSet(block.key, set.key, "rpe", value)
                 }

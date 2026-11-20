@@ -22,6 +22,7 @@ export {
   ChevronRightIcon,
   CloseIcon,
   CoachIcon,
+  DiscardIcon,
   HistoryIcon,
   PlusIcon,
   ProgressIcon,

@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 
 import type { Exercise } from "@spottr/api-client";
 
-import { BarbellIcon, Button, PlusIcon, cn } from "~/components/ui";
+import {
+  BarbellIcon,
+  Button,
+  DiscardIcon,
+  PlusIcon,
+  cn,
+} from "~/components/ui";
 
 import { saveWorkout } from "../actions";
 import { MAX_NOTES_LENGTH } from "../model/constants";
@@ -33,7 +39,7 @@ import { SetEditor } from "./set-editor";
 import { SessionSummary } from "./session-summary";
 
 function blankSet(key: string) {
-  return { key, weight: "", reps: "", rpe: "" };
+  return { key, weight: "", reps: "", rpe: "", completed: false };
 }
 
 function toDraft(handoff: RelogHandoff, catalog: Exercise[]): DraftExercise[] {
@@ -48,6 +54,7 @@ function toDraft(handoff: RelogHandoff, catalog: Exercise[]): DraftExercise[] {
         weight: set.weight,
         reps: set.reps,
         rpe: set.rpe,
+        completed: set.completed ?? true,
       })),
     }));
 }
@@ -58,22 +65,42 @@ function MobileBar({
   tonnage,
   errorCount,
   showErrors,
+  canFinish,
+  confirmDiscard,
   isPending,
   onAddExercise,
+  onDiscard,
 }: {
   sets: number;
   totalSets: number;
   tonnage: number;
   errorCount: number;
   showErrors: boolean;
+  canFinish: boolean;
+  confirmDiscard: boolean;
   isPending: boolean;
   onAddExercise: () => void;
+  onDiscard: () => void;
 }) {
   const hasErrors = showErrors && errorCount > 0;
 
   return (
     <div className="border-lab-700 bg-lab-900/95 sticky bottom-[calc(env(safe-area-inset-bottom)+88px)] z-30 -mx-4 mt-1 border-t px-4 py-3 backdrop-blur-md sm:-mx-6 lg:hidden">
       <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          data-testid="discard-session-mobile"
+          aria-label={
+            confirmDiscard ? "Tap again to discard" : "Discard session"
+          }
+          title={confirmDiscard ? "Tap again to discard" : "Discard session"}
+          onClick={onDiscard}
+          className={cn("size-11 shrink-0", confirmDiscard && "text-accent")}
+        >
+          <DiscardIcon className="size-4" />
+        </Button>
         <Button
           type="button"
           variant="secondary"
@@ -93,7 +120,9 @@ function MobileBar({
         >
           {hasErrors
             ? `Fix ${errorCount} ${errorCount === 1 ? "field" : "fields"}`
-            : `${sets}${sets === totalSets ? "" : ` of ${totalSets}`} ${sets === 1 && totalSets === 1 ? "set" : "sets"} · ${formatKg(tonnage)} kg`}
+            : !canFinish
+              ? "Check a set to finish"
+              : `${sets}${sets === totalSets ? "" : `/${totalSets}`} ${sets === 1 && totalSets === 1 ? "set" : "sets"} · ${formatKg(tonnage)} kg`}
         </p>
         <Button
           type="submit"
@@ -101,7 +130,7 @@ function MobileBar({
           size="md"
           data-testid="finish-workout"
           aria-label="Finish workout"
-          disabled={isPending}
+          disabled={isPending || !canFinish}
           className="shrink-0"
         >
           {isPending ? "Saving…" : "Finish"}
@@ -131,6 +160,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     name: string;
   } | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const keyRef = useRef(0);
   const pickerRef = useRef<HTMLDialogElement | null>(null);
@@ -204,6 +234,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
           weight: set.weight,
           reps: set.reps,
           rpe: set.rpe,
+          completed: set.completed,
         })),
       })),
     });
@@ -214,6 +245,12 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     const id = window.setTimeout(() => setRemoved(null), 6000);
     return () => window.clearTimeout(id);
   }, [removed]);
+
+  useEffect(() => {
+    if (!confirmDiscard) return;
+    const id = window.setTimeout(() => setConfirmDiscard(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [confirmDiscard]);
 
   // Leave guard: browser reload/close plus every in-app link.
   const isDirty =
@@ -291,6 +328,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     (total, block) => total + block.sets.length,
     0,
   );
+  const canFinish = totals.sets > 0;
   const draftSetCount = pendingDraft
     ? pendingDraft.exercises.reduce(
         (total, entry) => total + entry.sets.length,
@@ -347,21 +385,37 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   }
 
   function addSet(blockKey: string) {
+    const block = blocks.find((entry) => entry.key === blockKey);
+    const last = block?.sets[block.sets.length - 1];
+    const next = blankSet(nextKey("set"));
+    if (last) next.weight = last.weight;
     setBlocks((current) =>
-      current.map((block) => {
-        if (block.key !== blockKey) return block;
-        const last = block.sets[block.sets.length - 1];
-        const next =
-          last !== undefined
-            ? {
-                key: nextKey("set"),
-                weight: last.weight,
-                reps: last.reps,
-                rpe: "",
-              }
-            : blankSet(nextKey("set"));
-        return { ...block, sets: [...block.sets, next] };
-      }),
+      current.map((entry) =>
+        entry.key !== blockKey
+          ? entry
+          : { ...entry, sets: [...entry.sets, next] },
+      ),
+    );
+    // The new row is a plan: weight only, reps blank, not counted.
+    window.setTimeout(() => {
+      document.getElementById(`${blockKey}-${next.key}-weight`)?.focus();
+    }, 0);
+  }
+
+  function toggleSet(blockKey: string, setKey: string) {
+    setBlocks((current) =>
+      current.map((block) =>
+        block.key !== blockKey
+          ? block
+          : {
+              ...block,
+              sets: block.sets.map((set) =>
+                set.key !== setKey
+                  ? set
+                  : { ...set, completed: !set.completed },
+              ),
+            },
+      ),
     );
   }
 
@@ -404,9 +458,19 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     setShowErrors(false);
     setIsRedo(false);
     setRemoved(null);
+    setConfirmDiscard(false);
     setPerformedAt(null);
     clearRelogHandoff();
     clearDraft();
+  }
+
+  function requestDiscard() {
+    if (!confirmDiscard) {
+      setConfirmDiscard(true);
+      return;
+    }
+    setConfirmDiscard(false);
+    discard();
   }
 
   function resumeDraft() {
@@ -429,7 +493,13 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     if (event.key !== "Enter") return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    if (target.tagName === "TEXTAREA" || target.tagName === "BUTTON") return;
+    if (
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "BUTTON" ||
+      target.tagName === "SELECT"
+    ) {
+      return;
+    }
     // A valid form would otherwise submit and save mid-session.
     event.preventDefault();
     const fields = Array.from(
@@ -474,7 +544,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
           <span
             role="timer"
             aria-label="Elapsed time"
-            className="num text-ash-300 text-[13px]"
+            className="num bg-lab-800 text-bone-100 rounded-full px-2.5 py-1 text-[14px] leading-none"
           >
             {formatClock(elapsedSeconds)}
           </span>
@@ -633,9 +703,9 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                 <div className="rounded-panel bg-lab-800">
                   <div
                     aria-hidden="true"
-                    className="num text-ash-400 border-lab-700 bg-lab-800 rounded-t-panel sticky top-0 z-10 grid grid-cols-[1.25rem_1fr_1fr_1fr_2.75rem] gap-x-2 border-b px-4 pb-1 pt-3 text-[11px] uppercase tracking-[0.08em] sm:px-5"
+                    className="num text-bone-300 border-lab-600 bg-lab-800 rounded-t-panel sticky top-0 z-10 grid grid-cols-[2.75rem_1fr_1fr_1fr_2.75rem] gap-x-2 border-b px-4 pb-1 pt-3 text-[12px] uppercase tracking-[0.08em] sm:px-5"
                   >
-                    <span className="text-center">#</span>
+                    <span className="text-center">Set</span>
                     <span className="text-right">kg</span>
                     <span className="text-right">reps</span>
                     <span className="text-right">RPE</span>
@@ -657,6 +727,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                           onAddSet={addSet}
                           onRemoveSet={removeSet}
                           onRemoveExercise={removeExercise}
+                          onToggleSet={toggleSet}
                         />
                       );
                     })}
@@ -683,6 +754,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                 showErrors={showErrors}
                 errorCount={errorCount}
                 totalSets={totalSets}
+                canFinish={canFinish}
                 isPending={isPending}
                 onNotesChange={setNotes}
                 simulateFailure={simulateFailure}
@@ -699,8 +771,11 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
               tonnage={totals.tonnage}
               errorCount={errorCount}
               showErrors={showErrors}
+              canFinish={canFinish}
+              confirmDiscard={confirmDiscard}
               isPending={isPending}
               onAddExercise={openPicker}
+              onDiscard={requestDiscard}
             />
           ) : null}
         </form>
