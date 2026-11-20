@@ -1,3 +1,11 @@
+"use client";
+
+import { useRef, useState } from "react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from "react";
+
 import type { Exercise } from "@spottr/api-client";
 
 import {
@@ -10,7 +18,7 @@ import {
   cn,
 } from "~/components/ui";
 
-import type { DraftExercise, SetFieldErrors } from "../model/session";
+import type { DraftExercise, DraftSet, SetFieldErrors } from "../model/session";
 
 interface SetEditorProps {
   exercise: Exercise;
@@ -155,6 +163,217 @@ function RpeField({
   );
 }
 
+interface SetRowProps {
+  exercise: Exercise;
+  block: DraftExercise;
+  set: DraftSet;
+  index: number;
+  showErrors: boolean;
+  errors: SetFieldErrors;
+  onChangeSet: SetEditorProps["onChangeSet"];
+  onRemoveSet: SetEditorProps["onRemoveSet"];
+  onToggleSet: SetEditorProps["onToggleSet"];
+}
+
+const DELETE_THRESHOLD = 72;
+const MAX_DRAG = 112;
+
+function SetRow({
+  exercise,
+  block,
+  set,
+  index,
+  showErrors,
+  errors,
+  onChangeSet,
+  onRemoveSet,
+  onToggleSet,
+}: SetRowProps) {
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startRef = useRef<{ x: number; y: number; id: number } | null>(null);
+  const axisRef = useRef<"none" | "horizontal" | "vertical">("none");
+  const suppressClickRef = useRef(false);
+  const canRemove = block.sets.length > 1;
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLLIElement>) {
+    if (!canRemove || event.pointerType === "mouse") return;
+    if ((event.target as Element).closest("button, select")) return;
+    startRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      id: event.pointerId,
+    };
+    axisRef.current = "none";
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLLIElement>) {
+    const start = startRef.current;
+    if (!start) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+
+    if (axisRef.current === "none") {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (Math.abs(dx) > 10 && Math.abs(dx) > 1.4 * Math.abs(dy)) {
+        axisRef.current = "horizontal";
+        setDragging(true);
+        event.currentTarget.setPointerCapture(event.pointerId);
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      } else {
+        axisRef.current = "vertical";
+        return;
+      }
+    }
+
+    if (axisRef.current !== "horizontal") return;
+    event.preventDefault();
+    setDragX(Math.max(0, Math.min(MAX_DRAG, dx)));
+  }
+
+  function finishDrag(event: ReactPointerEvent<HTMLLIElement>) {
+    const start = startRef.current;
+    if (!start) return;
+    const wasHorizontal = axisRef.current === "horizontal";
+    startRef.current = null;
+    axisRef.current = "none";
+    if (!wasHorizontal) return;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+    if (dragX >= DELETE_THRESHOLD) {
+      onRemoveSet(block.key, set.key);
+      return;
+    }
+    setDragging(false);
+    setDragX(0);
+  }
+
+  function handleClickCapture(event: ReactMouseEvent<HTMLLIElement>) {
+    if (!suppressClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClickRef.current = false;
+  }
+
+  return (
+    <li
+      data-testid="set-row"
+      className="group relative overflow-hidden"
+      style={{ touchAction: "pan-y" }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
+      onClickCapture={handleClickCapture}
+    >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-y-0 left-0 flex w-20 items-center justify-center transition-colors",
+          dragX >= DELETE_THRESHOLD
+            ? "bg-accent text-accent-ink"
+            : "bg-accent/15 text-accent",
+        )}
+      >
+        <TrashIcon className="size-4" />
+      </div>
+
+      <div
+        className={cn(
+          "bg-lab-800 relative grid grid-cols-[1.75rem_1fr_1fr_1fr_2.75rem] items-start gap-x-2",
+          !dragging && "transition-transform duration-200 ease-out",
+        )}
+        style={{ transform: `translateX(${dragX}px)` }}
+      >
+        <span className="num text-ash-400 flex h-11 items-center justify-center text-[12px]">
+          {index + 1}
+        </span>
+        <NumberField
+          id={`${block.key}-${set.key}-weight`}
+          label={`${exercise.name} set ${index + 1} weight in kilograms`}
+          testid="set-weight"
+          value={set.weight}
+          error={errors.weight}
+          showErrors={showErrors}
+          inputMode="decimal"
+          onChange={(value) => onChangeSet(block.key, set.key, "weight", value)}
+        />
+        <NumberField
+          id={`${block.key}-${set.key}-reps`}
+          label={`${exercise.name} set ${index + 1} reps`}
+          testid="set-reps"
+          value={set.reps}
+          error={errors.reps}
+          showErrors={showErrors}
+          inputMode="numeric"
+          onChange={(value) => onChangeSet(block.key, set.key, "reps", value)}
+        />
+        <RpeField
+          id={`${block.key}-${set.key}-rpe`}
+          label={`${exercise.name} set ${index + 1} RPE, optional`}
+          value={set.rpe}
+          error={errors.rpe}
+          showErrors={showErrors}
+          onChange={(value) => onChangeSet(block.key, set.key, "rpe", value)}
+        />
+        <button
+          type="button"
+          data-testid="toggle-set"
+          aria-pressed={set.completed}
+          aria-label={`Set ${index + 1} complete`}
+          onClick={() => onToggleSet(block.key, set.key)}
+          className="flex h-11 w-11 items-center justify-center rounded-full"
+        >
+          <span
+            className={cn(
+              "grid size-7 place-items-center rounded-full ring-1 ring-inset transition-colors",
+              set.completed
+                ? "bg-accent/15 ring-accent/40 text-accent"
+                : "ring-lab-500 hover:bg-lab-700/40 text-transparent",
+            )}
+          >
+            <CheckIcon className="size-4" />
+          </span>
+        </button>
+
+        {canRemove ? (
+          <>
+            {/* Screen-reader path; the swipe is the sighted mobile path. */}
+            <button
+              type="button"
+              data-testid="remove-set-at"
+              aria-label={`Remove ${exercise.name} set ${index + 1}`}
+              onClick={() => onRemoveSet(block.key, set.key)}
+              className="sr-only lg:hidden"
+            >
+              Remove set {index + 1}
+            </button>
+
+            {/* Desktop: appears over the set number on hover or keyboard focus. */}
+            <span className="hidden lg:contents">
+              <button
+                type="button"
+                data-testid="remove-set"
+                aria-label={`Remove ${exercise.name} set ${index + 1}`}
+                title={`Remove set ${index + 1}`}
+                onClick={() => onRemoveSet(block.key, set.key)}
+                className="bg-lab-800 text-ash-500 absolute inset-y-0 left-0 z-20 flex w-7 items-center justify-center opacity-0 transition-opacity focus-visible:opacity-100 lg:group-hover:opacity-100"
+              >
+                <TrashIcon className="size-4" />
+              </button>
+            </span>
+          </>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
 /** One exercise block: a ruled set list on the shared session sheet. */
 export function SetEditor({
   exercise,
@@ -194,95 +413,20 @@ export function SetEditor({
       </div>
 
       <ul className="mt-2 flex flex-col gap-1">
-        {block.sets.map((set, index) => {
-          const errors = setErrors[set.key] ?? {};
-          return (
-            <li
-              key={set.key}
-              data-testid="set-row"
-              className="group grid grid-cols-[2.75rem_1fr_1fr_1fr_2.75rem] items-start gap-x-2"
-            >
-              <button
-                type="button"
-                data-testid="toggle-set"
-                aria-pressed={set.completed}
-                aria-label={
-                  set.completed
-                    ? `Set ${index + 1} completed`
-                    : `Mark set ${index + 1} complete`
-                }
-                onClick={() => onToggleSet(block.key, set.key)}
-                className={cn(
-                  "num flex h-11 w-11 items-center justify-center rounded-full text-[12px] transition-colors",
-                  set.completed
-                    ? "text-accent"
-                    : "text-ash-300 hover:bg-lab-700/60",
-                )}
-              >
-                {set.completed ? (
-                  <span className="bg-accent/15 ring-accent/40 grid size-7 place-items-center rounded-full ring-1 ring-inset">
-                    <CheckIcon className="size-4" />
-                  </span>
-                ) : (
-                  <span className="ring-lab-600 grid size-7 place-items-center rounded-full ring-1 ring-inset">
-                    {index + 1}
-                  </span>
-                )}
-              </button>
-              <NumberField
-                id={`${block.key}-${set.key}-weight`}
-                label={`${exercise.name} set ${index + 1} weight in kilograms`}
-                testid="set-weight"
-                value={set.weight}
-                error={errors.weight}
-                showErrors={showErrors}
-                inputMode="decimal"
-                onChange={(value) =>
-                  onChangeSet(block.key, set.key, "weight", value)
-                }
-              />
-              <NumberField
-                id={`${block.key}-${set.key}-reps`}
-                label={`${exercise.name} set ${index + 1} reps`}
-                testid="set-reps"
-                value={set.reps}
-                error={errors.reps}
-                showErrors={showErrors}
-                inputMode="numeric"
-                onChange={(value) =>
-                  onChangeSet(block.key, set.key, "reps", value)
-                }
-              />
-              <RpeField
-                id={`${block.key}-${set.key}-rpe`}
-                label={`${exercise.name} set ${index + 1} RPE, optional`}
-                value={set.rpe}
-                error={errors.rpe}
-                showErrors={showErrors}
-                onChange={(value) =>
-                  onChangeSet(block.key, set.key, "rpe", value)
-                }
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                data-testid="remove-set"
-                aria-label={`Remove ${exercise.name} set ${index + 1}`}
-                title={
-                  block.sets.length === 1
-                    ? "A block needs at least one set"
-                    : `Remove set ${index + 1}`
-                }
-                disabled={block.sets.length === 1}
-                onClick={() => onRemoveSet(block.key, set.key)}
-                className="shrink-0 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100"
-              >
-                <TrashIcon className="text-ash-500 size-4" />
-              </Button>
-            </li>
-          );
-        })}
+        {block.sets.map((set, index) => (
+          <SetRow
+            key={set.key}
+            exercise={exercise}
+            block={block}
+            set={set}
+            index={index}
+            showErrors={showErrors}
+            errors={setErrors[set.key] ?? {}}
+            onChangeSet={onChangeSet}
+            onRemoveSet={onRemoveSet}
+            onToggleSet={onToggleSet}
+          />
+        ))}
       </ul>
 
       {showErrors && blockError ? (

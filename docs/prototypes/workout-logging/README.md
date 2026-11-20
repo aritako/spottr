@@ -50,10 +50,11 @@ API origin.
 1. **Home → Start workout** opens the session builder.
 2. **Add exercise** opens the catalog picker. It loads every page of `GET /exercises`
    (8 per page while looping) and filters locally as you type.
-3. Each exercise gets a ruled set row: kg, reps, optional RPE. The left cell is a
-   completion check; only checked sets count toward the totals and are saved. A new
-   set is a plan: it copies the last load, leaves reps blank, and stays unchecked. RPE
-   opens a native picker on mobile (1–10 in 0.5 steps).
+3. Each exercise gets a ruled set row: number, kg, reps, optional RPE, and a
+   completion check on the right. Only checked sets count toward the totals and are
+   saved. A new set is a plan: it copies the last load, leaves reps blank, and stays
+   unchecked. RPE opens a native picker on mobile (1–10 in 0.5 steps). Swipe a set to
+   the right to remove it; the undo toast lasts six seconds.
 4. The header shows elapsed time once the first exercise is added. The sidebar shows
    sets, volume, the top set, and a plate loader for the heaviest load. Notes are
    optional.
@@ -83,8 +84,9 @@ API origin.
 - Copy is sentence case and user-facing. API, endpoint, and storage details live in this
   document, not in the UI.
 - Set rows are a ruled grid: units are labelled once in the sheet header, not per card.
-  The header stays pinned while the sheet scrolls. Remove-set is visible on touch and
-  appears on hover/focus with a pointer.
+  The header stays pinned while the sheet scrolls. The set number is left and the check
+  is right; swiping right reveals the delete bed and removes the row, with undo. With a
+  pointer, a remove control appears over the set number on hover or focus.
 - The exercise picker is a bottom sheet below `sm` and the centered 520px modal above it.
 
 ## Decisions recorded by this prototype
@@ -116,7 +118,7 @@ API origin.
 
 - Draft recovery is browser-local: another device or cleared storage loses it. It is
   not a server draft, and the clock is wall-clock rather than pause-aware.
-- Removing an exercise offers a six-second undo; removing a set is immediate.
+- Removing an exercise or a set offers a six-second undo.
 - The picker's no-match state offers Clear search; creating a missing exercise from
   inside the picker is a follow-up.
 - The saved receipt has no duration and no top set; the builder's top set is the

@@ -30,6 +30,7 @@ import {
   validateSession,
   writeDraft,
   type DraftExercise,
+  type DraftSet,
   type RelogHandoff,
   type StoredDraft,
 } from "../model/session";
@@ -154,11 +155,17 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   const [showErrors, setShowErrors] = useState(false);
   const [isRedo, setIsRedo] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<StoredDraft | null>(null);
-  const [removed, setRemoved] = useState<{
-    block: DraftExercise;
-    index: number;
-    name: string;
-  } | null>(null);
+  const [removed, setRemoved] = useState<
+    | { kind: "exercise"; block: DraftExercise; index: number; name: string }
+    | {
+        kind: "set";
+        blockKey: string;
+        set: DraftSet;
+        index: number;
+        name: string;
+      }
+    | null
+  >(null);
   const [hydrated, setHydrated] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -424,11 +431,26 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   }
 
   function removeSet(blockKey: string, setKey: string) {
+    const block = blocks.find((entry) => entry.key === blockKey);
+    const index = block?.sets.findIndex((set) => set.key === setKey) ?? -1;
+    const set = block?.sets[index];
+    if (!block || index === -1 || !set) return;
+    const exercise = catalogById.get(block.exerciseId);
+    setRemoved({
+      kind: "set",
+      blockKey,
+      set,
+      index,
+      name: exercise?.name ?? "Exercise",
+    });
     setBlocks((current) =>
-      current.map((block) =>
-        block.key !== blockKey
-          ? block
-          : { ...block, sets: block.sets.filter((set) => set.key !== setKey) },
+      current.map((entry) =>
+        entry.key !== blockKey
+          ? entry
+          : {
+              ...entry,
+              sets: entry.sets.filter((item) => item.key !== setKey),
+            },
       ),
     );
   }
@@ -438,20 +460,39 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     const block = blocks[index];
     if (index === -1 || !block) return;
     const exercise = catalogById.get(block.exerciseId);
-    setRemoved({ block, index, name: exercise?.name ?? "Exercise" });
+    setRemoved({
+      kind: "exercise",
+      block,
+      index,
+      name: exercise?.name ?? "Exercise",
+    });
     setBlocks((current) => current.filter((entry) => entry.key !== blockKey));
   }
 
   function undoRemove() {
     if (!removed) return;
-    setBlocks((current) => {
-      if (current.some((block) => block.key === removed.block.key)) {
-        return current;
-      }
-      const next = [...current];
-      next.splice(Math.min(removed.index, next.length), 0, removed.block);
-      return next;
-    });
+    if (removed.kind === "exercise") {
+      setBlocks((current) => {
+        if (current.some((block) => block.key === removed.block.key)) {
+          return current;
+        }
+        const next = [...current];
+        next.splice(Math.min(removed.index, next.length), 0, removed.block);
+        return next;
+      });
+    } else {
+      setBlocks((current) =>
+        current.map((block) => {
+          if (block.key !== removed.blockKey) return block;
+          if (block.sets.some((set) => set.key === removed.set.key)) {
+            return block;
+          }
+          const next = [...block.sets];
+          next.splice(Math.min(removed.index, next.length), 0, removed.set);
+          return { ...block, sets: next };
+        }),
+      );
+    }
     setRemoved(null);
   }
 
@@ -604,10 +645,14 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
         {removed ? (
           <div
             role="status"
-            data-testid="removed-exercise"
+            data-testid="removed-item"
             className="bg-lab-800 ring-lab-600 fixed inset-x-4 top-4 z-40 flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5 shadow-[0_12px_32px_rgba(0,0,0,0.45)] ring-1 ring-inset sm:inset-x-auto sm:right-6 sm:w-[340px]"
           >
-            <p className="text-ash-300 text-[12px]">Removed {removed.name}.</p>
+            <p className="text-ash-300 text-[12px]">
+              {removed.kind === "exercise"
+                ? `Removed ${removed.name}.`
+                : `Removed set ${removed.index + 1} of ${removed.name}.`}
+            </p>
             <Button
               type="button"
               variant="ghost"
