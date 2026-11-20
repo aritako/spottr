@@ -1,6 +1,7 @@
 import type { Exercise } from "@spottr/api-client";
 
 import {
+  DRAFT_STORAGE_KEY,
   MAX_NOTES_LENGTH,
   MAX_REPS,
   MAX_RPE,
@@ -55,8 +56,16 @@ export interface SessionTotals {
   topSet: { weight: number; reps: number } | null;
 }
 
-function parseWeight(raw: string): number | null {
+/** Accept the comma decimal that kg-region phone keyboards produce. */
+function normalizeDecimal(raw: string): string {
   const value = raw.trim();
+  return value.includes(",") && !value.includes(".")
+    ? value.replace(",", ".")
+    : value;
+}
+
+function parseWeight(raw: string): number | null {
+  const value = normalizeDecimal(raw);
   if (value === "") return null;
   if (!/^\d+(\.\d{1,2})?$/.test(value)) return Number.NaN;
   const parsed = Number(value);
@@ -72,7 +81,7 @@ function parseReps(raw: string): number | null {
 }
 
 function parseRpe(raw: string): number | null {
-  const value = raw.trim();
+  const value = normalizeDecimal(raw);
   if (value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
@@ -107,7 +116,7 @@ export function validateSession(
       const rawWeight = set.weight.trim();
       const weight = parseWeight(rawWeight);
       if (weight === null) {
-        fields.weight = "Enter a load in kg.";
+        fields.weight = "Required";
         summary.push(`${label}: enter a load in kg.`);
       } else if (Number.isNaN(weight)) {
         const numeric = Number(rawWeight);
@@ -115,28 +124,28 @@ export function validateSession(
           Number.isFinite(numeric) &&
           (numeric < 0 || numeric > MAX_WEIGHT_KG)
         ) {
-          fields.weight = `Load must be 0–${MAX_WEIGHT_KG} kg.`;
+          fields.weight = `0–${MAX_WEIGHT_KG} kg`;
           summary.push(`${label}: load must be 0–${MAX_WEIGHT_KG} kg.`);
         } else {
-          fields.weight = "Use a load like 82.5 (2 decimals max).";
+          fields.weight = "2 decimals max";
           summary.push(`${label}: use a load like 82.5, up to 2 decimals.`);
         }
       } else if (weight < 0 || weight > MAX_WEIGHT_KG) {
-        fields.weight = `Load must be 0–${MAX_WEIGHT_KG} kg.`;
+        fields.weight = `0–${MAX_WEIGHT_KG} kg`;
         summary.push(`${label}: load must be 0–${MAX_WEIGHT_KG} kg.`);
       }
 
       const reps = parseReps(set.reps);
       if (reps === null) {
-        fields.reps = "Enter reps.";
+        fields.reps = "Required";
         summary.push(`${label}: enter reps.`);
       } else if (Number.isNaN(reps)) {
-        fields.reps = `Use whole reps, 1–${MAX_REPS}.`;
+        fields.reps = `1–${MAX_REPS}`;
         summary.push(
           `${label}: reps must be a whole number from 1–${MAX_REPS}.`,
         );
       } else if (reps < 1 || reps > MAX_REPS) {
-        fields.reps = `Reps must be 1–${MAX_REPS}.`;
+        fields.reps = `1–${MAX_REPS}`;
         summary.push(
           `${label}: reps must be a whole number from 1–${MAX_REPS}.`,
         );
@@ -144,10 +153,10 @@ export function validateSession(
 
       const rpe = parseRpe(set.rpe);
       if (rpe !== null && Number.isNaN(rpe)) {
-        fields.rpe = `Use a number from 0 to ${MAX_RPE}.`;
+        fields.rpe = `0–${MAX_RPE}`;
         summary.push(`${label}: RPE must be a number from 0 to ${MAX_RPE}.`);
       } else if (rpe !== null && (rpe < 0 || rpe > MAX_RPE)) {
-        fields.rpe = `RPE must be 0–${MAX_RPE}.`;
+        fields.rpe = `0–${MAX_RPE}`;
         summary.push(`${label}: RPE must be 0–${MAX_RPE}.`);
       }
 
@@ -207,9 +216,9 @@ export function buildSetsPayload(blocks: DraftExercise[]): DraftSetPayload[] {
   return blocks.flatMap((block) =>
     block.sets.map((set, setIndex) => ({
       exerciseId: block.exerciseId,
-      weight: set.weight.trim() === "" ? Number.NaN : Number(set.weight),
-      reps: set.reps.trim() === "" ? Number.NaN : Number(set.reps),
-      rpe: set.rpe.trim() === "" ? null : Number(set.rpe),
+      weight: parseWeight(set.weight) ?? Number.NaN,
+      reps: parseReps(set.reps) ?? Number.NaN,
+      rpe: parseRpe(set.rpe),
       setIndex,
     })),
   );
@@ -224,6 +233,28 @@ export function formatCategory(category: string | null): string {
 const kgFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
+
+/** 0 -> "00:00", 3725 -> "1:02:05". */
+export function formatClock(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(rest).padStart(2, "0");
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/** 42 * 60 -> "42 min". Rounded to the minute. */
+export function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  if (seconds < 60) return "<1 min";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
 
 /** "1240" -> "1,240". Keeps one decimal when the value has one. */
 export function formatKg(value: number): string {
@@ -264,52 +295,97 @@ export function writeRelogHandoff(handoff: RelogHandoff): void {
   }
 }
 
+function normalizeHandoff(parsed: unknown): RelogHandoff | null {
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    (parsed as { version?: unknown }).version !== 1 ||
+    typeof (parsed as { performedAt?: unknown }).performedAt !== "string" ||
+    !Array.isArray((parsed as { exercises?: unknown }).exercises)
+  ) {
+    return null;
+  }
+  const handoff = parsed as RelogHandoff;
+  if (Number.isNaN(Date.parse(handoff.performedAt))) return null;
+  return {
+    version: 1,
+    performedAt: handoff.performedAt,
+    notes: typeof handoff.notes === "string" ? handoff.notes : "",
+    exercises: handoff.exercises
+      .filter(
+        (entry) =>
+          entry &&
+          typeof entry.exerciseId === "number" &&
+          Array.isArray(entry.sets),
+      )
+      .map((entry) => ({
+        exerciseId: entry.exerciseId,
+        sets: entry.sets
+          .filter((set) => set && typeof set === "object")
+          .map((set) => ({
+            weight: typeof set.weight === "string" ? set.weight : "",
+            reps: typeof set.reps === "string" ? set.reps : "",
+            rpe: typeof set.rpe === "string" ? set.rpe : "",
+          })),
+      })),
+  };
+}
+
 export function readRelogHandoff(): RelogHandoff | null {
-  let raw: string | null = null;
   try {
-    raw = sessionStorage.getItem(RELOG_STORAGE_KEY);
+    const raw = sessionStorage.getItem(RELOG_STORAGE_KEY);
+    if (!raw) return null;
+    return normalizeHandoff(JSON.parse(raw));
   } catch {
     return null;
   }
-  if (!raw) return null;
+}
+
+/** In-progress workout. localStorage so a discarded tab can still resume. */
+export interface StoredDraft extends RelogHandoff {
+  isRedo: boolean;
+}
+
+export function writeDraft(draft: StoredDraft): void {
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      (parsed as { version?: unknown }).version !== 1 ||
-      typeof (parsed as { performedAt?: unknown }).performedAt !== "string" ||
-      !Array.isArray((parsed as { exercises?: unknown }).exercises)
-    ) {
-      return null;
-    }
-    const handoff = parsed as RelogHandoff;
-    if (Number.isNaN(Date.parse(handoff.performedAt))) return null;
-    return {
-      version: 1,
-      performedAt: handoff.performedAt,
-      notes: typeof handoff.notes === "string" ? handoff.notes : "",
-      exercises: handoff.exercises
-        .filter(
-          (entry) =>
-            entry &&
-            typeof entry.exerciseId === "number" &&
-            Array.isArray(entry.sets),
-        )
-        .map((entry) => ({
-          exerciseId: entry.exerciseId,
-          sets: entry.sets
-            .filter((set) => set && typeof set === "object")
-            .map((set) => ({
-              weight: typeof set.weight === "string" ? set.weight : "",
-              reps: typeof set.reps === "string" ? set.reps : "",
-              rpe: typeof set.rpe === "string" ? set.rpe : "",
-            })),
-        })),
-    };
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // Private mode or quota: the session simply does not persist.
+  }
+}
+
+export function readDraft(): StoredDraft | null {
+  let parsed: unknown;
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    parsed = JSON.parse(raw);
   } catch {
     return null;
   }
+  const handoff = normalizeHandoff(parsed);
+  if (!handoff) return null;
+  const isRedo = Boolean(
+    parsed &&
+    typeof parsed === "object" &&
+    (parsed as { isRedo?: unknown }).isRedo === true,
+  );
+  return { ...handoff, isRedo };
+}
+
+export function clearDraft(): void {
+  try {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+/** 24 hours: long enough to survive a tab discard, short enough to be stale. */
+export function isFreshDraft(draft: StoredDraft): boolean {
+  const started = Date.parse(draft.performedAt);
+  if (Number.isNaN(started)) return false;
+  return Date.now() - started < 24 * 60 * 60 * 1000;
 }
 
 export function clearRelogHandoff(): void {

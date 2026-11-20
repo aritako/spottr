@@ -7,3 +7,6 @@ export const MAX_SETS_PER_SAVE = 500;
 
 /** sessionStorage key for the delete-and-re-log handoff. */
 export const RELOG_STORAGE_KEY = "spottr:relog-handoff:v1";
+
+/** localStorage key for the in-progress workout draft. */
+export const DRAFT_STORAGE_KEY = "spottr:session-draft:v1";

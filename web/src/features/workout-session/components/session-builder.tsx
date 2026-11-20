@@ -6,21 +6,26 @@ import { useRouter } from "next/navigation";
 
 import type { Exercise } from "@spottr/api-client";
 
-import { PageHeader } from "~/components/page-header";
-import { BarbellIcon, Button, EmptyState, PlusIcon } from "~/components/ui";
+import { BarbellIcon, Button, PlusIcon, cn } from "~/components/ui";
 
 import { saveWorkout } from "../actions";
 import { MAX_NOTES_LENGTH } from "../model/constants";
 import {
   buildSetsPayload,
+  clearDraft,
   clearRelogHandoff,
   computeTotals,
   exerciseNameById,
+  formatClock,
   formatKg,
+  isFreshDraft,
+  readDraft,
   readRelogHandoff,
   validateSession,
+  writeDraft,
   type DraftExercise,
   type RelogHandoff,
+  type StoredDraft,
 } from "../model/session";
 import { initialSaveState } from "../model/state";
 import { ExercisePicker } from "./exercise-picker";
@@ -50,17 +55,43 @@ function toDraft(handoff: RelogHandoff, catalog: Exercise[]): DraftExercise[] {
 function MobileBar({
   sets,
   tonnage,
+  errorCount,
+  showErrors,
   isPending,
+  onAddExercise,
 }: {
   sets: number;
   tonnage: number;
+  errorCount: number;
+  showErrors: boolean;
   isPending: boolean;
+  onAddExercise: () => void;
 }) {
+  const hasErrors = showErrors && errorCount > 0;
+
   return (
-    <div className="border-lab-600 bg-lab-900/95 sticky bottom-[calc(env(safe-area-inset-bottom)+88px)] z-30 -mx-4 mt-1 border-t px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-md sm:-mx-6 lg:hidden">
-      <div className="flex items-center justify-between gap-4">
-        <p className="num text-bone-300 min-w-0 flex-1 truncate text-[12px]">
-          {sets} {sets === 1 ? "set" : "sets"} · {formatKg(tonnage)} kg
+    <div className="border-lab-700 bg-lab-900/95 sticky bottom-[calc(env(safe-area-inset-bottom)+88px)] z-30 -mx-4 mt-1 border-t px-4 py-3 backdrop-blur-md sm:-mx-6 lg:hidden">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          data-testid="add-exercise"
+          aria-label="Add exercise"
+          onClick={onAddExercise}
+          className="size-11 shrink-0"
+        >
+          <PlusIcon className="size-4" />
+        </Button>
+        <p
+          className={cn(
+            "num min-w-0 flex-1 truncate text-[12px]",
+            hasErrors ? "text-accent" : "text-bone-300",
+          )}
+        >
+          {hasErrors
+            ? `Fix ${errorCount} ${errorCount === 1 ? "field" : "fields"}`
+            : `${sets} ${sets === 1 ? "set" : "sets"} · ${formatKg(tonnage)} kg`}
         </p>
         <Button
           type="submit"
@@ -69,6 +100,7 @@ function MobileBar({
           data-testid="finish-workout"
           aria-label="Finish workout"
           disabled={isPending}
+          className="shrink-0"
         >
           {isPending ? "Saving…" : "Finish"}
         </Button>
@@ -90,8 +122,12 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   const [performedAt, setPerformedAt] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [isRedo, setIsRedo] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<StoredDraft | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const keyRef = useRef(0);
   const pickerRef = useRef<HTMLDialogElement | null>(null);
+  const saveErrorRef = useRef<HTMLDivElement | null>(null);
 
   const catalogById = useMemo(
     () => new Map(catalog.map((entry) => [entry.id, entry])),
@@ -102,7 +138,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     [blocks],
   );
 
-  // Capture session start time; hydrate a delete-and-re-log handoff when asked.
+  // Restore an explicit delete-and-re-log handoff, or offer an unfinished draft.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("redo") === "1") {
@@ -112,18 +148,119 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
         setNotes(handoff.notes.slice(0, MAX_NOTES_LENGTH));
         setPerformedAt(handoff.performedAt);
         setIsRedo(true);
+        clearDraft();
+        setHydrated(true);
         return;
       }
     }
-    setPerformedAt(new Date().toISOString());
+
+    const draft = readDraft();
+    if (draft && draft.exercises.length > 0 && isFreshDraft(draft)) {
+      setPendingDraft(draft);
+    } else {
+      clearDraft();
+      setPerformedAt(new Date().toISOString());
+    }
+    setHydrated(true);
   }, [catalog]);
 
   useEffect(() => {
     if (saveState.status === "success") {
       clearRelogHandoff();
+      clearDraft();
       router.replace(`/workouts/${saveState.workoutId}?saved=1`);
     }
   }, [saveState, router]);
+
+  // The session clock runs while the draft has sets and the tab is open.
+  useEffect(() => {
+    if (!performedAt || blocks.length === 0) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [performedAt, blocks.length]);
+
+  // Keep the active session on disk so a reload or discarded tab can resume it.
+  useEffect(() => {
+    if (!hydrated || pendingDraft || !performedAt) return;
+    if (blocks.length === 0 && notes.length === 0) {
+      clearDraft();
+      return;
+    }
+    writeDraft({
+      version: 1,
+      performedAt,
+      notes,
+      isRedo,
+      exercises: blocks.map((block) => ({
+        exerciseId: block.exerciseId,
+        sets: block.sets.map((set) => ({
+          weight: set.weight,
+          reps: set.reps,
+          rpe: set.rpe,
+        })),
+      })),
+    });
+  }, [hydrated, pendingDraft, performedAt, blocks, notes, isRedo]);
+
+  // Leave guard: browser reload/close plus every in-app link.
+  const isDirty =
+    hydrated && blocks.length > 0 && saveState.status !== "success";
+
+  useEffect(() => {
+    if (!isDirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    function onClick(event: MouseEvent) {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const anchor = (event.target as Element | null)?.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target === "_blank") return;
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      const url = new URL(href, window.location.href);
+      if (
+        url.pathname === window.location.pathname &&
+        url.search === window.location.search
+      ) {
+        return;
+      }
+      if (
+        !window.confirm("Leave this workout? Your sets stay saved as a draft.")
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [isDirty]);
+
+  // A failed save must be seen from the finish action, wherever it is.
+  useEffect(() => {
+    if (saveState.status === "error") {
+      saveErrorRef.current?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+    }
+  }, [saveState.status]);
 
   const validation = useMemo(
     () =>
@@ -136,6 +273,13 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   const topSetLabel = totals.topSet
     ? `${formatKg(totals.topSet.weight)} × ${totals.topSet.reps}`
     : null;
+  const errorCount = validation.summary.length;
+  const draftSetCount = pendingDraft
+    ? pendingDraft.exercises.reduce(
+        (total, entry) => total + entry.sets.length,
+        0,
+      )
+    : 0;
 
   function nextKey(prefix: string): string {
     keyRef.current += 1;
@@ -224,42 +368,62 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     setIsRedo(false);
     setPerformedAt(new Date().toISOString());
     clearRelogHandoff();
+    clearDraft();
+  }
+
+  function resumeDraft() {
+    if (!pendingDraft) return;
+    setBlocks(toDraft(pendingDraft, catalog));
+    setNotes(pendingDraft.notes.slice(0, MAX_NOTES_LENGTH));
+    setPerformedAt(pendingDraft.performedAt);
+    setIsRedo(pendingDraft.isRedo);
+    setPendingDraft(null);
+  }
+
+  function discardDraft() {
+    clearDraft();
+    setPendingDraft(null);
+    setPerformedAt(new Date().toISOString());
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     setShowErrors(true);
-    if (validation.summary.length > 0) {
-      event.preventDefault();
-    }
+    if (validation.summary.length === 0) return;
+
+    event.preventDefault();
+    window.setTimeout(() => {
+      const field = document.querySelector<HTMLElement>(
+        '[aria-invalid="true"]',
+      );
+      field?.scrollIntoView({ block: "center", behavior: "smooth" });
+      field?.focus({ preventScroll: true });
+    }, 0);
   }
 
   const payload = JSON.stringify({
     performedAt: performedAt ?? new Date().toISOString(),
     sets: buildSetsPayload(blocks),
   });
+  const elapsedSeconds = performedAt
+    ? Math.max(0, (now - Date.parse(performedAt)) / 1000)
+    : 0;
 
   return (
     <>
-      <PageHeader
-        eyebrow="Live session"
-        title="Start workout"
-        action={
-          blocks.length > 0 ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid="add-exercise"
-              onClick={openPicker}
-              aria-label="Add exercise"
-              className="whitespace-nowrap"
-            >
-              <PlusIcon className="size-4" />
-              <span className="hidden sm:inline">Add exercise</span>
-            </Button>
-          ) : undefined
-        }
-      />
+      <header className="flex items-baseline justify-between gap-4 pb-5">
+        <h1 className="display text-[22px] leading-none lg:text-[28px]">
+          Workout
+        </h1>
+        {blocks.length > 0 ? (
+          <span
+            role="timer"
+            aria-label="Elapsed time"
+            className="num text-ash-300 text-[13px]"
+          >
+            {formatClock(elapsedSeconds)}
+          </span>
+        ) : null}
+      </header>
 
       <div className="flex flex-col gap-4">
         {saveState.status === "success" ? (
@@ -277,11 +441,11 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
 
         {saveState.status === "error" ? (
           <div
+            ref={saveErrorRef}
             role="alert"
             data-testid="submit-error"
-            className="rounded-card bg-accent/5 ring-accent/30 flex flex-col gap-3 p-4 ring-1 ring-inset"
+            className="rounded-card bg-lab-800 ring-accent/40 flex flex-col gap-3 p-4 ring-1 ring-inset"
           >
-            <span className="eyebrow text-accent">Save failed</span>
             <p className="text-bone-300 text-sm leading-relaxed">
               {saveState.message}
             </p>
@@ -298,28 +462,52 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
           </div>
         ) : null}
 
-        {showErrors && validation.summary.length > 0 ? (
-          <div
-            role="alert"
-            className="rounded-card bg-lab-800 ring-accent/30 flex flex-col gap-2 p-4 ring-1 ring-inset"
-          >
-            <span className="eyebrow text-accent">Check your sets</span>
-            <ul className="text-bone-300 flex list-disc flex-col gap-1 pl-5 text-sm leading-relaxed">
-              {validation.summary.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
         {isRedo ? (
           <p
             data-testid="relog-notice"
             className="bg-lab-800/70 text-ash-300 ring-lab-600 rounded-2xl px-3.5 py-2.5 text-[12px] leading-relaxed ring-1 ring-inset"
           >
-            Your sets are prefilled from the deleted workout. Fix anything, then
-            finish.
+            Sets prefilled from the deleted workout. Fix anything, then finish.
           </p>
+        ) : null}
+
+        {pendingDraft ? (
+          <div
+            role="status"
+            data-testid="resume-draft"
+            className="rounded-panel bg-lab-800 ring-lab-600 flex flex-col gap-3 p-4 ring-1 ring-inset sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="flex min-w-0 flex-col gap-1">
+              <h2 className="display text-[16px] leading-none">
+                Unfinished session
+              </h2>
+              <p className="num text-ash-300 text-[12px] leading-relaxed">
+                {pendingDraft.exercises.length}{" "}
+                {pendingDraft.exercises.length === 1 ? "exercise" : "exercises"}{" "}
+                · {draftSetCount} {draftSetCount === 1 ? "set" : "sets"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-testid="discard-draft"
+                onClick={discardDraft}
+              >
+                Discard
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                data-testid="resume-draft-confirm"
+                onClick={resumeDraft}
+              >
+                Resume
+              </Button>
+            </div>
+          </div>
         ) : null}
 
         <form
@@ -330,15 +518,29 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
         >
           <input type="hidden" name="payload" value={payload} />
 
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6">
-            <div className="flex min-w-0 flex-col gap-4">
-              {blocks.length === 0 ? (
-                <EmptyState
-                  eyebrow="Start here"
-                  title="Build your session"
-                  icon={<BarbellIcon className="size-9" />}
-                  body="Add an exercise, log your sets, and finish when you’re done. Nothing saves until then."
-                >
+          <div
+            className={cn(
+              "grid items-start gap-4",
+              blocks.length > 0 &&
+                "lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-6",
+            )}
+          >
+            <div className="min-w-0">
+              {pendingDraft ? (
+                <div aria-hidden="true" />
+              ) : !hydrated ? (
+                <div className="h-24" aria-hidden="true" />
+              ) : blocks.length === 0 ? (
+                <div className="rounded-panel bg-lab-800 flex flex-col items-start gap-4 px-5 py-6">
+                  <BarbellIcon className="text-accent size-7" />
+                  <div className="flex flex-col gap-1.5">
+                    <h2 className="display text-[20px] leading-none">
+                      No exercises yet
+                    </h2>
+                    <p className="text-bone-300 max-w-prose text-sm leading-relaxed">
+                      Add a lift, then log each set as you do it.
+                    </p>
+                  </div>
                   <Button
                     type="button"
                     variant="primary"
@@ -349,50 +551,77 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                     <PlusIcon className="size-4" />
                     Add exercise
                   </Button>
-                </EmptyState>
+                </div>
               ) : (
-                blocks.map((block, index) => {
-                  const exercise = catalogById.get(block.exerciseId);
-                  if (!exercise) return null;
-                  return (
-                    <SetEditor
-                      key={block.key}
-                      order={index + 1}
-                      exercise={exercise}
-                      block={block}
-                      showErrors={showErrors}
-                      setErrors={validation.setErrors}
-                      blockError={validation.blockErrors[block.key]}
-                      onChangeSet={changeSet}
-                      onAddSet={addSet}
-                      onRemoveSet={removeSet}
-                      onRemoveExercise={removeExercise}
-                    />
-                  );
-                })
+                <div className="rounded-panel bg-lab-800 overflow-hidden">
+                  <div
+                    aria-hidden="true"
+                    className="num text-ash-400 grid grid-cols-[1.25rem_1fr_1fr_1fr_2.5rem] gap-x-2 px-4 pb-1 pt-3 text-[11px] uppercase tracking-[0.08em] sm:px-5"
+                  >
+                    <span className="text-center">#</span>
+                    <span className="text-right">kg</span>
+                    <span className="text-right">reps</span>
+                    <span className="text-right">RPE</span>
+                    <span />
+                  </div>
+                  <div className="divide-lab-700 divide-y">
+                    {blocks.map((block) => {
+                      const exercise = catalogById.get(block.exerciseId);
+                      if (!exercise) return null;
+                      return (
+                        <SetEditor
+                          key={block.key}
+                          exercise={exercise}
+                          block={block}
+                          showErrors={showErrors}
+                          setErrors={validation.setErrors}
+                          blockError={validation.blockErrors[block.key]}
+                          onChangeSet={changeSet}
+                          onAddSet={addSet}
+                          onRemoveSet={removeSet}
+                          onRemoveExercise={removeExercise}
+                        />
+                      );
+                    })}
+                    <button
+                      type="button"
+                      data-testid="add-exercise"
+                      onClick={openPicker}
+                      className="text-ash-300 hover:bg-lab-700/40 hover:text-bone-100 flex h-14 w-full items-center gap-2 px-4 text-[13px] transition-colors sm:px-5"
+                    >
+                      <PlusIcon className="size-4" />
+                      Add exercise
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
-            <SessionSummary
-              className={blocks.length === 0 ? "hidden lg:block" : undefined}
-              totals={totals}
-              topSetLabel={topSetLabel}
-              notes={notes}
-              notesError={validation.notesError}
-              showErrors={showErrors}
-              isPending={isPending}
-              onNotesChange={setNotes}
-              simulateFailure={simulateFailure}
-              onSimulateChange={setSimulateFailure}
-              onDiscard={discard}
-            />
+            {blocks.length > 0 ? (
+              <SessionSummary
+                totals={totals}
+                topSetLabel={topSetLabel}
+                notes={notes}
+                notesError={validation.notesError}
+                showErrors={showErrors}
+                errorCount={errorCount}
+                isPending={isPending}
+                onNotesChange={setNotes}
+                simulateFailure={simulateFailure}
+                onSimulateChange={setSimulateFailure}
+                onDiscard={discard}
+              />
+            ) : null}
           </div>
 
           {blocks.length > 0 ? (
             <MobileBar
               sets={totals.sets}
               tonnage={totals.tonnage}
+              errorCount={errorCount}
+              showErrors={showErrors}
               isPending={isPending}
+              onAddExercise={openPicker}
             />
           ) : null}
         </form>

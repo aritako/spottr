@@ -11,15 +11,15 @@ existing `web/src/features/workout-session/` slice against the real API.
 - Start screen: `/workouts/start`
 - Saved-session screen: `/workouts/[id]`
 
-![Session builder with three exercises and a live summary](./builder.png)
+![Session builder: one ruled sheet, a running clock, and the session receipt](./builder.png)
 
-![Saved-session summary with the correction panel](./saved-session.png)
+![Saved session led by total volume, with one correction row](./saved-session.png)
 
 Phone layout:
 
-![Phone session builder with the anchored finish bar](./builder-mobile.png)
+![Phone session builder with the anchored action bar](./builder-mobile.png)
 
-![Phone saved-session summary](./saved-session-mobile.png)
+![Phone saved session](./saved-session-mobile.png)
 
 ## Run it
 
@@ -52,15 +52,20 @@ API origin.
    (8 per page while looping) and filters locally as you type.
 3. Each exercise gets editable set rows: kg, reps, optional RPE. Sets can be added,
    edited inline, and removed before saving.
-4. The live summary shows exercise/set counts, tonnage, the top set, and a plate loader
-   for the heaviest load. Notes are optional.
+4. The header shows elapsed time once the first exercise is added. The sidebar shows
+   sets, tonnage, the top set, and a plate loader for the heaviest load. Notes are
+   optional.
 5. **Finish workout** validates on the client and in the server action, then sends one
    `POST /workouts` with all nested sets.
 6. **Failure** leaves every set and note intact and shows a retry panel. Retrying posts
    the same session again. The prototype controls include **Simulate a failed save** so
    the failure state can be reviewed without editing code.
-7. **Success** redirects to `/workouts/[id]`, a server-rendered saved-session summary.
-8. **Delete & re-log** is the correction path. It confirms the delete, keeps the sets in
+7. **Success** redirects to `/workouts/[id]`, a server-rendered saved-session summary
+   led by the total volume.
+8. **Leaving or reloading** warns while sets are unsaved. The draft is mirrored to
+   `localStorage`; returning offers **Resume** or **Discard**, and the clock continues
+   from the original start.
+9. **Delete & re-log** is the correction path. It confirms the delete, keeps the sets in
    `sessionStorage`, deletes with `DELETE /workouts/{id}`, and reopens the builder
    prefilled. Saving again creates a new workout.
 
@@ -68,22 +73,28 @@ API origin.
 
 - The screens keep the existing **Red Lab** palette, type tokens, and primitives; the
   cleanup adds no new UI component.
-- The saved screen is one compact confirmation panel plus the set list. There is no
-  second stats grid repeating the same totals.
-- The mobile finish action is an anchored bar above the bottom nav. On mobile, the
-  header action collapses to a plus button so the page title stays on one line.
+- The saved screen leads with the session volume, then sets / exercises / top set,
+  then one set sheet. There is no second stats grid repeating the same totals.
+- The mobile bar holds add-exercise, the live totals (or the field-error count), and
+  Finish. The header carries the elapsed clock, so the page title stays on one line.
 - Copy is sentence case and user-facing. API, endpoint, and storage details live in this
   document, not in the UI.
 - The SAVED stamp is a check seal. It has no text inside the ring, so it cannot collide.
+- Set rows are a ruled grid: units are labelled once in the sheet header, not per card.
 
 ## Decisions recorded by this prototype
 
 - The session is client form state until finish; one `POST /workouts` persists it. No
-  set-level API calls, no background autosave, no draft endpoint.
+  set-level API calls and no server draft endpoint. The active session is mirrored to
+  browser `localStorage` so a reload or discarded tab can resume it; it is cleared on
+  save or discard and expires after 24 hours.
 - `performed_at` is the session start time, not the save time.
 - Unit is fixed to **kg**. A unit toggle needs conversion and is out of scope for #10.
 - Exercises are sent by `id`; the UI never uses the API's exact, case-sensitive name
   matching.
+- Session length is wall-clock from the builder opening to the save. The saved screen
+  hides implausible durations (seeded rows have a months-old `performed_at`). A stored
+  `ended_at` or `duration_seconds` is the production follow-up.
 - **Delete-and-re-log is acceptable for the MVP**, with these caveats: the confirmation
   dialog must be explicit, the sets stay in the browser, and a failed delete must leave
   the saved workout untouched. If corrections become common, a `PUT /workouts/{id}`
@@ -95,8 +106,8 @@ API origin.
 
 ## Prototype limitations / follow-ups
 
-- No draft autosave: a browser refresh during a session loses the unsaved form state.
-  The delete-and-re-log handoff survives navigation because it uses `sessionStorage`.
+- Draft recovery is browser-local: another device or cleared storage loses it. It is
+  not a server draft, and the clock is wall-clock rather than pause-aware.
 - No unit toggle, routine prefill, rest timer, PR detection, or notes templates.
 - The saved-session page fetches the catalog again only to map exercise ids to names; a
   denormalized read model would avoid that.

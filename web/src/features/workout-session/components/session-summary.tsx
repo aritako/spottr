@@ -9,6 +9,7 @@ interface SessionSummaryProps {
   notes: string;
   notesError?: string;
   showErrors: boolean;
+  errorCount: number;
   isPending: boolean;
   onNotesChange: (value: string) => void;
   simulateFailure: boolean;
@@ -17,32 +18,35 @@ interface SessionSummaryProps {
   className?: string;
 }
 
-function Stat({
+function Figure({
   label,
   testid,
   children,
 }: {
   label: string;
-  testid: string;
+  testid?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="eyebrow">{label}</span>
-      <span data-testid={testid} className="num text-[22px] leading-none">
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="text-ash-400 text-[11px] uppercase tracking-[0.1em]">
+        {label}
+      </dt>
+      <dd data-testid={testid} className="num text-[14px] leading-none">
         {children}
-      </span>
+      </dd>
     </div>
   );
 }
 
-/** Sticky sidebar: totals, plate loader, notes, finish, prototype controls. */
+/** Sidebar receipt: totals, bar load, note, finish. */
 export function SessionSummary({
   totals,
   topSetLabel,
   notes,
   notesError,
   showErrors,
+  errorCount,
   isPending,
   onNotesChange,
   simulateFailure,
@@ -52,56 +56,45 @@ export function SessionSummary({
 }: SessionSummaryProps) {
   const topWeight = totals.topSet?.weight ?? 0;
   const plates = platesForWeight(topWeight);
+  const showPlates = totals.topSet !== null;
   const caption =
     plates.length > 0
       ? `20 kg bar · ${plates.join(" + ")} per side`
-      : "Add a top set to load the bar";
+      : "20 kg bar";
 
   return (
     <aside
       aria-label="Session summary"
       className={cn("lg:sticky lg:top-8", className)}
     >
-      <div className="rounded-panel bg-lab-800 flex flex-col gap-5 p-[18px]">
-        <div className="flex flex-col gap-1">
-          <span className="eyebrow">Session total</span>
-          <p className="text-ash-300 text-[12px] leading-relaxed">
-            All loads in kilograms.
-          </p>
-        </div>
-
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-5">
-          <Stat label="Exercises" testid="session-total-exercises">
-            {totals.exercises}
-          </Stat>
-          <Stat label="Sets" testid="session-total-sets">
+      <div className="rounded-panel bg-lab-800 flex flex-col gap-5 p-5">
+        <dl className="flex flex-col gap-2.5">
+          <Figure label="Sets" testid="session-total-sets">
             {totals.sets}
-          </Stat>
-          <Stat label="Tonnage" testid="session-tonnage">
-            {formatKg(totals.tonnage)}
-            <span className="text-ash-300 text-[12px]"> kg</span>
-          </Stat>
-          <Stat label="Top set" testid="session-top-set">
+          </Figure>
+          <Figure label="Tonnage" testid="session-tonnage">
+            {formatKg(totals.tonnage)} kg
+          </Figure>
+          <Figure label="Top set" testid="session-top-set">
             {topSetLabel ?? "—"}
-          </Stat>
+          </Figure>
         </dl>
 
-        <figure className="flex flex-col gap-1.5">
-          <PlateLoader
-            weightKg={topWeight}
-            label={
-              totals.topSet
-                ? `Barbell loaded to ${formatKg(topWeight)} kilograms: 20 kilogram bar plus ${plates.join(", ")} kilograms per side.`
-                : "Empty barbell, no top set logged yet."
-            }
-          />
-          <figcaption className="num text-ash-400 text-center text-[10px]">
-            {caption}
-          </figcaption>
-        </figure>
+        {showPlates ? (
+          <figure className="flex flex-col gap-1">
+            <PlateLoader
+              className="h-12"
+              weightKg={topWeight}
+              label={`Barbell loaded to ${formatKg(topWeight)} kilograms: 20 kilogram bar plus ${plates.join(", ")} kilograms per side.`}
+            />
+            <figcaption className="num text-ash-400 text-center text-[11px]">
+              {caption}
+            </figcaption>
+          </figure>
+        ) : null}
 
         <div className="border-lab-700/70 flex flex-col gap-1.5 border-t pt-4">
-          <label htmlFor="notes-input" className="eyebrow">
+          <label htmlFor="notes-input" className="sr-only">
             Session notes
           </label>
           <textarea
@@ -110,13 +103,13 @@ export function SessionSummary({
             name="notes"
             value={notes}
             maxLength={MAX_NOTES_LENGTH}
-            rows={3}
-            placeholder="How did it move?"
+            rows={2}
+            placeholder="Add a note (optional)"
             onChange={(event) => onNotesChange(event.target.value)}
             aria-invalid={(showErrors && notesError !== undefined) || undefined}
-            className="bg-lab-700 placeholder:text-ash-500 min-h-20 w-full resize-y rounded-2xl px-3.5 py-3 text-[14px] leading-relaxed shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus:shadow-[inset_0_0_0_1.5px_var(--color-accent)] focus:outline-none"
+            className="bg-lab-700/60 placeholder:text-ash-400 min-h-16 w-full resize-y rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus:shadow-[inset_0_0_0_1.5px_var(--color-accent)]"
           />
-          {notes.length > 0 ? (
+          {notes.length > MAX_NOTES_LENGTH - 60 ? (
             <span className="num text-ash-400 self-end text-[10px]">
               {MAX_NOTES_LENGTH - notes.length} left
             </span>
@@ -129,6 +122,12 @@ export function SessionSummary({
         </div>
 
         <div className="hidden flex-col gap-2 lg:flex">
+          {showErrors && errorCount > 0 ? (
+            <p role="status" className="text-accent text-[12px] leading-snug">
+              Fix {errorCount} {errorCount === 1 ? "field" : "fields"} before
+              finishing.
+            </p>
+          ) : null}
           <Button
             type="submit"
             variant="primary"
@@ -141,11 +140,8 @@ export function SessionSummary({
           </Button>
         </div>
 
-        <details
-          data-testid="prototype-controls"
-          className="border-lab-600/70 rounded-2xl border px-3.5 py-2.5"
-        >
-          <summary className="text-ash-300 cursor-pointer text-[11px] font-medium tracking-wide">
+        <details data-testid="prototype-controls" className="group pt-1">
+          <summary className="text-ash-400 cursor-pointer text-[11px]">
             Prototype controls
           </summary>
           <div className="flex flex-col gap-3 pb-1 pt-3">

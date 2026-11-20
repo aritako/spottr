@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           <span className="flex flex-col">
             <span className="text-bone-300 text-sm">Melo</span>
-            <span className="text-ash-500 text-[9px] uppercase tracking-[0.12em]">
+            <span className="text-ash-400 text-[11px] uppercase tracking-[0.12em]">
               Demo
             </span>
           </span>

@@ -2,14 +2,9 @@ import type { Exercise } from "@spottr/api-client";
 
 import { Button, CloseIcon, PlusIcon, TrashIcon, cn } from "~/components/ui";
 
-import {
-  formatCategory,
-  type DraftExercise,
-  type SetFieldErrors,
-} from "../model/session";
+import type { DraftExercise, SetFieldErrors } from "../model/session";
 
 interface SetEditorProps {
-  order: number;
   exercise: Exercise;
   block: DraftExercise;
   showErrors: boolean;
@@ -26,10 +21,15 @@ interface SetEditorProps {
   onRemoveExercise: (blockKey: string) => void;
 }
 
-const inputClasses =
-  "num bg-lab-700 h-12 w-full rounded-2xl px-3 text-center text-[16px] shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus:shadow-[inset_0_0_0_1.5px_var(--color-accent)] focus:outline-none";
+const fieldClasses =
+  "num h-11 w-full min-w-0 rounded-md bg-transparent text-right text-[18px] leading-none " +
+  "text-bone-100 shadow-[inset_0_-1px_0_0_var(--color-lab-600)] " +
+  "transition-[box-shadow,background-color] duration-150 " +
+  "placeholder:text-ash-400 " +
+  "hover:shadow-[inset_0_-1px_0_0_var(--color-lab-500)] " +
+  "focus:bg-lab-700/45 focus:shadow-[inset_0_-2px_0_0_var(--color-accent)]";
 
-const invalidClasses = "shadow-[inset_0_0_0_1.5px_var(--color-accent)]";
+const invalidClasses = "shadow-[inset_0_-2px_0_0_var(--color-accent)]";
 
 interface NumberFieldProps {
   id: string;
@@ -39,7 +39,6 @@ interface NumberFieldProps {
   error?: string;
   showErrors: boolean;
   inputMode: "decimal" | "numeric";
-  placeholder: string;
   onChange: (value: string) => void;
 }
 
@@ -51,12 +50,11 @@ function NumberField({
   error,
   showErrors,
   inputMode,
-  placeholder,
   onChange,
 }: NumberFieldProps) {
   const invalid = showErrors && error !== undefined;
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <label htmlFor={id} className="sr-only">
         {label}
       </label>
@@ -65,17 +63,18 @@ function NumberField({
         data-testid={testid}
         value={value}
         inputMode={inputMode}
-        placeholder={placeholder}
+        enterKeyHint="next"
+        placeholder="–"
         autoComplete="off"
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? `${id}-error` : undefined}
-        className={cn(inputClasses, invalid && invalidClasses)}
+        className={cn(fieldClasses, invalid && invalidClasses)}
       />
       {invalid ? (
         <span
           id={`${id}-error`}
-          className="text-accent text-[11px] leading-tight"
+          className="text-accent text-right text-[10px] leading-tight"
         >
           {error}
         </span>
@@ -84,9 +83,8 @@ function NumberField({
   );
 }
 
-/** One exercise card: header, editable set rows, add-set. Always editable. */
+/** One exercise block: a ruled set list on the shared session sheet. */
 export function SetEditor({
-  order,
   exercise,
   block,
   showErrors,
@@ -97,28 +95,17 @@ export function SetEditor({
   onRemoveSet,
   onRemoveExercise,
 }: SetEditorProps) {
-  const orderLabel = String(order).padStart(2, "0");
-
   return (
     <section
       data-testid="exercise-card"
       data-exercise-name={exercise.name}
       aria-label={exercise.name}
-      className="rounded-panel bg-lab-800 flex flex-col gap-4 p-[18px]"
+      className="flex flex-col px-4 py-4 sm:px-5"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <span className="num text-accent text-[13px]">{orderLabel}</span>
-          <div className="flex min-w-0 flex-col gap-1">
-            <h3 className="display text-[17px] leading-tight">
-              {exercise.name}
-            </h3>
-            <span className="text-ash-300 text-[12px] leading-tight">
-              {formatCategory(exercise.category)}
-              {exercise.is_compound ? " · compound" : ""}
-            </span>
-          </div>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="display min-w-0 truncate text-[16px] leading-none">
+          {exercise.name}
+        </h2>
         <Button
           type="button"
           variant="ghost"
@@ -127,33 +114,22 @@ export function SetEditor({
           aria-label={`Remove ${exercise.name}`}
           title={`Remove ${exercise.name}`}
           onClick={() => onRemoveExercise(block.key)}
-          className="size-9 shrink-0"
+          className="-mr-2 size-10 shrink-0"
         >
           <CloseIcon className="size-4" />
         </Button>
       </div>
 
-      <div
-        aria-hidden="true"
-        className="num text-ash-500 grid grid-cols-[2rem_1fr_1fr_1fr_2.25rem] items-center gap-2 px-0 text-[10px] uppercase tracking-[0.12em]"
-      >
-        <span className="text-center">Set</span>
-        <span className="text-center">Load kg</span>
-        <span className="text-center">Reps</span>
-        <span className="text-center">RPE</span>
-        <span />
-      </div>
-
-      <ul className="flex flex-col gap-2">
+      <ul className="mt-2 flex flex-col gap-1">
         {block.sets.map((set, index) => {
           const errors = setErrors[set.key] ?? {};
           return (
             <li
               key={set.key}
               data-testid="set-row"
-              className="grid grid-cols-[2rem_1fr_1fr_1fr_2.25rem] items-start gap-2"
+              className="group grid grid-cols-[1.25rem_1fr_1fr_1fr_2.5rem] items-start gap-x-2"
             >
-              <span className="num text-ash-300 flex h-12 items-center justify-center text-[13px]">
+              <span className="num text-ash-400 flex h-11 items-center justify-center text-[11px]">
                 {index + 1}
               </span>
               <NumberField
@@ -164,7 +140,6 @@ export function SetEditor({
                 error={errors.weight}
                 showErrors={showErrors}
                 inputMode="decimal"
-                placeholder="80"
                 onChange={(value) =>
                   onChangeSet(block.key, set.key, "weight", value)
                 }
@@ -177,7 +152,6 @@ export function SetEditor({
                 error={errors.reps}
                 showErrors={showErrors}
                 inputMode="numeric"
-                placeholder="5"
                 onChange={(value) =>
                   onChangeSet(block.key, set.key, "reps", value)
                 }
@@ -190,7 +164,6 @@ export function SetEditor({
                 error={errors.rpe}
                 showErrors={showErrors}
                 inputMode="decimal"
-                placeholder="–"
                 onChange={(value) =>
                   onChangeSet(block.key, set.key, "rpe", value)
                 }
@@ -202,9 +175,9 @@ export function SetEditor({
                 aria-label={`Remove ${exercise.name} set ${index + 1}`}
                 title={`Remove set ${index + 1}`}
                 onClick={() => onRemoveSet(block.key, set.key)}
-                className="size-9 justify-self-center p-0"
+                className="size-10 shrink-0 p-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
               >
-                <TrashIcon className="size-4" />
+                <TrashIcon className="text-ash-500 size-4" />
               </Button>
             </li>
           );
@@ -212,22 +185,23 @@ export function SetEditor({
       </ul>
 
       {showErrors && blockError ? (
-        <p role="alert" className="text-accent text-[12px] leading-relaxed">
+        <p
+          role="alert"
+          className="text-accent mt-1 text-[12px] leading-relaxed"
+        >
           {blockError}
         </p>
       ) : null}
 
-      <Button
+      <button
         type="button"
-        variant="secondary"
-        size="md"
-        fullWidth
         data-testid="add-set"
         onClick={() => onAddSet(block.key)}
+        className="text-ash-300 hover:text-bone-100 -ml-1 mt-1 inline-flex h-11 items-center gap-1.5 self-start rounded-lg px-1 text-[13px] transition-colors"
       >
-        <PlusIcon className="size-4" />
+        <PlusIcon className="size-3.5" />
         Add set
-      </Button>
+      </button>
     </section>
   );
 }

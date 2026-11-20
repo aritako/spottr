@@ -47,35 +47,29 @@ export function ExercisePicker({
       onClick={(event) => {
         if (event.target === dialogRef.current) close();
       }}
-      className="bg-lab-800 text-bone-100 rounded-panel m-auto max-h-[80dvh] w-[min(560px,calc(100vw-2rem))] p-0 backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+      className="bg-lab-800 text-bone-100 rounded-panel m-auto max-h-[80dvh] w-[min(520px,calc(100vw-2rem))] p-0 backdrop:bg-black/70 backdrop:backdrop-blur-sm"
     >
       <div className="flex max-h-[80dvh] flex-col">
-        <div className="flex items-start justify-between gap-4 p-[18px] pb-0">
-          <div className="flex flex-col gap-1.5">
-            <span className="eyebrow">Exercise catalog</span>
-            <h2 className="display text-xl leading-none">Add exercise</h2>
-            <p className="num text-ash-400 text-[11px]">
-              {catalog.length} exercises
-            </p>
-          </div>
+        <div className="flex items-center justify-between gap-4 p-4 pb-0 sm:p-5 sm:pb-0">
+          <h2 className="display text-lg leading-none">Add exercise</h2>
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             size="icon"
             aria-label="Close picker"
             onClick={close}
-            className="shrink-0"
+            className="-mr-2 size-10 shrink-0"
           >
             <CloseIcon className="size-4" />
           </Button>
         </div>
 
-        <div className="p-[18px]">
+        <div className="p-4 sm:p-5">
           <label htmlFor="exercise-search" className="sr-only">
             Search exercises
           </label>
           <div className="bg-lab-700 flex items-center gap-2 rounded-full px-4 shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus-within:shadow-[inset_0_0_0_1.5px_var(--color-accent)]">
-            <SearchIcon className="text-ash-500 size-4 shrink-0" />
+            <SearchIcon className="text-ash-400 size-4 shrink-0" />
             <input
               id="exercise-search"
               data-testid="exercise-search"
@@ -83,51 +77,50 @@ export function ExercisePicker({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search exercises"
               autoComplete="off"
-              className="placeholder:text-ash-500 h-11 min-w-0 flex-1 bg-transparent text-[15px] focus:outline-none"
+              className="placeholder:text-ash-400 h-11 min-w-0 flex-1 bg-transparent text-[15px] focus:outline-none"
             />
           </div>
         </div>
 
-        <ul className="flex flex-col gap-1 overflow-y-auto px-3 pb-3">
+        <ul className="flex flex-col overflow-y-auto px-2 pb-2">
           {filtered.map((entry) => {
             const added = addedIds.has(entry.id);
+            const label = (
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
+                <span className="truncate text-[15px]">{entry.name}</span>
+                <span className="text-ash-400 text-[11px]">
+                  {formatCategory(entry.category)}
+                </span>
+              </span>
+            );
+
             return (
-              <li
-                key={entry.id}
-                className="hover:bg-lab-700/60 flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors"
-              >
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="truncate text-[15px] font-medium">
-                    {entry.name}
-                  </span>
-                  <span className="text-ash-300 text-[12px]">
-                    {formatCategory(entry.category)}
-                    {entry.is_compound ? " · compound" : ""}
-                  </span>
-                </div>
+              <li key={entry.id}>
                 {added ? (
-                  <span
+                  <div
                     data-testid="exercise-option"
                     data-exercise-name={entry.name}
                     aria-disabled="true"
-                    className="text-ash-300 inline-flex h-9 items-center gap-1.5 px-3 text-[12px] font-semibold"
+                    className="flex h-14 items-center gap-3 rounded-xl px-2.5"
                   >
-                    <CheckIcon className="text-accent size-4" />
-                    Added
-                  </span>
+                    {label}
+                    <span className="text-ash-400 inline-flex items-center gap-1.5 text-[12px]">
+                      <CheckIcon className="text-accent size-4" />
+                      Added
+                    </span>
+                  </div>
                 ) : (
-                  <Button
+                  <button
                     type="button"
-                    variant="secondary"
-                    size="sm"
                     data-testid="exercise-option"
                     data-exercise-name={entry.name}
                     onClick={() => onAdd(entry.id)}
                     aria-label={`Add ${entry.name}`}
+                    className="hover:bg-lab-700/60 group flex h-14 w-full items-center gap-3 rounded-xl px-2.5 transition-colors"
                   >
-                    <PlusIcon className="size-3.5" />
-                    Add
-                  </Button>
+                    {label}
+                    <PlusIcon className="text-ash-400 group-hover:text-bone-100 size-4 shrink-0 transition-colors" />
+                  </button>
                 )}
               </li>
             );
@@ -139,14 +132,16 @@ export function ExercisePicker({
           ) : null}
         </ul>
 
-        <div className="border-lab-600 flex justify-end border-t p-3">
+        <div className="border-lab-700 flex items-center justify-between gap-3 border-t p-3 sm:p-4">
+          <span className="num text-ash-400 pl-2 text-[11px]">
+            {addedIds.size} added
+          </span>
           <Button
             type="button"
             variant="primary"
             size="md"
             data-testid="picker-done"
             onClick={close}
-            className="w-full sm:w-auto"
           >
             Done
           </Button>

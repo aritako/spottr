@@ -2,12 +2,11 @@ import Link from "next/link";
 
 import type { Exercise, SetRead, Workout } from "@spottr/api-client";
 
-import { PageHeader } from "~/components/page-header";
-import { buttonClasses, Card, CheckIcon } from "~/components/ui";
+import { buttonClasses, CheckIcon } from "~/components/ui";
 
 import {
   exerciseNameById,
-  formatCategory,
+  formatDuration,
   formatKg,
   formatPerformedAt,
   type RelogHandoff,
@@ -46,25 +45,25 @@ function SavedSeal() {
     <span
       role="img"
       aria-label="Workout saved"
-      className="bg-accent/10 ring-accent relative grid size-14 shrink-0 place-items-center rounded-full ring-2 sm:size-20"
+      className="bg-accent/10 ring-accent relative grid size-12 shrink-0 place-items-center rounded-full ring-2 sm:size-14"
     >
       <span
         aria-hidden="true"
         className="border-accent/40 absolute inset-1.5 rounded-full border border-dashed"
       />
-      <CheckIcon className="text-accent relative size-6 sm:size-8" />
+      <CheckIcon className="text-accent relative size-5 sm:size-6" />
     </span>
   );
 }
 
 function SetLine({ set, index }: { set: SetRead; index: number }) {
   return (
-    <li className="border-lab-700 flex items-baseline justify-between gap-3 border-b py-2 last:border-0">
-      <span className="num text-ash-300 text-[12px]">Set {index + 1}</span>
+    <li className="flex items-baseline justify-between gap-3 py-1">
+      <span className="num text-ash-400 w-4 text-[11px]">{index + 1}</span>
       <span className="num text-[14px]">
         {formatKg(set.weight)} × {set.reps}
         {set.rpe !== null ? (
-          <span className="text-ash-300 text-[12px]"> @ {set.rpe}</span>
+          <span className="text-ash-400 text-[12px]"> @ {set.rpe}</span>
         ) : null}
       </span>
     </li>
@@ -110,97 +109,87 @@ export function WorkoutSavedScreen({
     }
     return top;
   }, null);
+  // created_at is the save time, so this is the session length. Seeded rows
+  // have a months-old performed_at; keep implausible durations off screen.
+  const durationSeconds =
+    (Date.parse(workout.created_at) - Date.parse(workout.performed_at)) / 1000;
+  const showDuration =
+    Number.isFinite(durationSeconds) &&
+    durationSeconds >= 1 &&
+    durationSeconds <= 12 * 3600;
 
   return (
-    <div data-testid="workout-saved" className="flex flex-col gap-4">
-      <PageHeader eyebrow="Session summary" title="Workout saved" />
-
-      <Card
+    <div
+      data-testid="workout-saved"
+      className="flex max-w-[720px] flex-col gap-4"
+    >
+      <header
         data-testid="saved-workout-summary"
-        className="rounded-panel flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6 sm:p-6"
+        className="flex flex-col gap-2 pb-2"
       >
-        <div className="flex items-center gap-4 sm:contents">
+        <div className="flex items-center justify-between gap-4">
+          <h1
+            aria-label={`Workout saved — ${formatKg(tonnage)} kilograms lifted`}
+            className="display min-w-0 text-[40px] leading-none sm:text-[52px]"
+          >
+            {formatKg(tonnage)}
+            <span className="text-ash-300 ml-2 align-baseline text-[15px] tracking-[0.02em] sm:text-[18px]">
+              kg
+            </span>
+          </h1>
           <SavedSeal />
-          <span className="eyebrow sm:hidden">
-            Logged {formatPerformedAt(workout.performed_at)}
-          </span>
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="eyebrow hidden sm:block">
-            Logged {formatPerformedAt(workout.performed_at)}
-          </span>
-          <p className="display text-[21px] leading-none sm:text-[28px]">
-            {groups.length} {groups.length === 1 ? "exercise" : "exercises"} ·{" "}
-            {workout.sets.length} sets
-          </p>
-          <p className="text-bone-300 text-sm leading-relaxed">
-            {formatKg(tonnage)} kg moved
-          </p>
-        </div>
-        <div className="border-lab-700 flex w-full items-baseline justify-between gap-4 border-t pt-3 sm:block sm:w-auto sm:shrink-0 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
-          <span className="eyebrow">Top set</span>
-          <p className="num text-[18px] leading-none sm:mt-2 sm:text-[20px]">
-            {topSet ? `${formatKg(topSet.weight)} × ${topSet.reps}` : "—"}
-          </p>
-        </div>
-      </Card>
+        <p className="num text-bone-300 text-[13px] leading-relaxed">
+          {workout.sets.length} sets · {groups.length}{" "}
+          {groups.length === 1 ? "exercise" : "exercises"}
+          {topSet
+            ? ` · top set ${formatKg(topSet.weight)} × ${topSet.reps}`
+            : ""}
+        </p>
+        <p className="num text-ash-400 text-pretty text-[12px] leading-relaxed">
+          {formatPerformedAt(workout.performed_at)}
+          {showDuration ? ` · ${formatDuration(durationSeconds)}` : ""}
+        </p>
+      </header>
 
-      {workout.notes ? (
-        <Card className="flex flex-col gap-1.5 p-5">
-          <span className="eyebrow">Session notes</span>
-          <p className="text-bone-300 text-sm leading-relaxed">
-            {workout.notes}
-          </p>
-        </Card>
-      ) : null}
-
-      <div className="flex flex-col gap-3">
+      <div className="rounded-panel bg-lab-800 divide-lab-700 divide-y overflow-hidden">
         {groups.map((group) => (
-          <Card key={group.exerciseId} className="p-5">
-            <div className="flex flex-col gap-1">
-              <h2 className="display text-[17px] leading-tight">
-                {exerciseNameById(exercises, group.exerciseId)}
-              </h2>
-              <span className="text-ash-300 text-[12px] leading-tight">
-                {formatCategory(
-                  exercises.find((entry) => entry.id === group.exerciseId)
-                    ?.category ?? null,
-                )}
-              </span>
-            </div>
-            <ul>
+          <section key={group.exerciseId} className="px-5 py-4">
+            <h2 className="display text-[15px] leading-none">
+              {exerciseNameById(exercises, group.exerciseId)}
+            </h2>
+            <ul className="mt-2 flex flex-col">
               {group.sets.map((set, index) => (
                 <SetLine key={set.id} set={set} index={index} />
               ))}
             </ul>
-          </Card>
+          </section>
         ))}
       </div>
 
-      <Card className="rounded-panel flex flex-col gap-3 p-5">
-        <div className="flex flex-col gap-1">
-          <span className="eyebrow">Corrections</span>
-          <h2 className="display text-[17px] leading-tight">Fix a mistake</h2>
-          <p className="text-bone-300 text-sm leading-relaxed">
-            Deleting is permanent. Your sets reopen in the builder so you can
-            fix them and save again.
-          </p>
-        </div>
+      {workout.notes ? (
+        <p className="text-bone-300 px-1 text-sm leading-relaxed">
+          {workout.notes}
+        </p>
+      ) : null}
+
+      <div className="rounded-panel bg-lab-800 flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+        <span className="text-ash-400 text-[12px]">Logged a mistake?</span>
         <DeleteAndRelog workoutId={workout.id} handoff={toHandoff(workout)} />
-      </Card>
+      </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Link
-          href="/"
-          className={buttonClasses({ variant: "secondary", size: "md" })}
-        >
-          Back to home
-        </Link>
         <Link
           href="/workouts/start"
           className={buttonClasses({ variant: "primary", size: "md" })}
         >
           Log another workout
+        </Link>
+        <Link
+          href="/"
+          className={buttonClasses({ variant: "secondary", size: "md" })}
+        >
+          Back to home
         </Link>
       </div>
     </div>
