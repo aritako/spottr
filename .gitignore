@@ -53,7 +53,8 @@ specs/
 postman/
 .postman/
 
-# Prototype capture artifacts (generated locally)
+# Prototype capture artifacts and recording specs (generated/kept locally)
 docs/prototypes/**/*.png
 docs/prototypes/**/*.webm
 docs/prototypes/**/*.mp4
+e2e/
