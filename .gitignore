@@ -34,6 +34,8 @@ out/
 htmlcov/
 .ruff_cache/
 .mypy_cache/
+test-results/
+playwright-report/
 
 # IDE / OS
 .idea/
@@ -50,3 +52,9 @@ specs/
 # Postman
 postman/
 .postman/
+
+# Prototype capture artifacts and recording specs (generated/kept locally)
+docs/prototypes/**/*.png
+docs/prototypes/**/*.webm
+docs/prototypes/**/*.mp4
+e2e/

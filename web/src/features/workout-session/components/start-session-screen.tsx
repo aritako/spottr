@@ -1,26 +1,41 @@
 import Link from "next/link";
 
-import { BarbellIcon, EmptyState, buttonClasses } from "~/components/ui";
-
 import { PageHeader } from "~/components/page-header";
+import { buttonClasses, EmptyState } from "~/components/ui";
 
-export function StartSessionScreen() {
+import { loadExerciseCatalog } from "../api/exercises";
+import { SessionBuilder } from "./session-builder";
+
+/** Start screen root: loads the catalog server-side, then hands to the builder. */
+export async function StartSessionScreen() {
+  let catalog: Awaited<ReturnType<typeof loadExerciseCatalog>> | null = null;
+  try {
+    catalog = await loadExerciseCatalog();
+  } catch {
+    catalog = null;
+  }
+
   return (
-    <>
-      <PageHeader eyebrow="Live session" title="Start workout" />
-      <EmptyState
-        eyebrow="Next up"
-        title="Set-by-set logging"
-        icon={<BarbellIcon className="size-9" />}
-        body="The active-session screen (plate loader, rest timer, PR stamps) is scaffolded in the mockups but needs a workout session API. POST /workouts already accepts a full session payload."
-      >
-        <Link
-          href="/"
-          className={buttonClasses({ variant: "outline", size: "md" })}
-        >
-          Back to home
-        </Link>
-      </EmptyState>
-    </>
+    <div data-testid="start-session-screen">
+      {catalog === null ? (
+        <>
+          <PageHeader eyebrow="Live session" title="Start workout" />
+          <EmptyState
+            eyebrow="Catalog unavailable"
+            title="Couldn't load exercises"
+            body="Exercises didn't load. Try again — nothing is lost."
+          >
+            <Link
+              href="/workouts/start"
+              className={buttonClasses({ variant: "primary", size: "md" })}
+            >
+              Try again
+            </Link>
+          </EmptyState>
+        </>
+      ) : (
+        <SessionBuilder catalog={catalog} />
+      )}
+    </div>
   );
 }

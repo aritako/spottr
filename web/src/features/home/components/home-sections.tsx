@@ -64,7 +64,8 @@ export function NextWorkoutCard() {
       </div>
 
       <Link
-        href={`/routines/${workout.slug}`}
+        href="/workouts/start"
+        data-testid="start-workout"
         className={buttonClasses({ size: "lg", fullWidth: true })}
       >
         Start workout

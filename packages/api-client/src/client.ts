@@ -116,6 +116,9 @@ export function createAppClient({
         body: JSON.stringify(input),
       }),
 
+    deleteWorkout: (id: number) =>
+      request<void>(`/workouts/${id}`, { method: "DELETE" }),
+
     askCoach: (question: string) =>
       request<AskCoachResponse>("/coach/ask", {
         method: "POST",
