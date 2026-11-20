@@ -77,7 +77,7 @@ export function ExercisePicker({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search exercises"
               autoComplete="off"
-              className="placeholder:text-ash-400 h-11 min-w-0 flex-1 bg-transparent text-[15px] focus:outline-none"
+              className="placeholder:text-ash-400 h-11 min-w-0 flex-1 bg-transparent text-[16px] focus:outline-none"
             />
           </div>
         </div>

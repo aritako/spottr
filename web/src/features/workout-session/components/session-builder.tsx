@@ -434,10 +434,12 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     event.preventDefault();
     const fields = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>(
-        'input:not([type="hidden"]), textarea',
+        'input:not([type="hidden"])',
       ),
     );
-    fields[fields.indexOf(target) + 1]?.focus();
+    const next = fields[fields.indexOf(target) + 1];
+    if (next) next.focus();
+    else target.blur();
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

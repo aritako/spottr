@@ -30,7 +30,7 @@ const fieldClasses =
   "focus:bg-lab-700/45 focus:shadow-[inset_0_-2px_0_0_var(--color-accent)]";
 
 const invalidClasses =
-  "bg-accent/5 shadow-[inset_0_-2px_0_0_var(--color-accent)]";
+  "bg-accent/5 shadow-[inset_0_-2px_0_0_var(--color-accent)] hover:shadow-[inset_0_-2px_0_0_var(--color-accent)]";
 
 interface NumberFieldProps {
   id: string;
