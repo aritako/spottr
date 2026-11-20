@@ -116,7 +116,10 @@ export function WorkoutSavedScreen({
   const showDuration =
     Number.isFinite(durationSeconds) &&
     durationSeconds >= 1 &&
-    durationSeconds <= 12 * 3600;
+    durationSeconds <= 4 * 3600;
+  const topSetExerciseName = topSet
+    ? exerciseNameById(exercises, topSet.exercise_id)
+    : null;
 
   return (
     <div
@@ -133,8 +136,8 @@ export function WorkoutSavedScreen({
             className="display min-w-0 text-[40px] leading-none sm:text-[52px]"
           >
             {formatKg(tonnage)}
-            <span className="text-ash-300 ml-2 align-baseline text-[15px] tracking-[0.02em] sm:text-[18px]">
-              kg
+            <span className="num text-ash-300 ml-2 align-baseline text-[13px] font-normal tracking-[0.02em] sm:text-[16px]">
+              kg lifted
             </span>
           </h1>
           <SavedSeal />
@@ -142,10 +145,13 @@ export function WorkoutSavedScreen({
         <p className="num text-bone-300 text-[13px] leading-relaxed">
           {workout.sets.length} sets · {groups.length}{" "}
           {groups.length === 1 ? "exercise" : "exercises"}
-          {topSet
-            ? ` · top set ${formatKg(topSet.weight)} × ${topSet.reps}`
-            : ""}
         </p>
+        {topSet ? (
+          <p className="num text-bone-300 text-[13px] leading-relaxed">
+            top set {topSetExerciseName} {formatKg(topSet.weight)} ×{" "}
+            {topSet.reps}
+          </p>
+        ) : null}
         <p className="num text-ash-400 text-pretty text-[12px] leading-relaxed">
           {formatPerformedAt(workout.performed_at)}
           {showDuration ? ` · ${formatDuration(durationSeconds)}` : ""}

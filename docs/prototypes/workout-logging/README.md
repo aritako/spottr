@@ -81,6 +81,8 @@ API origin.
   document, not in the UI.
 - The SAVED stamp is a check seal. It has no text inside the ring, so it cannot collide.
 - Set rows are a ruled grid: units are labelled once in the sheet header, not per card.
+  The header stays pinned while the sheet scrolls. Remove-set is visible on touch and
+  appears on hover/focus with a pointer.
 
 ## Decisions recorded by this prototype
 
@@ -92,9 +94,9 @@ API origin.
 - Unit is fixed to **kg**. A unit toggle needs conversion and is out of scope for #10.
 - Exercises are sent by `id`; the UI never uses the API's exact, case-sensitive name
   matching.
-- Session length is wall-clock from the builder opening to the save. The saved screen
-  hides implausible durations (seeded rows have a months-old `performed_at`). A stored
-  `ended_at` or `duration_seconds` is the production follow-up.
+- Session length is wall-clock from the first exercise added to the save. The saved
+  screen hides implausible durations (seeded rows have a months-old `performed_at`). A
+  stored `ended_at` or `duration_seconds` is the production follow-up.
 - **Delete-and-re-log is acceptable for the MVP**, with these caveats: the confirmation
   dialog must be explicit, the sets stay in the browser, and a failed delete must leave
   the saved workout untouched. If corrections become common, a `PUT /workouts/{id}`
@@ -108,6 +110,7 @@ API origin.
 
 - Draft recovery is browser-local: another device or cleared storage loses it. It is
   not a server draft, and the clock is wall-clock rather than pause-aware.
+- Removing an exercise offers a six-second undo; removing a set is immediate.
 - No unit toggle, routine prefill, rest timer, PR detection, or notes templates.
 - The saved-session page fetches the catalog again only to map exercise ids to names; a
   denormalized read model would avoid that.

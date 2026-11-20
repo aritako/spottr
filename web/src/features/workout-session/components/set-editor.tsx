@@ -127,7 +127,7 @@ export function SetEditor({
             <li
               key={set.key}
               data-testid="set-row"
-              className="group grid grid-cols-[1.25rem_1fr_1fr_1fr_2.5rem] items-start gap-x-2"
+              className="group grid grid-cols-[1.25rem_1fr_1fr_1fr_2.75rem] items-start gap-x-2"
             >
               <span className="num text-ash-400 flex h-11 items-center justify-center text-[11px]">
                 {index + 1}
@@ -171,11 +171,12 @@ export function SetEditor({
               <Button
                 type="button"
                 variant="ghost"
+                size="icon"
                 data-testid="remove-set"
                 aria-label={`Remove ${exercise.name} set ${index + 1}`}
                 title={`Remove set ${index + 1}`}
                 onClick={() => onRemoveSet(block.key, set.key)}
-                className="size-10 shrink-0 p-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+                className="shrink-0 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100"
               >
                 <TrashIcon className="text-ash-500 size-4" />
               </Button>

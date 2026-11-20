@@ -72,7 +72,7 @@ export function SessionSummary({
           <Figure label="Sets" testid="session-total-sets">
             {totals.sets}
           </Figure>
-          <Figure label="Tonnage" testid="session-tonnage">
+          <Figure label="Volume" testid="session-tonnage">
             {formatKg(totals.tonnage)} kg
           </Figure>
           <Figure label="Top set" testid="session-top-set">

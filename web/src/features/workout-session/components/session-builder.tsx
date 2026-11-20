@@ -123,6 +123,11 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   const [showErrors, setShowErrors] = useState(false);
   const [isRedo, setIsRedo] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<StoredDraft | null>(null);
+  const [removed, setRemoved] = useState<{
+    block: DraftExercise;
+    index: number;
+    name: string;
+  } | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const keyRef = useRef(0);
@@ -159,7 +164,6 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
       setPendingDraft(draft);
     } else {
       clearDraft();
-      setPerformedAt(new Date().toISOString());
     }
     setHydrated(true);
   }, [catalog]);
@@ -168,6 +172,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     if (saveState.status === "success") {
       clearRelogHandoff();
       clearDraft();
+      setRemoved(null);
       router.replace(`/workouts/${saveState.workoutId}?saved=1`);
     }
   }, [saveState, router]);
@@ -201,6 +206,12 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
       })),
     });
   }, [hydrated, pendingDraft, performedAt, blocks, notes, isRedo]);
+
+  useEffect(() => {
+    if (!removed) return;
+    const id = window.setTimeout(() => setRemoved(null), 6000);
+    return () => window.clearTimeout(id);
+  }, [removed]);
 
   // Leave guard: browser reload/close plus every in-app link.
   const isDirty =
@@ -297,6 +308,8 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
 
   function addExercise(exerciseId: number) {
     if (addedIds.has(exerciseId)) return;
+    setRemoved(null);
+    setPerformedAt((current) => current ?? new Date().toISOString());
     setBlocks((current) => [
       ...current,
       {
@@ -357,7 +370,25 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   }
 
   function removeExercise(blockKey: string) {
-    setBlocks((current) => current.filter((block) => block.key !== blockKey));
+    const index = blocks.findIndex((block) => block.key === blockKey);
+    const block = blocks[index];
+    if (index === -1 || !block) return;
+    const exercise = catalogById.get(block.exerciseId);
+    setRemoved({ block, index, name: exercise?.name ?? "Exercise" });
+    setBlocks((current) => current.filter((entry) => entry.key !== blockKey));
+  }
+
+  function undoRemove() {
+    if (!removed) return;
+    setBlocks((current) => {
+      if (current.some((block) => block.key === removed.block.key)) {
+        return current;
+      }
+      const next = [...current];
+      next.splice(Math.min(removed.index, next.length), 0, removed.block);
+      return next;
+    });
+    setRemoved(null);
   }
 
   function discard() {
@@ -366,7 +397,8 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     setSimulateFailure(false);
     setShowErrors(false);
     setIsRedo(false);
-    setPerformedAt(new Date().toISOString());
+    setRemoved(null);
+    setPerformedAt(null);
     clearRelogHandoff();
     clearDraft();
   }
@@ -383,7 +415,8 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
   function discardDraft() {
     clearDraft();
     setPendingDraft(null);
-    setPerformedAt(new Date().toISOString());
+    setRemoved(null);
+    setPerformedAt(null);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -471,6 +504,26 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
           </p>
         ) : null}
 
+        {removed ? (
+          <div
+            role="status"
+            data-testid="removed-exercise"
+            className="bg-lab-800 ring-lab-600 fixed inset-x-4 top-4 z-40 flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5 shadow-[0_12px_32px_rgba(0,0,0,0.45)] ring-1 ring-inset sm:inset-x-auto sm:right-6 sm:w-[340px]"
+          >
+            <p className="text-ash-300 text-[12px]">Removed {removed.name}.</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="md"
+              data-testid="undo-remove"
+              onClick={undoRemove}
+              className="text-bone-100"
+            >
+              Undo
+            </Button>
+          </div>
+        ) : null}
+
         {pendingDraft ? (
           <div
             role="status"
@@ -553,10 +606,10 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                   </Button>
                 </div>
               ) : (
-                <div className="rounded-panel bg-lab-800 overflow-hidden">
+                <div className="rounded-panel bg-lab-800">
                   <div
                     aria-hidden="true"
-                    className="num text-ash-400 grid grid-cols-[1.25rem_1fr_1fr_1fr_2.5rem] gap-x-2 px-4 pb-1 pt-3 text-[11px] uppercase tracking-[0.08em] sm:px-5"
+                    className="num text-ash-400 border-lab-700 bg-lab-800 rounded-t-panel sticky top-0 z-10 grid grid-cols-[1.25rem_1fr_1fr_1fr_2.75rem] gap-x-2 border-b px-4 pb-1 pt-3 text-[11px] uppercase tracking-[0.08em] sm:px-5"
                   >
                     <span className="text-center">#</span>
                     <span className="text-right">kg</span>
@@ -564,7 +617,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                     <span className="text-right">RPE</span>
                     <span />
                   </div>
-                  <div className="divide-lab-700 divide-y">
+                  <div className="divide-lab-700 rounded-b-panel divide-y overflow-hidden">
                     {blocks.map((block) => {
                       const exercise = catalogById.get(block.exerciseId);
                       if (!exercise) return null;
