@@ -56,7 +56,9 @@ and muted, rather than the reverse.
 - Cards: `bg-lab-800 rounded-panel p-[18px]`; inner controls on `bg-lab-700`.
 - Hairlines are `ring-1 ring-inset ring-lab-600` or `border-lab-800`; avoid bright
   borders and drop shadows.
-- Focus states come from the global `:focus-visible` accent outline. Do not remove it.
+- Focus states come from the global `:focus-visible` accent outline on controls. Text,
+  number, and select fields use their accent underline and tinted background instead; keep
+  one of the two visible.
 - Status color is accent, used sparingly. Never color large backgrounds with accent;
   primary buttons are the place for a solid accent fill.
 

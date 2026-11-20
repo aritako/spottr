@@ -130,7 +130,7 @@ export function SessionSummary({
             aria-describedby={
               showErrors && notesError ? "notes-error" : undefined
             }
-            className="bg-lab-700/60 placeholder:text-ash-400 min-h-16 w-full resize-y rounded-xl px-3.5 py-2.5 text-[16px] leading-relaxed shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus:shadow-[inset_0_0_0_1.5px_var(--color-accent)] lg:text-[13px]"
+            className="bg-lab-700/60 placeholder:text-ash-400 min-h-16 w-full resize-y rounded-xl px-3.5 py-2.5 text-[16px] leading-relaxed shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus:shadow-[inset_0_0_0_1.5px_var(--color-accent)] focus-visible:outline-none lg:text-[13px]"
           />
           {notes.length > MAX_NOTES_LENGTH - 60 ? (
             <span className="num text-ash-400 self-end text-[10px]">

@@ -44,7 +44,8 @@ const fieldClasses =
   "transition-[box-shadow,background-color] duration-150 " +
   "placeholder:text-ash-400 " +
   "hover:shadow-[inset_0_-1px_0_0_var(--color-lab-500)] " +
-  "focus:bg-lab-700/45 focus:shadow-[inset_0_-2px_0_0_var(--color-accent)]";
+  "focus:bg-lab-700/45 focus:shadow-[inset_0_-2px_0_0_var(--color-accent)] " +
+  "focus-visible:outline-none";
 
 const invalidClasses =
   "bg-accent/5 shadow-[inset_0_-2px_0_0_var(--color-accent)] hover:shadow-[inset_0_-2px_0_0_var(--color-accent)]";
