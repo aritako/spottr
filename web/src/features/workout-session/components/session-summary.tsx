@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 import { Button, PlateLoader, cn, platesForWeight } from "~/components/ui";
 
 import { MAX_NOTES_LENGTH } from "../model/constants";
@@ -10,6 +14,7 @@ interface SessionSummaryProps {
   notesError?: string;
   showErrors: boolean;
   errorCount: number;
+  totalSets: number;
   isPending: boolean;
   onNotesChange: (value: string) => void;
   simulateFailure: boolean;
@@ -47,6 +52,7 @@ export function SessionSummary({
   notesError,
   showErrors,
   errorCount,
+  totalSets,
   isPending,
   onNotesChange,
   simulateFailure,
@@ -54,6 +60,14 @@ export function SessionSummary({
   onDiscard,
   className,
 }: SessionSummaryProps) {
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  useEffect(() => {
+    if (!confirmDiscard) return;
+    const id = window.setTimeout(() => setConfirmDiscard(false), 4000);
+    return () => window.clearTimeout(id);
+  }, [confirmDiscard]);
+
   const topWeight = totals.topSet?.weight ?? 0;
   const plates = platesForWeight(topWeight);
   const showPlates = totals.topSet !== null;
@@ -70,7 +84,9 @@ export function SessionSummary({
       <div className="rounded-panel bg-lab-800 flex flex-col gap-5 p-5">
         <dl className="flex flex-col gap-2.5">
           <Figure label="Sets" testid="session-total-sets">
-            {totals.sets}
+            {totals.sets === totalSets
+              ? totals.sets
+              : `${totals.sets} of ${totalSets}`}
           </Figure>
           <Figure label="Volume" testid="session-tonnage">
             {formatKg(totals.tonnage)} kg
@@ -107,6 +123,9 @@ export function SessionSummary({
             placeholder="Add a note (optional)"
             onChange={(event) => onNotesChange(event.target.value)}
             aria-invalid={(showErrors && notesError !== undefined) || undefined}
+            aria-describedby={
+              showErrors && notesError ? "notes-error" : undefined
+            }
             className="bg-lab-700/60 placeholder:text-ash-400 min-h-16 w-full resize-y rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed shadow-[inset_0_0_0_1px_var(--color-lab-600)] focus:shadow-[inset_0_0_0_1.5px_var(--color-accent)]"
           />
           {notes.length > MAX_NOTES_LENGTH - 60 ? (
@@ -115,7 +134,11 @@ export function SessionSummary({
             </span>
           ) : null}
           {showErrors && notesError ? (
-            <span role="alert" className="text-accent text-[12px]">
+            <span
+              id="notes-error"
+              role="alert"
+              className="text-accent text-[12px]"
+            >
               {notesError}
             </span>
           ) : null}
@@ -165,10 +188,22 @@ export function SessionSummary({
               variant="ghost"
               size="sm"
               data-testid="discard-session"
-              onClick={onDiscard}
-              className="text-ash-300 hover:text-bone-100 self-start px-0"
+              onClick={() => {
+                if (!confirmDiscard) {
+                  setConfirmDiscard(true);
+                  return;
+                }
+                setConfirmDiscard(false);
+                onDiscard();
+              }}
+              className={cn(
+                "self-start px-0",
+                confirmDiscard
+                  ? "text-accent hover:text-accent-soft"
+                  : "text-ash-300 hover:text-bone-100",
+              )}
             >
-              Discard session
+              {confirmDiscard ? "Tap again to discard" : "Discard session"}
             </Button>
           </div>
         </details>

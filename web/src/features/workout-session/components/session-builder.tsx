@@ -54,6 +54,7 @@ function toDraft(handoff: RelogHandoff, catalog: Exercise[]): DraftExercise[] {
 
 function MobileBar({
   sets,
+  totalSets,
   tonnage,
   errorCount,
   showErrors,
@@ -61,6 +62,7 @@ function MobileBar({
   onAddExercise,
 }: {
   sets: number;
+  totalSets: number;
   tonnage: number;
   errorCount: number;
   showErrors: boolean;
@@ -91,7 +93,7 @@ function MobileBar({
         >
           {hasErrors
             ? `Fix ${errorCount} ${errorCount === 1 ? "field" : "fields"}`
-            : `${sets} ${sets === 1 ? "set" : "sets"} · ${formatKg(tonnage)} kg`}
+            : `${sets}${sets === totalSets ? "" : ` of ${totalSets}`} ${sets === 1 && totalSets === 1 ? "set" : "sets"} · ${formatKg(tonnage)} kg`}
         </p>
         <Button
           type="submit"
@@ -285,6 +287,10 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     ? `${formatKg(totals.topSet.weight)} × ${totals.topSet.reps}`
     : null;
   const errorCount = validation.summary.length;
+  const totalSets = blocks.reduce(
+    (total, block) => total + block.sets.length,
+    0,
+  );
   const draftSetCount = pendingDraft
     ? pendingDraft.exercises.reduce(
         (total, entry) => total + entry.sets.length,
@@ -674,6 +680,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
                 notesError={validation.notesError}
                 showErrors={showErrors}
                 errorCount={errorCount}
+                totalSets={totalSets}
                 isPending={isPending}
                 onNotesChange={setNotes}
                 simulateFailure={simulateFailure}
@@ -686,6 +693,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
           {blocks.length > 0 ? (
             <MobileBar
               sets={totals.sets}
+              totalSets={totalSets}
               tonnage={totals.tonnage}
               errorCount={errorCount}
               showErrors={showErrors}
