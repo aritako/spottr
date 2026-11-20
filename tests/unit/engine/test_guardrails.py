@@ -375,7 +375,7 @@ def test_grounding_violation_requires_an_exact_receipt(
                 "metric": "e1rm",
                 "buckets": [{"label": "Week of Jun 15, 2026", "value": 125.0}],
             },
-            _group("15", "2026", "125", series=("125",)),
+            _group("1", "15", "2026", "125", series=("125",)),
         ),
         ("query_workouts", {"result": "No matching workout data found."}, _group()),
         ("search_coaching_docs", {"status": "no_match", "passages": []}, _group()),
@@ -398,6 +398,50 @@ def test_scrape_receipts_reads_every_tool_output_shape(
     tool: str, result: object, expected: Receipts
 ) -> None:
     assert scrape_receipts(tool, result) == expected
+
+
+def test_a_quoted_metric_name_backs_its_own_digit() -> None:
+    """Naming the metric is not an unbacked statistic: "e1RM" quotes the tool's ``e1rm`` label.
+
+    Regression: the scraper dropped ``metric``, so a correct bench answer was blocked for the
+    ``1`` in ``e1RM`` and then rejected as out of scope.
+    """
+    result = {
+        "metric": "e1rm",
+        "group_by": "week",
+        "exercise": "Bench Press",
+        "buckets": [{"label": "Week of Oct 12, 2026", "value": 100.92}],
+    }
+    receipts = scrape_receipts("query_workouts", result)
+
+    assert grounding_violation("Your bench e1RM is 100.92.", [receipts]) is None
+
+
+def test_a_quoted_query_range_backs_its_dates() -> None:
+    """The coach may cite the range it checked; the tool echoes it, so its dates are Receipts."""
+    result = {
+        "metric": "e1rm",
+        "start_date": "2026-10-20",
+        "end_date": "2026-11-20",
+        "buckets": [{"label": "Week of Oct 12, 2026", "value": 100.92}],
+    }
+    receipts = scrape_receipts("query_workouts", result)
+
+    answer = "I checked Oct 20 through Nov 20, 2026 and found no data."
+    assert grounding_violation(answer, [receipts]) is None
+
+
+def test_a_violation_quotes_the_answer_around_the_numeral() -> None:
+    """The correction turn needs the phrase, not just the bare number, to locate the offender."""
+    violation = grounding_violation(
+        "There is no bench data for Oct 13 → Nov 20, 2026.",
+        _receipts("2026"),
+    )
+
+    assert violation is not None
+    assert violation.numeral == "13"
+    assert "Oct 13 → Nov 20, 2026" in violation.context
+    assert violation.context.startswith("…")
 
 
 def test_every_scraped_tool_has_a_real_scraper() -> None:

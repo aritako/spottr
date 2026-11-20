@@ -95,14 +95,16 @@ class AnalyticsHandler:
     ) -> dict[str, Any]:
         """Shape workout analytics for the coach's query_workouts tool."""
         metric = Metric(metric)
+        range_fields = self._date_range(start_date, end_date)
         if exercise is not None:
             resolved = self.exercisesRepository.get_by_name(exercise)
             if resolved is None:
-                return dict(NO_DATA_RESULT)
+                return {**NO_DATA_RESULT, **range_fields}
             series = self.read_series(resolved.id, metric, start_date, end_date, group_by)
             if not series.buckets:
-                return dict(NO_DATA_RESULT)
+                return {**NO_DATA_RESULT, **range_fields}
             return {
+                **range_fields,
                 "metric": metric.value,
                 "group_by": group_by,
                 "exercise": resolved.name,
@@ -111,7 +113,7 @@ class AnalyticsHandler:
 
         sets = self.workoutsRepository.get_sets_for_all_exercises(start_date, end_date)
         if not sets:
-            return dict(NO_DATA_RESULT)
+            return {**NO_DATA_RESULT, **range_fields}
 
         grouped = self._buckets_grouped_by_exercise(metric, sets, group_by)
         series = [
@@ -131,7 +133,21 @@ class AnalyticsHandler:
                     ],
                 }
             )
-        return {"metric": metric.value, "group_by": group_by, "series": series}
+        return {
+            **range_fields,
+            "metric": metric.value,
+            "group_by": group_by,
+            "series": series,
+        }
+
+    @staticmethod
+    def _date_range(start_date: date | None, end_date: date | None) -> dict[str, str]:
+        """Echo the applied date filter, so the coach can cite the range it actually checked."""
+        return {
+            key: value.isoformat()
+            for key, value in (("start_date", start_date), ("end_date", end_date))
+            if value is not None
+        }
 
     def _buckets_grouped_by_exercise(
         self, metric: Metric, sets: list[SetModel], group_by: GroupBy

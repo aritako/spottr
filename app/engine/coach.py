@@ -353,6 +353,8 @@ class Coach:
             return self._decide_violation(
                 "no substantive tool call",
                 SCOPE_RETRY,
+                rejection=OUT_OF_SCOPE,
+                rejection_kind="out-of-scope",
                 context=context,
             )
         if not output_text.strip():
@@ -366,8 +368,11 @@ class Coach:
         violation = grounding_violation(output_text, receipt_groups)
         if violation is not None:
             return self._decide_violation(
-                f"grounding: numeral {violation.numeral} has no Receipt in the tool results",
-                grounding_retry(violation.numeral),
+                f'grounding: numeral {violation.numeral} in "{violation.context}" has no '
+                "Receipt in the tool results",
+                grounding_retry(violation.numeral, violation.context),
+                rejection=COULD_NOT_COMPLETE,
+                rejection_kind="couldn't-complete",
                 context=context,
             )
         return _AnswerDecision(_AnswerOutcome.SHIP)
@@ -377,25 +382,30 @@ class Coach:
         reason: str,
         complaint: str,
         *,
+        rejection: str,
+        rejection_kind: str,
         context: _GuardrailContext,
     ) -> _AnswerDecision:
         """Apply the one per-request retry budget to a fixable Violation.
 
         The budget counts retries, not Violation kinds: the first Violation of any kind spends
-        the correction turn, a second one is the two-strike out-of-scope Rejection, and a first
-        Violation with no iteration left to carry its correction turn is the couldn't-complete
-        Rejection.
+        the correction turn, and a second one is the Rejection for that Violation — out-of-scope
+        when no tool ever backed the answer, couldn't-complete when the model twice stated a
+        number the tools cannot back. A first Violation with no iteration left to carry its
+        correction turn is also the couldn't-complete Rejection: the question is not out of
+        scope, the answer just did not finish.
         """
         tools = _tools_in_flight(context.used_tools)
         if context.retry_used:
             logger.warning(
                 "coach answer blocked: %s again after one correction turn; returning the "
-                "out-of-scope Rejection; tools in flight: %s; available tools: %s",
+                "%s Rejection; tools in flight: %s; available tools: %s",
                 reason,
+                rejection_kind,
                 tools,
                 context.available_tools,
             )
-            return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=OUT_OF_SCOPE)
+            return _AnswerDecision(_AnswerOutcome.REJECTION, rejection=rejection)
         if not context.retry_available:
             logger.warning(
                 "coach answer blocked: %s but the iteration budget is spent; returning the "

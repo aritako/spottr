@@ -33,8 +33,8 @@ result. The derivation whitelist is closed and small:
 
 Derivations never span tool results or two series inside one result, and never use identifiers
 or labels as source numbers: a sum of a year and a document id is not a statistic. Labels (bucket
-names, dates) and Passage prose are literal Receipts only, so they back a quoted numeral but never
-feed arithmetic. Repeated
+names, dates, the metric name) and Passage prose are literal Receipts only, so they back a quoted
+numeral but never feed arithmetic. Repeated
 measurements are kept as a multiset, because summing repeated rows is legitimate.
 
 Every recipe computes in exact decimal arithmetic: the values are scaled to integers, so a
@@ -208,19 +208,26 @@ _NUMERAL_PATTERN = re.compile(
 
 @dataclass(frozen=True)
 class Numeral:
-    """One numeral as written in text, with its normalized numeric value."""
+    """One numeral as written in text, with its normalized numeric value and source span."""
 
     text: str
     value: Decimal
     percent: bool = False
+    start: int = 0
+    end: int = 0
 
 
 @dataclass(frozen=True)
 class GroundingViolation:
-    """A numeral in the answer with no Receipt in the tool output."""
+    """A numeral in the answer with no Receipt in the tool output.
+
+    ``context`` holds the answer text around the numeral so a correction turn can point at the
+    offending phrase, not merely the bare number.
+    """
 
     numeral: str
     value: Decimal
+    context: str
 
 
 def extract_numerals(text: str) -> tuple[Numeral, ...]:
@@ -242,6 +249,8 @@ def extract_numerals(text: str) -> tuple[Numeral, ...]:
                 text=token,
                 value=_numeral_value(token),
                 percent=_is_percent(text, match.end()),
+                start=match.start(),
+                end=match.end(),
             )
         )
     return tuple(numerals)
@@ -278,9 +287,10 @@ def scrape_receipts(tool: str, result: object) -> Receipts:
     """Scrape one successful tool result into the numbers it can back.
 
     Literal Receipts are everything the model could quote verbatim: data rows, bucket labels,
-    exercise names, and Passage titles and text. The derivation series is the result's measurement
-    values only. Identifiers — exercise ids, document ids, chunk indexes — are not content and
-    back nothing. Duplicate measurements are kept, so repeated rows still sum correctly.
+    exercise names, the metric name, the applied date range, and Passage titles and text. The
+    derivation series is the result's measurement values only. Identifiers — exercise ids,
+    document ids, chunk indexes — are not content and back nothing. Duplicate measurements are
+    kept, so repeated rows still sum correctly.
     """
     match tool:
         case "search_coaching_docs":
@@ -292,6 +302,8 @@ def scrape_receipts(tool: str, result: object) -> Receipts:
                 for bucket in buckets:
                     texts.extend(_bucket_texts(bucket))
             texts.extend(_workout_names(result))
+            texts.extend(_workout_metric(result))
+            texts.extend(_workout_range(result))
             return Receipts(
                 literal=frozenset(_numerals_in(texts)),
                 series=_workout_series(result),
@@ -382,6 +394,29 @@ def _workout_names(result: object) -> list[str]:
     return names
 
 
+def _workout_metric(result: object) -> list[str]:
+    """The metric label in an analytics result.
+
+    The label is output the model may quote: an answer naming "e1RM" is naming the metric, not
+    stating a statistic, so its ``1`` must be a literal Receipt.
+    """
+    if not isinstance(result, dict):
+        return []
+    metric = result.get("metric")
+    return [metric] if isinstance(metric, str) else []
+
+
+def _workout_range(result: object) -> list[str]:
+    """The applied date filter in an analytics result.
+
+    The coach may cite the range it checked ("I found no bench data for Oct 20 - Nov 20"), and
+    the tool echoes that range, so those numerals are literal Receipts.
+    """
+    if not isinstance(result, dict):
+        return []
+    return [result[key] for key in ("start_date", "end_date") if isinstance(result.get(key), str)]
+
+
 def _workout_series(result: object) -> tuple[tuple[Decimal, ...], ...]:
     """The measurement values of each series in a workout result, in order."""
     series: list[tuple[Decimal, ...]] = []
@@ -397,6 +432,21 @@ def _workout_series(result: object) -> tuple[tuple[Decimal, ...], ...]:
 # is treated as unbacked when it is not literal.
 _MAX_DERIVATION_EXPONENT = 12
 
+# How much answer text on each side of an unbacked numeral a correction turn quotes. The bare
+# numeral cannot tell the model which token failed: "13" in "Oct 13 → Nov 20" looks the same as
+# "13" in "13 sets", so the model repeats the phrase it cannot locate.
+_CONTEXT_RADIUS = 24
+
+
+def _context_window(text: str, start: int, end: int) -> str:
+    """The one-line answer fragment around one numeral, with ellipses where it was cut."""
+    left = max(0, start - _CONTEXT_RADIUS)
+    right = min(len(text), end + _CONTEXT_RADIUS)
+    snippet = " ".join(text[left:right].split())
+    prefix = "…" if left > 0 else ""
+    suffix = "…" if right < len(text) else ""
+    return f"{prefix}{snippet}{suffix}"
+
 
 def grounding_violation(
     output_text: str, receipts: Sequence[Receipts]
@@ -407,14 +457,19 @@ def grounding_violation(
     needs Receipts for both ends, and one unsupported numeral among supported ones is a Violation.
     Matching is exact after format normalization; a numeral close to a tool value is unbacked. A
     numeral that is not literal may still be backed by one of the four derivation recipes, using
-    the measurements of a single tool result.
+    the measurements of a single tool result. The Violation carries the answer text around the
+    numeral, so a correction turn can quote the offending phrase.
     """
     literals = {value for group in receipts for value in group.literal}
     for numeral in extract_numerals(output_text):
         if numeral.value in literals:
             continue
         if abs(numeral.value.as_tuple().exponent) > _MAX_DERIVATION_EXPONENT:
-            return GroundingViolation(numeral=numeral.text, value=numeral.value)
+            return GroundingViolation(
+                numeral=numeral.text,
+                value=numeral.value,
+                context=_context_window(output_text, numeral.start, numeral.end),
+            )
         written_whole = _written_whole(numeral.text, numeral.value, numeral.percent)
         if any(
             _is_derived(numeral.value, series, written_whole=written_whole)
@@ -422,7 +477,11 @@ def grounding_violation(
             for series in group.series
         ):
             continue
-        return GroundingViolation(numeral=numeral.text, value=numeral.value)
+        return GroundingViolation(
+            numeral=numeral.text,
+            value=numeral.value,
+            context=_context_window(output_text, numeral.start, numeral.end),
+        )
     return None
 
 

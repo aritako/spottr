@@ -359,7 +359,7 @@ def test_ask_coach_retries_once_when_an_answer_states_an_unbacked_numeral(
     assert retry["instructions"] == create.call_args_list[0].kwargs["instructions"]
     assert retry["tools"] == coach.TOOLS
     assert isinstance(retry["input"], str)
-    assert retry["input"] == grounding_retry("12,400")
+    assert retry["input"] == grounding_retry("12,400", "You lifted 12,400 kg this week.")
     assert "12,400" in retry["input"]
     assert "neither present in nor derivable" in retry["input"]
     assert question not in retry["input"]
@@ -398,10 +398,12 @@ def test_ask_coach_ships_the_corrected_answer_with_its_citations(coach: Coach) -
         "citations": [CITATION],
     }
     assert create.call_count == 3
-    assert create.call_args_list[2].kwargs["input"] == grounding_retry("14")
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry(
+        "14", "Deload every 14 to 16 weeks."
+    )
 
 
-def test_ask_coach_returns_the_out_of_scope_rejection_after_a_second_unbacked_numeral(
+def test_ask_coach_returns_could_not_complete_after_a_second_unbacked_numeral(
     coach: Coach, engine_logs: pytest.LogCaptureFixture
 ) -> None:
     search_call = _tool_call("search_coaching_docs", '{"k": null}', "call_search")
@@ -424,17 +426,19 @@ def test_ask_coach_returns_the_out_of_scope_rejection_after_a_second_unbacked_nu
         result = coach.ask_coach("Should I deload?")
 
     assert result == {
-        "answer": OUT_OF_SCOPE,
+        "answer": COULD_NOT_COMPLETE,
         "used_tools": ["search_coaching_docs"],
         "citations": [],
     }
     # Initial question, tool follow-up, then the single correction turn. The second offending
     # answer gets no further request.
     assert create.call_count == 3
-    assert create.call_args_list[2].kwargs["input"] == grounding_retry("14")
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry(
+        "14", "Deload every 14 to 16 weeks."
+    )
     assert "blocked" in engine_logs.text
     assert "numeral 18" in engine_logs.text
-    assert "out-of-scope" in engine_logs.text
+    assert "couldn't-complete" in engine_logs.text
 
 
 def test_ask_coach_shares_one_retry_budget_across_violation_kinds(
@@ -461,7 +465,7 @@ def test_ask_coach_shares_one_retry_budget_across_violation_kinds(
         result = coach.ask_coach(question)
 
     assert result == {
-        "answer": OUT_OF_SCOPE,
+        "answer": COULD_NOT_COMPLETE,
         "used_tools": ["search_coaching_docs"],
         "citations": [],
     }
@@ -470,7 +474,7 @@ def test_ask_coach_shares_one_retry_budget_across_violation_kinds(
     assert "no substantive tool call" in engine_logs.text
     assert "numeral 14" in engine_logs.text
     assert "retried" in engine_logs.text
-    assert "out-of-scope" in engine_logs.text
+    assert "couldn't-complete" in engine_logs.text
     assert question not in engine_logs.text
 
 
@@ -572,17 +576,19 @@ def test_ask_coach_retries_then_rejects_a_wrong_derived_percentage(
         result = coach.ask_coach("How is my tonnage trending?")
 
     assert result == {
-        "answer": OUT_OF_SCOPE,
+        "answer": COULD_NOT_COMPLETE,
         "used_tools": ["query_workouts"],
         "citations": [],
     }
     assert create.call_count == 3
-    assert create.call_args_list[2].kwargs["input"] == grounding_retry("25")
+    retry_input = create.call_args_list[2].kwargs["input"]
+    assert retry_input.startswith('Your answer states the number "25" in "')
+    assert "a 25% increase" in retry_input
     assert "retried" in engine_logs.text
     assert "numeral 25" in engine_logs.text
     assert "blocked" in engine_logs.text
     assert "numeral 30" in engine_logs.text
-    assert "out-of-scope" in engine_logs.text
+    assert "couldn't-complete" in engine_logs.text
 
 
 def test_ask_coach_backs_numerals_from_every_tool_result(coach: Coach) -> None:
@@ -670,7 +676,9 @@ def test_ask_coach_ships_after_the_correction_turn_retrieves_the_missing_number(
         "citations": [],
     }
     assert create.call_count == 4
-    assert create.call_args_list[2].kwargs["input"] == grounding_retry("12,400")
+    assert create.call_args_list[2].kwargs["input"] == grounding_retry(
+        "12,400", "You lifted 12,400 kg this week."
+    )
 
 
 def test_ask_coach_tracks_used_tools(coach: Coach) -> None:
@@ -1264,7 +1272,9 @@ def test_ask_coach_retries_a_violation_at_the_last_dispatchable_iteration(
         "citations": [],
     }
     assert create.call_count == 6
-    assert create.call_args_list[5].kwargs["input"] == grounding_retry("99,999")
+    assert create.call_args_list[5].kwargs["input"] == grounding_retry(
+        "99,999", "You lifted 99,999 kg."
+    )
 
 
 def test_ask_coach_answers_unusable_arguments_with_an_error_result(
