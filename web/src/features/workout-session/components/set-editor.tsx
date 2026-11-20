@@ -29,7 +29,8 @@ const fieldClasses =
   "hover:shadow-[inset_0_-1px_0_0_var(--color-lab-500)] " +
   "focus:bg-lab-700/45 focus:shadow-[inset_0_-2px_0_0_var(--color-accent)]";
 
-const invalidClasses = "shadow-[inset_0_-2px_0_0_var(--color-accent)]";
+const invalidClasses =
+  "bg-accent/5 shadow-[inset_0_-2px_0_0_var(--color-accent)]";
 
 interface NumberFieldProps {
   id: string;
@@ -74,7 +75,7 @@ function NumberField({
       {invalid ? (
         <span
           id={`${id}-error`}
-          className="text-accent text-right text-[10px] leading-tight"
+          className="text-accent text-right text-[12px] leading-tight"
         >
           {error}
         </span>
@@ -174,7 +175,12 @@ export function SetEditor({
                 size="icon"
                 data-testid="remove-set"
                 aria-label={`Remove ${exercise.name} set ${index + 1}`}
-                title={`Remove set ${index + 1}`}
+                title={
+                  block.sets.length === 1
+                    ? "A block needs at least one set"
+                    : `Remove set ${index + 1}`
+                }
+                disabled={block.sets.length === 1}
                 onClick={() => onRemoveSet(block.key, set.key)}
                 className="shrink-0 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100"
               >

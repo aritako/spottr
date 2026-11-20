@@ -419,6 +419,21 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
     setPerformedAt(null);
   }
 
+  function handleFormKeyDown(event: React.KeyboardEvent<HTMLFormElement>) {
+    if (event.key !== "Enter") return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.tagName === "TEXTAREA" || target.tagName === "BUTTON") return;
+    // A valid form would otherwise submit and save mid-session.
+    event.preventDefault();
+    const fields = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]), textarea',
+      ),
+    );
+    fields[fields.indexOf(target) + 1]?.focus();
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     setShowErrors(true);
     if (validation.summary.length === 0) return;
@@ -567,6 +582,7 @@ export function SessionBuilder({ catalog }: { catalog: Exercise[] }) {
           id="session-form"
           action={formAction}
           onSubmit={handleSubmit}
+          onKeyDown={handleFormKeyDown}
           className="flex flex-col gap-4"
         >
           <input type="hidden" name="payload" value={payload} />

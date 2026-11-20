@@ -81,7 +81,7 @@ export function SessionSummary({
         </dl>
 
         {showPlates ? (
-          <figure className="flex flex-col gap-1">
+          <figure className="hidden flex-col gap-1 lg:flex">
             <PlateLoader
               className="h-12"
               weightKg={topWeight}
@@ -93,7 +93,7 @@ export function SessionSummary({
           </figure>
         ) : null}
 
-        <div className="border-lab-700/70 flex flex-col gap-1.5 border-t pt-4">
+        <div className="lg:border-lab-700/70 order-first flex flex-col gap-1.5 lg:order-none lg:border-t lg:pt-4">
           <label htmlFor="notes-input" className="sr-only">
             Session notes
           </label>
