@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -67,6 +67,39 @@ def test_query_workouts_with_an_exercise_returns_one_series() -> None:
             {"label": "Week of Jun 15, 2026", "value": 500.0},
             {"label": "Week of Jun 22, 2026", "value": 600.0},
         ],
+    }
+
+
+def test_query_workouts_echoes_the_applied_date_range() -> None:
+    handler = _handler()
+    squat = _exercise(1, "Back Squat")
+    workout = _workout(10, datetime(2026, 6, 15, 12, tzinfo=UTC))
+    sets = [_set(squat, workout, "100.00", 5)]
+
+    with (
+        patch.object(handler.exercisesRepository, "get_by_name", return_value=squat),
+        patch.object(handler.workoutsRepository, "get_sets_for_exercise", return_value=sets),
+    ):
+        result = handler.query_workouts(
+            Metric.TONNAGE, "Back Squat", date(2026, 6, 1), date(2026, 6, 30), "week"
+        )
+
+    assert result["start_date"] == "2026-06-01"
+    assert result["end_date"] == "2026-06-30"
+
+
+def test_query_workouts_echoes_the_date_range_when_nothing_matches() -> None:
+    handler = _handler()
+
+    with patch.object(handler.exercisesRepository, "get_by_name", return_value=None):
+        result = handler.query_workouts(
+            Metric.TONNAGE, "Bench Press", date(2026, 10, 20), date(2026, 11, 20), "week"
+        )
+
+    assert result == {
+        "result": "No matching workout data found.",
+        "start_date": "2026-10-20",
+        "end_date": "2026-11-20",
     }
 
 

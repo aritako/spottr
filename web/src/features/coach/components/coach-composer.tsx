@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from "react";
+
 import { Button, SendIcon } from "~/components/ui";
 
 import { MAX_QUESTION_LENGTH } from "../model/constants";
@@ -11,6 +13,15 @@ export function CoachComposer({
   onChange: (value: string) => void;
   disabled: boolean;
 }) {
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    // Submit the form itself instead of letting Enter click the form's first submit button.
+    // That button is a suggestion, and its value would be sent alongside the typed question;
+    // the server action reads the suggestion first.
+    event.preventDefault();
+    if (value.trim()) event.currentTarget.form?.requestSubmit();
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
@@ -18,6 +29,7 @@ export function CoachComposer({
           name="question"
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Ask about your training"
           aria-label="Message coach"
           autoComplete="off"
