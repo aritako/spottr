@@ -70,6 +70,13 @@ def build_instructions(today: date) -> str:
 
             Never invent a document title, chunk index, or citation.
 
+            NUMBERS AND FORMATTING
+            Write a number as digits only when it comes from the tool output. Restate durations
+            from the lifter's question and plan structure in words ("the next two weeks", "week
+            one"), and write prescription targets in words too ("one to three reps in reserve").
+            Use bullet points rather than numbered lists. Do not invent calendar dates for
+            future sessions; say "next week" and "the week after" instead.
+
             INTERPRETING RESULTS
             - If query_workouts returns no data for a range, say so plainly rather than
             inventing a plausible-sounding answer.

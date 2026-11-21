@@ -56,7 +56,8 @@ date-like numerals are checked component by component. Digits embedded in a word
 numerals, so ``e1RM`` carries a ``1`` and ``5x5`` carries two ``5``s. Letters after a numeral are
 ignored as a unit suffix, never as a multiplier, so ``10k`` is ``10``; an explicit scientific
 exponent is part of the numeral itself, so ``1e5`` is ``100000``. Spelled-out and Roman numerals
-are not numerals and never violate.
+are not numerals and never violate, and ordered-list markers (``1.``, ``2)``) are structure, not
+statements about training.
 """
 
 import re
@@ -240,6 +241,8 @@ def extract_numerals(text: str) -> tuple[Numeral, ...]:
     """
     numerals: list[Numeral] = []
     for match in _NUMERAL_PATTERN.finditer(text):
+        if _is_list_marker(text, match.start(), match.end()):
+            continue
         token = match.group(0)
         if match.group("sign") and _follows_digit(text, match.start()):
             # "4-6" is a range, not 4 and negative 6.
@@ -271,6 +274,26 @@ def _is_percent(text: str, end: int) -> bool:
 def _follows_digit(text: str, start: int) -> bool:
     """Whether a token starts right after a digit, making its leading sign a range separator."""
     return start > 0 and text[start - 1].isdigit()
+
+
+def _is_list_marker(text: str, start: int, end: int) -> bool:
+    """Whether a numeral is an ordered-list marker rather than a value.
+
+    A short number followed by ``)`` is a marker anywhere ("reply with: 1) your goal"). A number
+    followed by ``.`` is a marker only at the start of a line, so a sentence-ending value ("your
+    best set was 100.") is still checked. Bullets avoid the ambiguity entirely.
+    """
+    if end - start > 2 or end >= len(text):
+        return False
+    punctuation = text[end]
+    if punctuation not in ".)":
+        return False
+    if end + 1 < len(text) and not text[end + 1].isspace():
+        return False
+    if punctuation == ")":
+        return True
+    line_start = text.rfind("\n", 0, start) + 1
+    return not text[line_start:start].strip()
 
 
 def _numeral_value(token: str) -> Decimal:
