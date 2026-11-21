@@ -88,8 +88,11 @@ const markdownComponents: Components = {
     />
   ),
   li: ({ children }) => <li className="pl-1 [&>p+p]:mt-2">{children}</li>,
-  ol: ({ children }) => (
-    <ol className="marker:text-ash-300 flex list-decimal flex-col gap-1.5 pl-5">
+  ol: ({ start, children }) => (
+    <ol
+      start={start}
+      className="marker:text-ash-300 flex list-decimal flex-col gap-1.5 pl-5"
+    >
       {children}
     </ol>
   ),
