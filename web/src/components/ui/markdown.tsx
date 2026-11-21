@@ -8,6 +8,9 @@ import { cn } from "./cn";
 const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 
 function isSafeHref(href: string | undefined): href is string {
+  // Intentionally absolute-only: coach copy has no same-origin link targets,
+  // so relative URLs ("/workouts", "#section", "//host/path") fail closed to
+  // plain text instead of navigating the app or leaking the origin.
   if (!href) return false;
   try {
     return SAFE_LINK_PROTOCOLS.has(new URL(href).protocol);
@@ -75,10 +78,18 @@ const markdownComponents: Components = {
     </h6>
   ),
   hr: () => <hr className="border-lab-700" />,
-  input: (props) => <input {...props} className="accent-accent mr-1" />,
-  li: ({ children }) => <li className="pl-1">{children}</li>,
+  img: ({ alt }) => (alt ? <span className="text-ash-300">{alt}</span> : null),
+  input: ({ checked, disabled }) => (
+    <input
+      type="checkbox"
+      checked={checked ?? false}
+      disabled={disabled ?? true}
+      className="accent-accent mr-1"
+    />
+  ),
+  li: ({ children }) => <li className="pl-1 [&>p+p]:mt-2">{children}</li>,
   ol: ({ children }) => (
-    <ol className="num marker:text-ash-300 flex list-decimal flex-col gap-1.5 pl-5">
+    <ol className="marker:text-ash-300 flex list-decimal flex-col gap-1.5 pl-5">
       {children}
     </ol>
   ),
@@ -91,9 +102,11 @@ const markdownComponents: Components = {
     <strong className="text-bone-100 font-semibold">{children}</strong>
   ),
   table: ({ children }) => (
-    <table className="w-full border-collapse text-[14px] leading-relaxed">
-      {children}
-    </table>
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-[14px] leading-relaxed">
+        {children}
+      </table>
+    </div>
   ),
   td: ({ children }) => (
     <td className="border-lab-800 border-b px-2 py-1.5 align-top">
