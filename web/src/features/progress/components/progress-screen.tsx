@@ -8,9 +8,9 @@ export function ProgressScreen() {
       <PageHeader eyebrow="Trends" title="Progress" />
       <EmptyState
         eyebrow="Next up"
-        title="Charts need an analytics endpoint"
+        title="Charts"
         icon={<ProgressIcon className="size-9" />}
-        body="The desktop mockup tracks e1RM, best sets and weekly volume per lift. Those aggregates do not exist on the API yet, so this route is reserved until the metrics handler is exposed."
+        body="Lorem Ipsum"
       />
     </>
   );
