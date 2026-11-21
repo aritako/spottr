@@ -33,5 +33,7 @@ export {
 export type { IconProps } from "./icons";
 export { Logo } from "./logo";
 export type { LogoProps } from "./logo";
+export { Markdown } from "./markdown";
+export type { MarkdownProps } from "./markdown";
 export { BAR_WEIGHT_KG, PlateLoader, platesForWeight } from "./plate-loader";
 export type { PlateLoaderProps } from "./plate-loader";

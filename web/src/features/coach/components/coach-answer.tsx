@@ -1,4 +1,4 @@
-import { Citation } from "~/components/ui";
+import { Citation, Markdown } from "~/components/ui";
 
 import type { CoachState } from "../model/state";
 
@@ -11,9 +11,7 @@ export function CoachAnswer({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-bone-300 whitespace-pre-line text-[15px] leading-relaxed">
-        {state.response.answer}
-      </p>
+      <Markdown content={state.response.answer} />
 
       {citations.length > 0 ? (
         <div className="flex flex-col gap-2">
